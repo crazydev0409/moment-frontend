@@ -1,0 +1,83 @@
+{
+  "expo": {
+    "name": "Catch",
+    "slug": "ios-app",
+    "version": "1.0.0",
+    "newArchEnabled": false,
+    "extra": {
+      "eas": {
+        "projectId": "53303aed-83d0-469c-ae4f-8d2c27c784cb"
+      }
+    },
+    "web": {
+      "favicon": "./assets/images/logo.png"
+    },
+    "experiments": {
+      "tsconfigPaths": true
+    },
+    "plugins": [
+      "expo-asset",
+      "expo-font",
+      [
+        "expo-location",
+        {
+          "locationAlwaysAndWhenInUsePermission": "Allow $(PRODUCT_NAME) to use your location for weather updates."
+        }
+      ],
+      [
+        "expo-build-properties",
+        {
+          "android": {
+            "gradleVersion": "8.10.2",
+            "targetSdkVersion": 35
+          }
+        }
+      ]
+    ],
+    "orientation": "portrait",
+    "icon": "./assets/images/logo.png",
+    "userInterfaceStyle": "light",
+    "splash": {
+      "image": "./assets/splash.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#ffffff"
+    },
+    "assetBundlePatterns": [
+      "**/*"
+    ],
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.crazydev0409.catchapp",
+      "buildNumber": "1",
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false,
+        "NSLocationWhenInUseUsageDescription": "Catch needs your location to provide weather updates and location-based features.",
+        "NSLocationAlwaysUsageDescription": "Catch needs your location to provide weather updates and location-based features.",
+        "NSContactsUsageDescription": "Catch needs access to your contacts to help you connect with friends and schedule meetings.",
+        "NSUserNotificationsUsageDescription": "Catch needs to send you notifications about meeting requests and updates."
+      }
+    },
+    "android": {
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/images/logo.png",
+        "backgroundColor": "#ffffff"
+      },
+      "permissions": [
+        "ACCESS_COARSE_LOCATION",
+        "ACCESS_FINE_LOCATION",
+        "android.permission.ACCESS_COARSE_LOCATION",
+        "android.permission.ACCESS_FINE_LOCATION"
+      ],
+      "package": "com.crazydev0409.catchapp",
+      "versionCode": 1
+    },
+    "notification": {
+      "icon": "./assets/images/logo.png",
+      "color": "#000000",
+      "iosDisplayInForeground": true,
+      "androidMode": "default",
+      "androidCollapsedTitle": "#{unread_notifications} new notifications"
+    },
+    "owner": "crazydev0409"
+  }
+}

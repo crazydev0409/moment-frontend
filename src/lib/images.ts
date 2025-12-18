@@ -1,0 +1,17 @@
+export const Background = require(`../../assets/images/background.png`);
+export const Splash = require(`../../assets/splash.png`);
+export const CreateAccountBackground = require(`../../assets/images/create-account-background.png`);
+export const BackArrow = require(`../../assets/images/back-arrow.png`);
+export const PhoneNumberpad = require(`../../assets/images/phone-numberpad.png`);
+export const SMSVerification = require(`../../assets/images/sms-verification.png`);
+export const Avatar = require(`../../assets/images/avatar.png`);
+export const Notification = require(`../../assets/images/notification.png`);
+export const Search = require(`../../assets/images/search.png`);
+export const HomeIcon = require(`../../assets/images/icon_home.png`);
+export const BusinessIcon = require(`../../assets/images/icon_bussines.png`);
+export const ProfileIcon = require(`../../assets/images/icon_profile.png`);
+export const CalendarIcon = require(`../../assets/images/icon_calendar.png`);
+export const GymIcon = require(`../../assets/images/icon_gym.png`);
+export const FootballIcon = require(`../../assets/images/icon_football.png`);
+export const AddIcon = require(`..h/../assets/images/icon_add.png`);
+export const Settings = require(`../../assets/images/settings.png`);
