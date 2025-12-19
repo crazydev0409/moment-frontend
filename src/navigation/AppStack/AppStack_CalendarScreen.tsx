@@ -241,7 +241,7 @@ const AppStack_CalendarScreen: React.FC<Props> = ({ navigation, route }) => {
       <View style={tw`absolute w-full h-full bg-black opacity-5`} />
 
       {/* Fixed Header */}
-      <View style={tw`pt-10 px-10 pb-4`}>
+      <View style={[tw`pt-10 pb-4`, { paddingHorizontal: '8%' }]}>
         <View style={tw`flex-row justify-between items-center`}>
           <Text style={tw`text-lg font-bold font-dm text-black`}>
             {getMonthAbbreviation(visibleMonth)} - {getMonthAbbreviation(nextMonth)} {getYear(nextMonth)}
@@ -276,7 +276,7 @@ const AppStack_CalendarScreen: React.FC<Props> = ({ navigation, route }) => {
         scrollEnabled={true}
         showScrollIndicator={false}
         theme={calendarTheme}
-        calendarStyle={tw`px-10`}
+        calendarStyle={{ paddingHorizontal: '8%' }}
       />
 
       {/* Add Menu Popup Modal */}
@@ -361,7 +361,7 @@ const AppStack_CalendarScreen: React.FC<Props> = ({ navigation, route }) => {
           </TouchableOpacity>
 
           <View style={tw`absolute bottom-0 left-0 right-0 bg-white rounded-t-3xl`}>
-            <View style={tw`px-5 pt-6 pb-8`}>
+            <View style={[tw`pt-6 pb-8`, { paddingHorizontal: '4%' }]}>
               {/* Header */}
               <View style={tw`flex-row justify-between items-center mb-4`}>
                 <Text style={tw`text-black text-xl font-bold font-dm`}>Select Contact</Text>

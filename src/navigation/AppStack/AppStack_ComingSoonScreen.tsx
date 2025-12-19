@@ -17,7 +17,7 @@ const AppStack_ComingSoonScreen: React.FC<Props> = ({ navigation }) => {
       <View style={tw`absolute w-full h-full bg-black opacity-5`} />
 
       {/* Header */}
-      <View style={tw`pt-16 px-5 pb-4`}>
+      <View style={[tw`pt-16 pb-4`, { paddingHorizontal: '4%' }]}>
         <View style={tw`flex-row items-center`}>
           <TouchableOpacity
             onPress={() => navigation.goBack()}
@@ -31,7 +31,7 @@ const AppStack_ComingSoonScreen: React.FC<Props> = ({ navigation }) => {
       </View>
 
       {/* Content */}
-      <View style={tw`flex-1 items-center justify-center px-5`}>
+      <View style={[tw`flex-1 items-center justify-center`, { paddingHorizontal: '4%' }]}>
         <Text style={tw`text-4xl font-bold font-dm text-black mb-4`}>
           Coming Soon
         </Text>

@@ -188,7 +188,7 @@ const AppStack_SearchScreen: React.FC<Props> = ({ navigation, route }) => {
       <Image source={Background} style={tw`absolute w-full h-full`} />
       <View style={tw`absolute w-full h-full bg-black opacity-5`} />
       
-      <View style={tw`flex-1 mt-16 px-5`}>
+      <View style={[tw`flex-1 mt-16`, { paddingHorizontal: '4%' }]}>
         {/* Header */}
         <View style={tw`flex-row items-center mb-6`}>
           <TouchableOpacity

@@ -1170,7 +1170,7 @@ const AppStack_DateDetailScreen: React.FC<Props> = ({ navigation, route }) => {
       <View style={tw`absolute w-full h-full bg-black opacity-5`} />
 
       {/* Fixed Header Section */}
-      <View style={tw`pt-16 px-5 pb-4`}>
+      <View style={[tw`pt-16 pb-4`, { paddingHorizontal: '4%' }]}>
         {/* Header */}
         <View style={tw`flex-row justify-between items-center mb-6`}>
           <TouchableOpacity
@@ -1259,7 +1259,7 @@ const AppStack_DateDetailScreen: React.FC<Props> = ({ navigation, route }) => {
 
         {/* Username Labels for Full Availability (only when contact selected and full view) */}
         {availabilityView === 'full' && selectedContact && (
-          <View style={tw`flex-row mt-4 px-5`}>
+          <View style={[tw`flex-row mt-4`, { paddingHorizontal: '4%' }]}>
             <View style={tw`w-16`} />
             <View style={tw`flex-1 flex-row ml-2`}>
               <View style={tw`flex-1 items-center mr-2`}>
@@ -1280,7 +1280,7 @@ const AppStack_DateDetailScreen: React.FC<Props> = ({ navigation, route }) => {
       {/* Scrollable Time Slots List */}
       <ScrollView
         style={tw`flex-1`}
-        contentContainerStyle={tw`px-5 ${selectedContact ? 'pb-32' : 'pb-16'}`}
+        contentContainerStyle={[{ paddingHorizontal: '4%' }, tw`${selectedContact ? 'pb-32' : 'pb-16'}`]}
         showsVerticalScrollIndicator={false}
       >
         <View style={tw`mt-4`}>
@@ -1636,7 +1636,7 @@ const AppStack_DateDetailScreen: React.FC<Props> = ({ navigation, route }) => {
       {/* Bottom Fixed Bar - Show when contact is selected */}
       {selectedContact && (
         <View style={tw`absolute bottom-0 left-0 right-0 bg-white rounded-t-3xl shadow-lg border-t border-gray-200`}>
-          <View style={tw`px-5 pt-4 pb-8`}>
+          <View style={[tw`pt-4 pb-8`, { paddingHorizontal: '4%' }]}>
             {/* Create Button */}
             <TouchableOpacity
               onPress={handleCreateAppointment}
@@ -2171,7 +2171,7 @@ const AppStack_DateDetailScreen: React.FC<Props> = ({ navigation, route }) => {
                 }
               ]}
             >
-            <View style={tw`px-5 pt-6 pb-8`}>
+            <View style={[tw`pt-6 pb-8`, { paddingHorizontal: '4%' }]}>
               {/* Header */}
               <View style={tw`flex-row justify-between items-center mb-4`}>
                 <Text style={tw`text-black text-xl font-bold font-dm`}>Select Contact</Text>

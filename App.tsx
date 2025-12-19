@@ -1,6 +1,7 @@
 // App.tsx
 import { useCallback, useEffect, useState } from 'react';
 import { View, Alert } from 'react-native';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
 import * as SplashScreen from 'expo-splash-screen';
 import * as Contacts from 'expo-contacts';
 import * as Location from 'expo-location';
@@ -259,12 +260,14 @@ export default function App() {
 
   // Here JS is ready, we control what to show
   return (
-    <View style={{ flex: 1 }} onLayout={onLayoutRootView}>
-      {showCustomSplash ? (
-        <CustomSplashScreen />
-      ) : (
-        <RootNavigator />
-      )}
-    </View>
+    <SafeAreaProvider>
+      <View style={{ flex: 1 }} onLayout={onLayoutRootView}>
+        {showCustomSplash ? (
+          <CustomSplashScreen />
+        ) : (
+          <RootNavigator />
+        )}
+      </View>
+    </SafeAreaProvider>
   );
 }

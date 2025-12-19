@@ -2,6 +2,7 @@ import React from 'react';
 import { View, TouchableOpacity, Image } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import tw from '../../tailwindcss';
 import { HomeIcon, CalendarIcon, BusinessIcon, ProfileIcon, AddIcon } from '~/lib/images';
 import { AppStackParamList } from '~/navigation/AppStack';
@@ -26,6 +27,7 @@ const BottomNavigationBar: React.FC<BottomNavigationBarProps> = ({
   onProfilePress
 }) => {
   const navigation = useNavigation<NavigationProp>();
+  const insets = useSafeAreaInsets();
 
   const handleHomePress = () => {
     if (onHomePress) {
@@ -60,7 +62,7 @@ const BottomNavigationBar: React.FC<BottomNavigationBarProps> = ({
   };
 
   return (
-    <View style={tw`absolute left-0 right-0 bottom-5 justify-center flex-row gap-2`}>
+    <View style={[tw`absolute left-0 right-0 justify-center flex-row gap-2`, { bottom: Math.max(insets.bottom, 20) }]}>
       <View style={tw`flex-row items-center gap-2 rounded-full p-[10px] bg-black overflow-hidden`}>
         <TouchableOpacity
           activeOpacity={0.7}

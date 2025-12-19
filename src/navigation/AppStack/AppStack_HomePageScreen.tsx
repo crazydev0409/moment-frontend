@@ -2,6 +2,7 @@ import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { useFocusEffect } from '@react-navigation/native';
 import React, { useEffect, useState, useCallback, useRef } from 'react';
 import { Text, Image, View, TouchableOpacity, ScrollView, TextInput, Modal, ActivityIndicator } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { BlurView } from 'expo-blur';
 import * as Location from 'expo-location';
 import * as Contacts from 'expo-contacts';
@@ -124,6 +125,7 @@ const formatDate = (date: Date, formatStr: string): string => {
 
 const AppStack_HomePageScreen: React.FC<Props> = ({ navigation, route }) => {
   const { setOnAddPress } = useAddButton();
+  const insets = useSafeAreaInsets();
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
   const [dates, setDates] = useState<DateItem[]>([]);
   const [searchText, setSearchText] = useState('');
@@ -702,10 +704,10 @@ const AppStack_HomePageScreen: React.FC<Props> = ({ navigation, route }) => {
       <View style={tw`absolute w-full h-full bg-black opacity-5`} />
       <ScrollView
         style={tw`flex-1`}
-        contentContainerStyle={tw`pb-24`}
+        contentContainerStyle={[tw`pb-24`, { paddingTop: Math.max(insets.top, 40) }]}
         showsVerticalScrollIndicator={false}
       >
-        <View style={tw`mt-10 px-10`}>
+        <View style={[tw`flex-1`, { paddingHorizontal: '8%' }]}>
           {/* Header */}
           <View style={tw`flex-row justify-between items-center my-2`}>
             <TouchableOpacity
@@ -1062,7 +1064,7 @@ const AppStack_HomePageScreen: React.FC<Props> = ({ navigation, route }) => {
           </TouchableOpacity>
 
           <View style={tw`absolute bottom-0 left-0 right-0 bg-white rounded-t-3xl`}>
-            <View style={tw`px-5 pt-6 pb-8`}>
+            <View style={[tw`pt-6 pb-8`, { paddingHorizontal: '4%' }]}>
               {/* Header */}
               <View style={tw`flex-row justify-between items-center mb-4`}>
                 <Text style={tw`text-black text-xl font-bold font-dm`}>Select Contact</Text>

@@ -250,7 +250,7 @@ const AppStack_ContactScreen: React.FC<Props> = ({ navigation, route }) => {
                 contentContainerStyle={tw`pb-24`}
                 showsVerticalScrollIndicator={false}
             >
-                <View style={tw`mt-16 px-10`}>
+                <View style={[tw`mt-16`, { paddingHorizontal: '8%' }]}>
                     {/* Header */}
                     <View style={tw`flex-row justify-between items-center mb-6`}>
                         <TouchableOpacity
@@ -423,7 +423,7 @@ const AppStack_ContactScreen: React.FC<Props> = ({ navigation, route }) => {
                     </TouchableOpacity>
 
                     <View style={tw`absolute bottom-0 left-0 right-0 bg-white rounded-t-3xl`}>
-                        <View style={tw`px-5 pt-6 pb-8`}>
+                        <View style={[tw`pt-6 pb-8`, { paddingHorizontal: '4%' }]}>
                             {/* Header */}
                             <View style={tw`flex-row justify-between items-center mb-4`}>
                                 <Text style={tw`text-black text-xl font-bold font-dm`}>Select Contact</Text>

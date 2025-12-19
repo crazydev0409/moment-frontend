@@ -115,7 +115,7 @@ const AuthStack_ProfileScreen: React.FC<Props> = ({ navigation, route }) => {
     <View style={tw`flex-1 relative bg-white`}>
       <Image source={Background} style={tw`absolute w-full h-full`} />
       <View style={tw`absolute w-full h-full bg-black opacity-5`} />
-      <View style={tw`mt-10 mb-10 px-10`}>
+      <View style={[tw`mt-10 mb-10`, { paddingHorizontal: '8%' }]}>
         <TouchableOpacity onPress={navigateToMainPage} activeOpacity={0.5} style={tw`mb-5`}>
           <Image source={BackArrow} />
         </TouchableOpacity>

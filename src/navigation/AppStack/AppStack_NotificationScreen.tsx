@@ -164,7 +164,7 @@ const AppStack_NotificationScreen: React.FC<Props> = ({ navigation }) => {
   return (
     <View style={tw`flex-1 bg-white`}>
       {/* Header */}
-      <View style={tw`mt-12 px-6 pb-4 border-b border-gray-200`}>
+      <View style={[tw`mt-12 pb-4 border-b border-gray-200`, { paddingHorizontal: '4%' }]}>
         <View style={tw`flex-row justify-between items-center`}>
           <TouchableOpacity
             onPress={() => navigation.goBack()}

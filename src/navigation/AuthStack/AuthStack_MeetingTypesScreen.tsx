@@ -83,7 +83,7 @@ const AuthStack_MeetingTypesScreen: React.FC<Props> = ({ navigation, route }) =>
         contentContainerStyle={tw`pb-24`}
         showsVerticalScrollIndicator={false}
       >
-        <View style={tw`mt-10 mb-10 px-10`}>
+        <View style={[tw`mt-10 mb-10`, { paddingHorizontal: '8%' }]}>
           {/* Close Button */}
           <TouchableOpacity 
             onPress={() => navigation.goBack()} 

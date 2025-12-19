@@ -2,7 +2,7 @@
   "expo": {
     "name": "Catch",
     "slug": "ios-app",
-    "version": "1.0.0",
+    "version": "1.0.1",
     "newArchEnabled": false,
     "extra": {
       "eas": {
@@ -48,7 +48,6 @@
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.crazydev0409.catchapp",
-      "buildNumber": "1",
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false,
         "NSLocationWhenInUseUsageDescription": "Catch needs your location to provide weather updates and location-based features.",
@@ -68,8 +67,7 @@
         "android.permission.ACCESS_COARSE_LOCATION",
         "android.permission.ACCESS_FINE_LOCATION"
       ],
-      "package": "com.crazydev0409.catchapp",
-      "versionCode": 1
+      "package": "com.crazydev0409.catchapp"
     },
     "notification": {
       "icon": "./assets/images/logo.png",

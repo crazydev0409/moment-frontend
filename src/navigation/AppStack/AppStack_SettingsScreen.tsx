@@ -54,7 +54,7 @@ const AppStack_SettingsScreen: React.FC<Props> = ({ navigation, route }) => {
                 contentContainerStyle={tw`pb-10`}
                 showsVerticalScrollIndicator={false}
             >
-                <View style={tw`mt-16 mb-10 px-10`}>
+                <View style={[tw`mt-16 mb-10`, { paddingHorizontal: '8%' }]}>
           {/* Header */}
           <View style={tw`flex-row items-center mb-8 relative`}>
             <TouchableOpacity onPress={navigateToProfile} activeOpacity={0.5} style={tw`absolute left-0 z-10`}>

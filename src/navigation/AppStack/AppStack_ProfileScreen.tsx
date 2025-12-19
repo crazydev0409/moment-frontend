@@ -161,7 +161,7 @@ const AppStack_ProfileScreen: React.FC<Props> = ({ navigation, route }) => {
       <Image source={Background} style={tw`absolute w-full h-full`} />
       <View style={tw`absolute w-full h-full bg-black opacity-5`} />
 
-      <View style={tw`mt-16 mb-10 px-10`}>
+      <View style={[tw`mt-16 mb-10`, { paddingHorizontal: '8%' }]}>
         {/* Header with back arrow and settings */}
         <View style={tw`flex-row justify-between items-center -mb-2`}>
           <TouchableOpacity onPress={navigateToMainPage} activeOpacity={0.5}>
