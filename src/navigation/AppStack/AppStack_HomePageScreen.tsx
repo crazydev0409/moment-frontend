@@ -677,7 +677,13 @@ const AppStack_HomePageScreen: React.FC<Props> = ({ navigation, route }) => {
     .filter(contact => contact.displayName.toLowerCase().includes(contactSearchText.toLowerCase()));
   const handleBookMeeting = () => {
     setShowAddMenu(false);
-    setShowContactModal(true);
+    // Close menu first, then navigate after a brief delay to ensure modal closes
+    setTimeout(() => {
+      const today = new Date().toISOString().split('T')[0];
+      navigation.navigate('AppStack_DateDetailScreen', {
+        date: today
+      });
+    }, 100);
   };
 
   const handleContactSelect = (contact: Contact) => {

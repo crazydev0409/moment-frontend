@@ -6,11 +6,19 @@ import {
     Image,
     Switch,
     ScrollView,
+    Alert,
+    ActivityIndicator,
 } from 'react-native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import tw from '../../../tailwindcss';
 import { AppStackParamList } from '.';
 import { BackArrow, Background } from '~/lib/images';
+import { http } from '~/helpers/http';
+import { disconnectSocket } from '~/services/socketService';
+import { useAtom } from 'jotai';
+import { userAtom } from '../../store';
+import { navigationRef } from '~/index';
 
 type Props = NativeStackScreenProps<
     AppStackParamList,
@@ -23,6 +31,9 @@ const AppStack_SettingsScreen: React.FC<Props> = ({ navigation, route }) => {
     const [autoTheme, setAutoTheme] = useState(false);
     const [systemNotifications, setSystemNotifications] = useState(false);
     const [mailNotifications, setMailNotifications] = useState(true);
+    const [isLoggingOut, setIsLoggingOut] = useState(false);
+    const [isDeletingAccount, setIsDeletingAccount] = useState(false);
+    const [, setUser] = useAtom(userAtom);
 
     const navigateToProfile = () => {
         navigation.navigate('AppStack_ProfileScreen');
@@ -42,6 +53,178 @@ const AppStack_SettingsScreen: React.FC<Props> = ({ navigation, route }) => {
             setDarkTheme(false);
             setAutoTheme(true);
         }
+    };
+
+    const handleLogout = async () => {
+        Alert.alert(
+            'Logout',
+            'Are you sure you want to logout?',
+            [
+                {
+                    text: 'Cancel',
+                    style: 'cancel',
+                },
+                {
+                    text: 'Logout',
+                    style: 'destructive',
+                    onPress: async () => {
+                        setIsLoggingOut(true);
+                        try {
+                            // Clear tokens from storage
+                            await AsyncStorage.removeItem('accessToken');
+                            await AsyncStorage.removeItem('refreshToken');
+                            
+                            // Clear authorization header
+                            delete http.defaults.headers.common['Authorization'];
+                            
+                            // Disconnect socket
+                            disconnectSocket();
+                            
+                            // Clear user atom
+                            setUser({
+                                id: '',
+                                name: '',
+                                email: '',
+                                phoneNumber: '',
+                                birthday: '',
+                                bio: '',
+                                meetingTypes: [],
+                                verified: false
+                            });
+                            
+                            // Navigate to AuthStack - use reset to clear navigation stack
+                            if (navigationRef.isReady()) {
+                                navigationRef.reset({
+                                    index: 0,
+                                    routes: [{ name: 'AuthStack' }],
+                                });
+                            } else {
+                                // If not ready, wait a bit and try again
+                                setTimeout(() => {
+                                    if (navigationRef.isReady()) {
+                                        navigationRef.reset({
+                                            index: 0,
+                                            routes: [{ name: 'AuthStack' }],
+                                        });
+                                    }
+                                }, 100);
+                            }
+                        } catch (error) {
+                            console.error('Error during logout:', error);
+                            // Even if there's an error, try to navigate to auth
+                            setUser({
+                                id: '',
+                                name: '',
+                                email: '',
+                                phoneNumber: '',
+                                birthday: '',
+                                bio: '',
+                                meetingTypes: [],
+                                verified: false
+                            });
+                            if (navigationRef.isReady()) {
+                                navigationRef.reset({
+                                    index: 0,
+                                    routes: [{ name: 'AuthStack' }],
+                                });
+                            }
+                        } finally {
+                            setIsLoggingOut(false);
+                        }
+                    },
+                },
+            ]
+        );
+    };
+
+    const handleDeleteAccount = async () => {
+        Alert.alert(
+            'Delete Account',
+            'Are you sure you want to delete your account? This action cannot be undone and all your data will be permanently deleted.',
+            [
+                {
+                    text: 'Cancel',
+                    style: 'cancel',
+                },
+                {
+                    text: 'Delete',
+                    style: 'destructive',
+                    onPress: async () => {
+                        // Second confirmation
+                        Alert.alert(
+                            'Final Confirmation',
+                            'This will permanently delete your account and all associated data. Are you absolutely sure?',
+                            [
+                                {
+                                    text: 'Cancel',
+                                    style: 'cancel',
+                                },
+                                {
+                                    text: 'Delete Account',
+                                    style: 'destructive',
+                                    onPress: async () => {
+                                        setIsDeletingAccount(true);
+                                        try {
+                                            // Call delete account API
+                                            await http.delete('/users/account');
+                                            
+                                            // Clear tokens from storage
+                                            await AsyncStorage.removeItem('accessToken');
+                                            await AsyncStorage.removeItem('refreshToken');
+                                            
+                                            // Clear authorization header
+                                            delete http.defaults.headers.common['Authorization'];
+                                            
+                                            // Disconnect socket
+                                            disconnectSocket();
+                                            
+                                            // Clear user atom
+                                            setUser({
+                                                id: '',
+                                                name: '',
+                                                email: '',
+                                                phoneNumber: '',
+                                                birthday: '',
+                                                bio: '',
+                                                meetingTypes: [],
+                                                verified: false
+                                            });
+                                            
+                                            // Navigate to AuthStack - use reset to clear navigation stack
+                                            if (navigationRef.isReady()) {
+                                                navigationRef.reset({
+                                                    index: 0,
+                                                    routes: [{ name: 'AuthStack' }],
+                                                });
+                                            } else {
+                                                // If not ready, wait a bit and try again
+                                                setTimeout(() => {
+                                                    if (navigationRef.isReady()) {
+                                                        navigationRef.reset({
+                                                            index: 0,
+                                                            routes: [{ name: 'AuthStack' }],
+                                                        });
+                                                    }
+                                                }, 100);
+                                            }
+                                        } catch (error: any) {
+                                            console.error('Error deleting account:', error);
+                                            Alert.alert(
+                                                'Error',
+                                                error.response?.data?.error || 'Failed to delete account. Please try again.',
+                                                [{ text: 'OK' }]
+                                            );
+                                        } finally {
+                                            setIsDeletingAccount(false);
+                                        }
+                                    },
+                                },
+                            ]
+                        );
+                    },
+                },
+            ]
+        );
     };
 
     return (
@@ -163,6 +346,44 @@ const AppStack_SettingsScreen: React.FC<Props> = ({ navigation, route }) => {
                         <Text style={tw`text-sm font-dm text-grey`}>
                             Application version 1.86
                         </Text>
+                    </View>
+
+                    {/* Logout Section */}
+                    <View style={tw`mt-8`}>
+                        <TouchableOpacity
+                            style={tw`bg-white rounded-2xl overflow-hidden`}
+                            activeOpacity={0.7}
+                            onPress={handleLogout}
+                            disabled={isLoggingOut || isDeletingAccount}
+                        >
+                            <View style={tw`flex-row items-center justify-between px-5 py-4`}>
+                                <Text style={tw`text-base font-dm text-black`}>
+                                    Logout
+                                </Text>
+                                {isLoggingOut ? (
+                                    <ActivityIndicator size="small" color="#000000" />
+                                ) : null}
+                            </View>
+                        </TouchableOpacity>
+                    </View>
+
+                    {/* Delete Account Section */}
+                    <View style={tw`mt-4 mb-8`}>
+                        <TouchableOpacity
+                            style={tw`bg-white rounded-2xl overflow-hidden border border-red-500`}
+                            activeOpacity={0.7}
+                            onPress={handleDeleteAccount}
+                            disabled={isLoggingOut || isDeletingAccount}
+                        >
+                            <View style={tw`flex-row items-center justify-between px-5 py-4`}>
+                                <Text style={tw`text-base font-dm text-red-500`}>
+                                    Delete Account
+                                </Text>
+                                {isDeletingAccount ? (
+                                    <ActivityIndicator size="small" color="#EF4444" />
+                                ) : null}
+                            </View>
+                        </TouchableOpacity>
                     </View>
                 </View>
             </ScrollView>

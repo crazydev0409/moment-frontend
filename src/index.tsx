@@ -48,6 +48,23 @@ const RootNavigator = () => {
         checkAuthToken();
     }, []);
 
+    // Watch for user logout - navigate to AuthStack when user is cleared
+    useEffect(() => {
+        if (!isCheckingAuth && navigationRef.isReady()) {
+            const checkAuthAndNavigate = async () => {
+                const accessToken = await AsyncStorage.getItem('accessToken');
+                // If no user ID and no token, navigate to AuthStack
+                if (!user?.id && !accessToken) {
+                    navigationRef.reset({
+                        index: 0,
+                        routes: [{ name: 'AuthStack' }],
+                    });
+                }
+            };
+            checkAuthAndNavigate();
+        }
+    }, [user?.id, isCheckingAuth]);
+
     // Show loading indicator while checking auth
     if (isCheckingAuth) {
         return (
