@@ -7,7 +7,7 @@ import { NavigationContainer, createNavigationContainerRef } from '@react-naviga
 import { userAtom } from './store';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { View, ActivityIndicator } from 'react-native';
-import tw from '../tailwindcss';
+import tw from '~/tailwindcss';
 
 export type RootStackParamList = {
     AuthStack: {

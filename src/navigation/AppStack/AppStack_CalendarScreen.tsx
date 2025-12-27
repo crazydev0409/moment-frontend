@@ -11,11 +11,12 @@ import {
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { BlurView } from 'expo-blur';
 import { CalendarList } from 'react-native-calendars';
-import tw from '../../../tailwindcss';
+import tw from '~/tailwindcss';
 import { AppStackParamList } from '.';
 import { Background, Notification, Avatar, AddIcon, HomeIcon, CalendarIcon, BusinessIcon, ProfileIcon, Search } from '~/lib/images';
 import { http } from '~/helpers/http';
 import { useAddButton } from '~/contexts/AddButtonContext';
+import { horizontalScale, verticalScale, moderateScale } from '~/helpers/responsive';
 
 type Props = NativeStackScreenProps<
   AppStackParamList,
@@ -24,7 +25,7 @@ type Props = NativeStackScreenProps<
 
 const AppStack_CalendarScreen: React.FC<Props> = ({ navigation, route }) => {
   const { setOnAddPress } = useAddButton();
-  
+
   // Initialize with current month
   const today = new Date();
   const currentYear = today.getFullYear();
@@ -34,12 +35,12 @@ const AppStack_CalendarScreen: React.FC<Props> = ({ navigation, route }) => {
   const [visibleMonth, setVisibleMonth] = useState(currentMonthString);
   const [selectedDate, setSelectedDate] = useState(`${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`);
   const [showAddMenu, setShowAddMenu] = useState(false);
-  
+
   // Contact selection
   const [showContactModal, setShowContactModal] = useState(false);
   const [contacts, setContacts] = useState<any[]>([]);
   const [contactSearchText, setContactSearchText] = useState('');
-  
+
   // Meetings data
   const [meetings, setMeetings] = useState<any[]>([]);
 
@@ -57,7 +58,7 @@ const AppStack_CalendarScreen: React.FC<Props> = ({ navigation, route }) => {
   // Register add button handler
   useEffect(() => {
     setOnAddPress(() => () => setShowAddMenu(true));
-    
+
     // Cleanup on unmount
     return () => {
       setOnAddPress(undefined);
@@ -71,12 +72,12 @@ const AppStack_CalendarScreen: React.FC<Props> = ({ navigation, route }) => {
         http.get('/users/moment-requests/received'),
         http.get('/users/moment-requests/sent')
       ]);
-      
+
       // Backend returns { requests: [...] } for both endpoints
       const received = Array.isArray(receivedResponse.data.requests) ? receivedResponse.data.requests : [];
       const sent = Array.isArray(sentResponse.data.requests) ? sentResponse.data.requests : [];
       const allMeetings = [...received, ...sent];
-      
+
       setMeetings(allMeetings);
     } catch (error) {
       console.error('Error fetching meetings:', error);
@@ -166,7 +167,7 @@ const AppStack_CalendarScreen: React.FC<Props> = ({ navigation, route }) => {
         marginTop: 5,
         flexDirection: 'row',
         justifyContent: 'space-between',
-        paddingHorizontal: 10,
+        paddingHorizontal: '2.5%', // Use percentage instead of fixed 10
       },
     },
     'stylesheet.day.basic': {
@@ -179,7 +180,7 @@ const AppStack_CalendarScreen: React.FC<Props> = ({ navigation, route }) => {
   // Create marked dates for selected date
   const markedDates = useMemo(() => {
     const marked: any = {};
-    
+
     // Add dots for dates with meetings
     meetings.forEach(meeting => {
       if (meeting.status === 'approved') {
@@ -189,15 +190,15 @@ const AppStack_CalendarScreen: React.FC<Props> = ({ navigation, route }) => {
         const month = String(meetingDate.getMonth() + 1).padStart(2, '0');
         const day = String(meetingDate.getDate()).padStart(2, '0');
         const dateString = `${year}-${month}-${day}`;
-        
+
         if (!marked[dateString]) {
           marked[dateString] = { dots: [] };
         }
-        
+
         if (!marked[dateString].dots) {
           marked[dateString].dots = [];
         }
-        
+
         // Add a dot (limit to 3 dots per day)
         if (marked[dateString].dots.length < 3) {
           marked[dateString].dots.push({
@@ -207,7 +208,7 @@ const AppStack_CalendarScreen: React.FC<Props> = ({ navigation, route }) => {
         }
       }
     });
-    
+
     // Mark selected date
     if (selectedDate) {
       if (marked[selectedDate]) {
@@ -225,7 +226,7 @@ const AppStack_CalendarScreen: React.FC<Props> = ({ navigation, route }) => {
         };
       }
     }
-    
+
     return marked;
   }, [selectedDate, meetings]);
 
@@ -241,16 +242,16 @@ const AppStack_CalendarScreen: React.FC<Props> = ({ navigation, route }) => {
       <View style={tw`absolute w-full h-full bg-black opacity-5`} />
 
       {/* Fixed Header */}
-      <View style={[tw`pt-10 pb-4`, { paddingHorizontal: '8%' }]}>
+      <View style={[{ paddingTop: verticalScale(37.5), paddingBottom: verticalScale(15) }, { paddingHorizontal: '8%' }]}>
         <View style={tw`flex-row justify-between items-center`}>
-          <Text style={tw`text-lg font-bold font-dm text-black`}>
+          <Text style={[tw`font-bold font-dm text-black`, { fontSize: moderateScale(16.875) }]}>
             {getMonthAbbreviation(visibleMonth)} - {getMonthAbbreviation(nextMonth)} {getYear(nextMonth)}
           </Text>
-          <TouchableOpacity 
+          <TouchableOpacity
             activeOpacity={0.5}
             onPress={() => navigation.navigate('AppStack_NotificationScreen')}
           >
-            <Image source={Notification} style={tw`w-13 h-13`} />
+            <Image source={Notification} style={{ width: horizontalScale(48.75), height: horizontalScale(48.75) }} />
           </TouchableOpacity>
         </View>
       </View>
@@ -297,45 +298,45 @@ const AppStack_CalendarScreen: React.FC<Props> = ({ navigation, route }) => {
             </BlurView>
           </TouchableOpacity>
 
-          <View style={tw`absolute bottom-0 left-0 right-0 items-center pb-24`}>
-            <View style={tw`bg-white rounded-3xl w-11/12 overflow-hidden`}>
+          <View style={[tw`absolute bottom-0 left-0 right-0 items-center`, { paddingBottom: verticalScale(90) }]}>
+            <View style={[tw`bg-white rounded-3xl w-11/12 overflow-hidden`, { paddingHorizontal: horizontalScale(15) }]}>
               <TouchableOpacity
-                style={tw`flex-row items-center px-6 py-4`}
+                style={[tw`flex-row items-center`, { paddingHorizontal: horizontalScale(22.5), paddingVertical: verticalScale(15) }]}
                 activeOpacity={0.7}
                 onPress={handleBookMeeting}
               >
-                <View style={tw`w-10 h-10 rounded-full bg-gray-200 items-center justify-center mr-4`}>
-                  <Text style={tw`text-black text-xl font-bold`}>+</Text>
+                <View style={[tw`rounded-full bg-gray-200 items-center justify-center`, { width: horizontalScale(37.5), height: horizontalScale(37.5), marginRight: horizontalScale(15) }]}>
+                  <Text style={[tw`text-black font-bold`, { fontSize: moderateScale(18.75) }]}>+</Text>
                 </View>
-                <Text style={tw`text-black text-base font-dm flex-1`}>Book a meeting</Text>
+                <Text style={[tw`text-black font-dm flex-1`, { fontSize: moderateScale(15) }]}>Book a meeting</Text>
               </TouchableOpacity>
-              <View style={tw`h-px bg-gray-200 mx-6`} />
+              <View style={[tw`bg-gray-200`, { height: verticalScale(1.125), marginHorizontal: horizontalScale(22.5) }]} />
               <TouchableOpacity
                 style={[
-                  tw`flex-row items-center px-6 py-4`,
-                  tw`opacity-50`
+                  tw`flex-row items-center opacity-50`,
+                  { paddingHorizontal: horizontalScale(22.5), paddingVertical: verticalScale(15) }
                 ]}
                 activeOpacity={1}
                 disabled={true}
               >
-                <View style={tw`w-10 h-10 rounded-full bg-gray-200 items-center justify-center mr-4`}>
-                  <Text style={tw`text-black text-xl font-bold`}>+</Text>
+                <View style={[tw`rounded-full bg-gray-200 items-center justify-center`, { width: horizontalScale(37.5), height: horizontalScale(37.5), marginRight: horizontalScale(15) }]}>
+                  <Text style={[tw`text-black font-bold`, { fontSize: moderateScale(18.75) }]}>+</Text>
                 </View>
-                <Text style={tw`text-black text-base font-dm flex-1`}>Create meeting type</Text>
+                <Text style={[tw`text-black font-dm flex-1`, { fontSize: moderateScale(15) }]}>Create meeting type</Text>
               </TouchableOpacity>
-              <View style={tw`h-px bg-gray-200 mx-6`} />
+              <View style={[tw`bg-gray-200`, { height: verticalScale(1.125), marginHorizontal: horizontalScale(22.5) }]} />
               <TouchableOpacity
                 style={[
-                  tw`flex-row items-center px-6 py-4`,
-                  tw`opacity-50`
+                  tw`flex-row items-center opacity-50`,
+                  { paddingHorizontal: horizontalScale(22.5), paddingVertical: verticalScale(15) }
                 ]}
                 activeOpacity={1}
                 disabled={true}
               >
-                <View style={tw`w-10 h-10 rounded-full bg-gray-200 items-center justify-center mr-4`}>
-                  <Text style={tw`text-black text-xl font-bold`}>+</Text>
+                <View style={[tw`rounded-full bg-gray-200 items-center justify-center`, { width: horizontalScale(37.5), height: horizontalScale(37.5), marginRight: horizontalScale(15) }]}>
+                  <Text style={[tw`text-black font-bold`, { fontSize: moderateScale(18.75) }]}>+</Text>
                 </View>
-                <Text style={tw`text-black text-base font-dm flex-1`}>Manage availability</Text>
+                <Text style={[tw`text-black font-dm flex-1`, { fontSize: moderateScale(15) }]}>Manage availability</Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -361,23 +362,23 @@ const AppStack_CalendarScreen: React.FC<Props> = ({ navigation, route }) => {
           </TouchableOpacity>
 
           <View style={tw`absolute bottom-0 left-0 right-0 bg-white rounded-t-3xl`}>
-            <View style={[tw`pt-6 pb-8`, { paddingHorizontal: '4%' }]}>
+            <View style={[{ paddingTop: verticalScale(22.5), paddingBottom: verticalScale(30) }, { paddingHorizontal: '4%' }]}>
               {/* Header */}
-              <View style={tw`flex-row justify-between items-center mb-4`}>
-                <Text style={tw`text-black text-xl font-bold font-dm`}>Select Contact</Text>
+              <View style={[tw`flex-row justify-between items-center`, { marginBottom: verticalScale(15) }]}>
+                <Text style={[tw`text-black font-bold font-dm`, { fontSize: moderateScale(18.75) }]}>Select Contact</Text>
                 <TouchableOpacity
                   onPress={() => setShowContactModal(false)}
                   activeOpacity={0.7}
                 >
-                  <Text style={tw`text-[#A3CB31] text-base font-dm`}>Cancel</Text>
+                  <Text style={[tw`text-[#A3CB31] font-dm`, { fontSize: moderateScale(15) }]}>Cancel</Text>
                 </TouchableOpacity>
               </View>
 
               {/* Search Bar */}
-              <View style={tw`bg-gray-100 rounded-2xl px-4 py-3 flex-row items-center mb-4`}>
-                <Image source={Search} style={tw`w-5 h-5 mr-2`} />
+              <View style={[tw`bg-gray-100 rounded-2xl flex-row items-center`, { paddingHorizontal: horizontalScale(15), paddingVertical: verticalScale(11.25), marginBottom: verticalScale(15) }]}>
+                <Image source={Search} style={{ width: horizontalScale(18.75), height: horizontalScale(18.75), marginRight: horizontalScale(7.5) }} />
                 <TextInput
-                  style={tw`flex-1 text-black font-dm`}
+                  style={[tw`flex-1 text-black font-dm`, { fontSize: moderateScale(13.125) }]}
                   placeholder="Search contacts"
                   placeholderTextColor="#999"
                   value={contactSearchText}
@@ -386,7 +387,7 @@ const AppStack_CalendarScreen: React.FC<Props> = ({ navigation, route }) => {
               </View>
 
               {/* Contacts List */}
-              <ScrollView style={tw`max-h-96`} showsVerticalScrollIndicator={false}>
+              <ScrollView style={{ maxHeight: verticalScale(337.5) }} showsVerticalScrollIndicator={false}>
                 {filteredContacts.length > 0 ? (
                   filteredContacts.map((contact) => {
                     const isDisabled = !contact.contactUser?.id;
@@ -394,34 +395,35 @@ const AppStack_CalendarScreen: React.FC<Props> = ({ navigation, route }) => {
                       <TouchableOpacity
                         key={contact.id}
                         style={[
-                          tw`flex-row items-center py-4 border-b border-gray-100`,
+                          tw`flex-row items-center border-b border-gray-100`,
+                          { paddingVertical: verticalScale(15) },
                           isDisabled && tw`opacity-50`
                         ]}
                         activeOpacity={isDisabled ? 1 : 0.7}
                         onPress={() => !isDisabled && handleContactSelect(contact)}
                         disabled={isDisabled}
                       >
-                        <View style={tw`w-12 h-12 rounded-full bg-gray-200 items-center justify-center mr-4 overflow-hidden`}>
+                        <View style={[tw`rounded-full bg-gray-200 items-center justify-center overflow-hidden`, { width: horizontalScale(45), height: horizontalScale(45), marginRight: horizontalScale(15) }]}>
                           {contact.contactUser?.avatar ? (
                             <Image
                               source={{ uri: contact.contactUser.avatar }}
-                              style={tw`w-12 h-12 rounded-full`}
+                              style={{ width: horizontalScale(45), height: horizontalScale(45), borderRadius: 9999 }}
                             />
                           ) : (
-                            <Image source={Avatar} style={tw`w-8 h-8`} />
+                            <Image source={Avatar} style={{ width: horizontalScale(30), height: horizontalScale(30) }} />
                           )}
                         </View>
                         <View style={tw`flex-1`}>
-                          <Text style={tw`text-black text-base font-bold font-dm`}>
+                          <Text style={[tw`text-black font-bold font-dm`, { fontSize: moderateScale(15) }]}>
                             {contact.displayName}
                           </Text>
                           {contact.contactPhone && (
-                            <Text style={tw`text-grey text-sm font-dm`}>
+                            <Text style={[tw`text-grey font-dm`, { fontSize: moderateScale(13.125) }]}>
                               {contact.contactPhone}
                             </Text>
                           )}
                           {isDisabled && (
-                            <Text style={tw`text-grey text-xs font-dm mt-1`}>
+                            <Text style={[tw`text-grey font-dm`, { fontSize: moderateScale(11.25), marginTop: 1 }]}>
                               Not registered
                             </Text>
                           )}
@@ -430,8 +432,8 @@ const AppStack_CalendarScreen: React.FC<Props> = ({ navigation, route }) => {
                     );
                   })
                 ) : (
-                  <View style={tw`py-10 items-center`}>
-                    <Text style={tw`text-grey text-base font-dm`}>No contacts found</Text>
+                  <View style={{ paddingVertical: verticalScale(37.5), alignItems: 'center' }}>
+                    <Text style={[tw`text-grey font-dm`, { fontSize: moderateScale(15) }]}>No contacts found</Text>
                   </View>
                 )}
               </ScrollView>

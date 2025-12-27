@@ -8,11 +8,12 @@ import {
   TouchableOpacity,
   ActivityIndicator,
 } from 'react-native';
-import tw from '../../../tailwindcss';
+import tw from '~/tailwindcss';
 import countries from '../../lib/countryCode';
 import { AuthStackParamList } from '.';
 import { http } from '../../helpers/http';
 import { BackArrow, Background, PhoneNumberpad } from '~/lib/images';
+import { horizontalScale, verticalScale, moderateScale } from '~/helpers/responsive';
 type Props = NativeStackScreenProps<
   AuthStackParamList,
   'AuthStack_SignupScreen'
@@ -34,7 +35,7 @@ const AuthStack_SignupScreen: React.FC<Props> = ({ navigation, route }) => {
       return;
     }
     if (isSending) return;
-    
+
     setIsSending(true);
     http.post('/auth/generate-otp', { phoneNumber: phoneNumber })
       .then(res => {
@@ -70,30 +71,29 @@ const AuthStack_SignupScreen: React.FC<Props> = ({ navigation, route }) => {
     <View style={tw`flex-1 relative bg-white`}>
       <Image source={Background} style={tw`absolute w-full h-full`} />
       <View style={tw`absolute w-full h-full bg-black opacity-5`} />
-      <View style={[tw`mt-10 mb-10`, { paddingHorizontal: '8%' }]}>
-        <TouchableOpacity onPress={() => navigation.goBack()} activeOpacity={0.5} style={tw`mb-5`}>
+      <View style={[{ marginTop: verticalScale(37.5), marginBottom: verticalScale(37.5) }, { paddingHorizontal: '8%' }]}>
+        <TouchableOpacity onPress={() => navigation.goBack()} activeOpacity={0.5} style={{ marginBottom: verticalScale(18.75) }}>
           <Image source={BackArrow} />
         </TouchableOpacity>
-        <Image source={PhoneNumberpad} style={tw`self-center mb-10`} />
-        <Text style={tw`text-[22px] font-bold font-dm w-2/3 leading-[32px]`}>What's your phone number?</Text>
+        <Image source={PhoneNumberpad} style={[tw`self-center`, { marginBottom: verticalScale(37.5) }]} />
+        <Text style={[tw`font-bold font-dm w-2/3`, { fontSize: moderateScale(20.625), lineHeight: moderateScale(30) }]}>What's your phone number?</Text>
         <View style={tw`flex-row w-full justify-center`}>
           <View
-            style={tw`flex-row items-center h-15 w-full bg-white rounded-full mt-10`}>
+            style={[tw`flex-row items-center w-full bg-white rounded-full`, { height: verticalScale(56.25), marginTop: verticalScale(37.5) }]}>
             <TouchableOpacity onPress={onPressCountry} activeOpacity={0.5}>
               <Image
-                width={60}
-                height={30}
                 source={{
                   uri: `https://flagcdn.com/w320/${countryCode.toLowerCase()}.png`,
                 }}
-                style={tw`mx-2.5`}
+                style={{ marginHorizontal: horizontalScale(9.375), width: horizontalScale(56.25), height: verticalScale(28.125) }}
+                resizeMode="cover"
               />
             </TouchableOpacity>
-            <Text style={tw`text-black text-[18px] font-dm font-bold`}>
+            <Text style={[tw`text-black font-dm font-bold`, { fontSize: moderateScale(16.875) }]}>
               {countryNumber}
             </Text>
             <TextInput
-              style={tw`bg-white rounded-lg flex-1 font-dm font-bold text-[18px] mt-0.7`}
+              style={[tw`bg-white rounded-lg flex-1 font-dm font-bold`, { fontSize: moderateScale(16.875), marginTop: verticalScale(2.625) }]}
               value={phone}
               placeholder="Phone Number?"
               onChangeText={setPhone}
@@ -103,17 +103,17 @@ const AuthStack_SignupScreen: React.FC<Props> = ({ navigation, route }) => {
         </View>
       </View>
       <View style={tw`absolute bottom-0 w-full flex-col items-center`}>
-        <TouchableOpacity 
-          onPress={onSendCode} 
+        <TouchableOpacity
+          onPress={onSendCode}
           activeOpacity={0.7}
           disabled={isSending}
         >
           <View
-            style={tw`bg-[#A3CB31] rounded-full h-15 w-60 mb-10 justify-center items-center shadow-lg ${isSending ? 'opacity-50' : ''}`}>
+            style={[tw`bg-[#A3CB31] rounded-full justify-center items-center shadow-lg ${isSending ? 'opacity-50' : ''}`, { height: verticalScale(56.25), width: horizontalScale(225), marginBottom: verticalScale(37.5) }]}>
             {isSending ? (
               <ActivityIndicator size="small" color="#FFFFFF" />
             ) : (
-              <Text style={tw`text-white text-base font-bold font-dm`}>
+              <Text style={[tw`text-white font-bold font-dm`, { fontSize: moderateScale(15) }]}>
                 Send
               </Text>
             )}

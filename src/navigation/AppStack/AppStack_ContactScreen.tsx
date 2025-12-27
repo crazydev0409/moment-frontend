@@ -12,11 +12,12 @@ import {
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { BlurView } from 'expo-blur';
 import * as Contacts from 'expo-contacts';
-import tw from '../../../tailwindcss';
+import tw from '~/tailwindcss';
 import { AppStackParamList } from '.';
 import { Background, Notification, Avatar, AddIcon, HomeIcon, CalendarIcon, BusinessIcon, ProfileIcon, Search, BackArrow } from '~/lib/images';
 import { http } from '~/helpers/http';
 import { useAddButton } from '~/contexts/AddButtonContext';
+import { horizontalScale, verticalScale, moderateScale } from '~/helpers/responsive';
 
 type Props = NativeStackScreenProps<
     AppStackParamList,
@@ -47,7 +48,7 @@ const AppStack_ContactScreen: React.FC<Props> = ({ navigation, route }) => {
     // Register add button handler
     useEffect(() => {
         setOnAddPress(() => () => setShowAddMenu(true));
-        
+
         // Cleanup on unmount
         return () => {
             setOnAddPress(undefined);
@@ -102,7 +103,7 @@ const AppStack_ContactScreen: React.FC<Props> = ({ navigation, route }) => {
                     // Try to find matching local avatar by phone number
                     const normalizedContactPhone = contact.contactPhone?.replace(/[\s\-\(\)]/g, '') || '';
                     let localAvatar = phoneToAvatarMap.get(normalizedContactPhone);
-                    
+
                     // Try without country code if no match
                     if (!localAvatar && normalizedContactPhone.startsWith('+')) {
                         const withoutCountryCode = normalizedContactPhone.substring(1);
@@ -190,7 +191,7 @@ const AppStack_ContactScreen: React.FC<Props> = ({ navigation, route }) => {
         // Navigate to DateDetailScreen with selected contact
         const today = new Date();
         const todayString = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
-        
+
         navigation.navigate('AppStack_DateDetailScreen', {
             date: todayString,
             contact: contact.backendContact
@@ -247,44 +248,44 @@ const AppStack_ContactScreen: React.FC<Props> = ({ navigation, route }) => {
 
             <ScrollView
                 style={tw`flex-1`}
-                contentContainerStyle={tw`pb-24`}
+                contentContainerStyle={{ paddingBottom: verticalScale(90) }}
                 showsVerticalScrollIndicator={false}
             >
-                <View style={[tw`mt-16`, { paddingHorizontal: '8%' }]}>
+                <View style={[{ marginTop: verticalScale(60) }, { paddingHorizontal: '8%' }]}>
                     {/* Header */}
-                    <View style={tw`flex-row justify-between items-center mb-6`}>
+                    <View style={[tw`flex-row justify-between items-center`, { marginBottom: verticalScale(22.5) }]}>
                         <TouchableOpacity
                             onPress={() => navigation.goBack()}
                             activeOpacity={0.5}
                         >
-                            <Image source={BackArrow} />
+                            <Image source={BackArrow} style={{ width: horizontalScale(30), height: horizontalScale(30) }} resizeMode="contain" />
                         </TouchableOpacity>
-                        <TouchableOpacity 
+                        <TouchableOpacity
                             activeOpacity={0.5}
                             onPress={() => navigation.navigate('AppStack_NotificationScreen')}
                         >
-                            <Image source={Notification} style={tw`w-13 h-13`} />
+                            <Image source={Notification} style={{ width: horizontalScale(48.75), height: horizontalScale(48.75) }} />
                         </TouchableOpacity>
                     </View>
 
                     {/* Search Bar */}
-                    <View style={tw`mb-6`}>
-                        <View style={tw`bg-white rounded-2xl px-4 py-3 flex-row items-center shadow-sm`}>
+                    <View style={{ marginBottom: verticalScale(22.5) }}>
+                        <View style={[tw`bg-white rounded-2xl flex-row items-center shadow-sm`, { paddingHorizontal: horizontalScale(15), paddingVertical: verticalScale(11.25) }]}>
                             <TextInput
-                                style={tw`flex-1 text-black font-dm`}
+                                style={[tw`flex-1 text-black font-dm`, { fontSize: moderateScale(13.125) }]}
                                 placeholder="Search your contacts"
                                 placeholderTextColor="#999"
                                 value={searchText}
                                 onChangeText={setSearchText}
                             />
-                            <Image source={Search} style={tw`w-5 h-5`} />
+                            <Image source={Search} style={{ width: horizontalScale(18.75), height: horizontalScale(18.75) }} />
                         </View>
                     </View>
 
                     {/* Contacts List */}
-                    <View style={tw`mb-4`}>
+                    <View style={{ marginBottom: verticalScale(15) }}>
                         {isLoading ? (
-                            <Text style={tw`text-center text-grey font-dm py-8`}>Loading contacts...</Text>
+                            <Text style={[tw`text-center text-grey font-dm`, { paddingVertical: verticalScale(30), fontSize: moderateScale(13.125) }]}>Loading contacts...</Text>
                         ) : filteredContacts.length > 0 ? (
                             filteredContacts.map((contact) => {
                                 const isDisabled = !contact.backendContact?.contactUser?.id && !contact.backendContact?.contactUserId;
@@ -292,29 +293,30 @@ const AppStack_ContactScreen: React.FC<Props> = ({ navigation, route }) => {
                                     <TouchableOpacity
                                         key={contact.id}
                                         style={[
-                                            tw`rounded-2xl p-4 mb-3 flex-row items-center shadow-sm`,
+                                            tw`rounded-2xl flex-row items-center shadow-sm`,
+                                            { padding: horizontalScale(15), marginBottom: verticalScale(11.25) },
                                             isDisabled ? tw`bg-gray-100` : tw`bg-white`
                                         ]}
                                         activeOpacity={isDisabled ? 1 : 0.7}
                                         onPress={() => !isDisabled && handleContactPress(contact)}
                                         disabled={isDisabled}
                                     >
-                                        <View style={tw`w-12 h-12 rounded-full bg-gray-200 items-center justify-center mr-4 overflow-hidden`}>
+                                        <View style={[tw`rounded-full bg-gray-200 items-center justify-center overflow-hidden`, { width: horizontalScale(45), height: horizontalScale(45), marginRight: horizontalScale(15) }]}>
                                             {contact.imageUri ? (
                                                 <Image
                                                     source={{ uri: contact.imageUri }}
-                                                    style={tw`w-12 h-12 rounded-full`}
+                                                    style={{ width: horizontalScale(45), height: horizontalScale(45), borderRadius: 9999 }}
                                                 />
                                             ) : (
-                                                <Image source={Avatar} style={tw`w-8 h-8`} />
+                                                <Image source={Avatar} style={{ width: horizontalScale(30), height: horizontalScale(30) }} />
                                             )}
                                         </View>
                                         <View style={tw`flex-1`}>
-                                            <Text style={tw`text-black text-sm font-bold font-dm`}>
+                                            <Text style={[tw`text-black font-bold font-dm`, { fontSize: moderateScale(13.125) }]}>
                                                 {contact.name}
                                             </Text>
                                             {isDisabled && (
-                                                <Text style={tw`text-grey text-xs font-dm mt-1`}>
+                                                <Text style={[tw`text-grey font-dm`, { fontSize: moderateScale(11.25), marginTop: 1 }]}>
                                                     Not registered
                                                 </Text>
                                             )}
@@ -323,7 +325,7 @@ const AppStack_ContactScreen: React.FC<Props> = ({ navigation, route }) => {
                                 );
                             })
                         ) : (
-                            <Text style={tw`text-center text-grey font-dm py-8`}>
+                            <Text style={[tw`text-center text-grey font-dm`, { paddingVertical: verticalScale(30), fontSize: moderateScale(13.125) }]}>
                                 {searchText ? 'No contacts found' : 'No contacts available'}
                             </Text>
                         )}
@@ -350,54 +352,54 @@ const AppStack_ContactScreen: React.FC<Props> = ({ navigation, route }) => {
                     </TouchableOpacity>
 
                     {/* Popup Menu */}
-                    <View style={tw`absolute bottom-0 left-0 right-0 items-center pb-24`}>
-                        <View style={tw`bg-white rounded-3xl w-5/6 overflow-hidden p-4`}>
+                    <View style={[tw`absolute bottom-0 left-0 right-0 items-center`, { paddingBottom: verticalScale(90) }]}>
+                        <View style={[tw`bg-white rounded-3xl w-5/6 overflow-hidden`, { padding: horizontalScale(15) }]}>
                             {/* Book a meeting */}
                             <TouchableOpacity
-                                style={tw`flex-row items-center px-6 py-4`}
+                                style={[tw`flex-row items-center`, { paddingHorizontal: horizontalScale(22.5), paddingVertical: verticalScale(15) }]}
                                 activeOpacity={0.7}
                                 onPress={handleBookMeeting}
                             >
-                                <View style={tw`w-10 h-10 rounded-full bg-gray-200 items-center justify-center mr-4`}>
-                                    <Text style={tw`text-black text-xl font-bold`}>+</Text>
+                                <View style={[tw`rounded-full bg-gray-200 items-center justify-center`, { width: horizontalScale(37.5), height: horizontalScale(37.5), marginRight: horizontalScale(15) }]}>
+                                    <Text style={[tw`text-black font-bold`, { fontSize: moderateScale(18.75) }]}>+</Text>
                                 </View>
-                                <Text style={tw`text-black text-base font-dm flex-1`}>Book a meeting</Text>
+                                <Text style={[tw`text-black font-dm flex-1`, { fontSize: moderateScale(15) }]}>Book a meeting</Text>
                             </TouchableOpacity>
 
                             {/* Separator */}
-                            <View style={tw`h-px bg-gray-200 mx-6`} />
+                            <View style={[tw`bg-gray-200`, { height: verticalScale(1.125), marginHorizontal: horizontalScale(22.5) }]} />
 
                             {/* Create meeting type */}
                             <TouchableOpacity
                                 style={[
-                                    tw`flex-row items-center px-6 py-4`,
-                                    tw`opacity-50`
+                                    tw`flex-row items-center opacity-50`,
+                                    { paddingHorizontal: horizontalScale(22.5), paddingVertical: verticalScale(15) }
                                 ]}
                                 activeOpacity={1}
                                 disabled={true}
                             >
-                                <View style={tw`w-10 h-10 rounded-full bg-gray-200 items-center justify-center mr-4`}>
-                                    <Text style={tw`text-black text-xl font-bold`}>+</Text>
+                                <View style={[tw`rounded-full bg-gray-200 items-center justify-center`, { width: horizontalScale(37.5), height: horizontalScale(37.5), marginRight: horizontalScale(15) }]}>
+                                    <Text style={[tw`text-black font-bold`, { fontSize: moderateScale(18.75) }]}>+</Text>
                                 </View>
-                                <Text style={tw`text-black text-base font-dm flex-1`}>Create meeting type</Text>
+                                <Text style={[tw`text-black font-dm flex-1`, { fontSize: moderateScale(15) }]}>Create meeting type</Text>
                             </TouchableOpacity>
 
                             {/* Separator */}
-                            <View style={tw`h-px bg-gray-200 mx-6`} />
+                            <View style={[tw`bg-gray-200`, { height: verticalScale(1.125), marginHorizontal: horizontalScale(22.5) }]} />
 
                             {/* Manage availability */}
                             <TouchableOpacity
                                 style={[
-                                    tw`flex-row items-center px-6 py-4`,
-                                    tw`opacity-50`
+                                    tw`flex-row items-center opacity-50`,
+                                    { paddingHorizontal: horizontalScale(22.5), paddingVertical: verticalScale(15) }
                                 ]}
                                 activeOpacity={1}
                                 disabled={true}
                             >
-                                <View style={tw`w-10 h-10 rounded-full bg-gray-200 items-center justify-center mr-4`}>
-                                    <Text style={tw`text-black text-xl font-bold`}>+</Text>
+                                <View style={[tw`rounded-full bg-gray-200 items-center justify-center`, { width: horizontalScale(37.5), height: horizontalScale(37.5), marginRight: horizontalScale(15) }]}>
+                                    <Text style={[tw`text-black font-bold`, { fontSize: moderateScale(18.75) }]}>+</Text>
                                 </View>
-                                <Text style={tw`text-black text-base font-dm flex-1`}>Manage availability</Text>
+                                <Text style={[tw`text-black font-dm flex-1`, { fontSize: moderateScale(15) }]}>Manage availability</Text>
                             </TouchableOpacity>
                         </View>
                     </View>
@@ -423,23 +425,23 @@ const AppStack_ContactScreen: React.FC<Props> = ({ navigation, route }) => {
                     </TouchableOpacity>
 
                     <View style={tw`absolute bottom-0 left-0 right-0 bg-white rounded-t-3xl`}>
-                        <View style={[tw`pt-6 pb-8`, { paddingHorizontal: '4%' }]}>
+                        <View style={[{ paddingTop: verticalScale(22.5), paddingBottom: verticalScale(30) }, { paddingHorizontal: '4%' }]}>
                             {/* Header */}
-                            <View style={tw`flex-row justify-between items-center mb-4`}>
-                                <Text style={tw`text-black text-xl font-bold font-dm`}>Select Contact</Text>
+                            <View style={[tw`flex-row justify-between items-center`, { marginBottom: verticalScale(15) }]}>
+                                <Text style={[tw`text-black font-bold font-dm`, { fontSize: moderateScale(18.75) }]}>Select Contact</Text>
                                 <TouchableOpacity
                                     onPress={() => setShowContactModal(false)}
                                     activeOpacity={0.7}
                                 >
-                                    <Text style={tw`text-[#A3CB31] text-base font-dm`}>Cancel</Text>
+                                    <Text style={[tw`text-[#A3CB31] font-dm`, { fontSize: moderateScale(15) }]}>Cancel</Text>
                                 </TouchableOpacity>
                             </View>
 
                             {/* Search Bar */}
-                            <View style={tw`bg-gray-100 rounded-2xl px-4 py-3 flex-row items-center mb-4`}>
-                                <Image source={Search} style={tw`w-5 h-5 mr-2`} />
+                            <View style={[tw`bg-gray-100 rounded-2xl flex-row items-center`, { paddingHorizontal: horizontalScale(15), paddingVertical: verticalScale(11.25), marginBottom: verticalScale(15) }]}>
+                                <Image source={Search} style={[{ width: horizontalScale(18.75), height: horizontalScale(18.75), marginRight: horizontalScale(7.5) }]} />
                                 <TextInput
-                                    style={tw`flex-1 text-black font-dm`}
+                                    style={[tw`flex-1 text-black font-dm`, { fontSize: moderateScale(13.125) }]}
                                     placeholder="Search contacts"
                                     placeholderTextColor="#999"
                                     value={contactSearchText}
@@ -448,7 +450,7 @@ const AppStack_ContactScreen: React.FC<Props> = ({ navigation, route }) => {
                             </View>
 
                             {/* Contacts List */}
-                            <ScrollView style={tw`max-h-96`} showsVerticalScrollIndicator={false}>
+                            <ScrollView style={{ maxHeight: verticalScale(337.5) }} showsVerticalScrollIndicator={false}>
                                 {filteredContactsForSelection.length > 0 ? (
                                     filteredContactsForSelection.map((contact) => {
                                         const isDisabled = !contact.contactUser?.id && !contact.contactUserId;
@@ -456,34 +458,35 @@ const AppStack_ContactScreen: React.FC<Props> = ({ navigation, route }) => {
                                             <TouchableOpacity
                                                 key={contact.id}
                                                 style={[
-                                                    tw`flex-row items-center py-4 border-b border-gray-100`,
+                                                    tw`flex-row items-center border-b border-gray-100`,
+                                                    { paddingVertical: verticalScale(15) },
                                                     isDisabled ? tw`bg-gray-100` : tw`bg-white`
                                                 ]}
                                                 activeOpacity={isDisabled ? 1 : 0.7}
                                                 onPress={() => !isDisabled && handleContactSelect(contact)}
                                                 disabled={isDisabled}
                                             >
-                                                <View style={tw`w-12 h-12 rounded-full bg-gray-200 items-center justify-center mr-4 overflow-hidden`}>
+                                                <View style={[tw`rounded-full bg-gray-200 items-center justify-center overflow-hidden`, { width: horizontalScale(45), height: horizontalScale(45), marginRight: horizontalScale(15) }]}>
                                                     {contact.contactUser?.avatar ? (
                                                         <Image
                                                             source={{ uri: contact.contactUser.avatar }}
-                                                            style={tw`w-12 h-12 rounded-full`}
+                                                            style={{ width: horizontalScale(45), height: horizontalScale(45), borderRadius: 9999 }}
                                                         />
                                                     ) : (
-                                                        <Image source={Avatar} style={tw`w-8 h-8`} />
+                                                        <Image source={Avatar} style={{ width: horizontalScale(30), height: horizontalScale(30) }} />
                                                     )}
                                                 </View>
                                                 <View style={tw`flex-1`}>
-                                                    <Text style={tw`text-black text-base font-bold font-dm`}>
+                                                    <Text style={[tw`text-black font-bold font-dm`, { fontSize: moderateScale(15) }]}>
                                                         {contact.displayName}
                                                     </Text>
                                                     {contact.contactPhone && (
-                                                        <Text style={tw`text-grey text-sm font-dm`}>
+                                                        <Text style={[tw`text-grey font-dm`, { fontSize: moderateScale(13.125) }]}>
                                                             {contact.contactPhone}
                                                         </Text>
                                                     )}
                                                     {isDisabled && (
-                                                        <Text style={tw`text-grey text-xs font-dm mt-1`}>
+                                                        <Text style={[tw`text-grey font-dm`, { fontSize: moderateScale(11.25), marginTop: 1 }]}>
                                                             Not registered
                                                         </Text>
                                                     )}
@@ -492,8 +495,8 @@ const AppStack_ContactScreen: React.FC<Props> = ({ navigation, route }) => {
                                         );
                                     })
                                 ) : (
-                                    <View style={tw`py-10 items-center`}>
-                                        <Text style={tw`text-grey text-base font-dm`}>No contacts found</Text>
+                                    <View style={{ paddingVertical: verticalScale(37.5), alignItems: 'center' }}>
+                                        <Text style={[tw`text-grey font-dm`, { fontSize: moderateScale(15) }]}>No contacts found</Text>
                                     </View>
                                 )}
                             </ScrollView>

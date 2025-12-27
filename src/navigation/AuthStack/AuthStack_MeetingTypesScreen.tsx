@@ -7,10 +7,11 @@ import {
   Image,
 } from 'react-native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
-import tw from '../../../tailwindcss';
+import tw from '~/tailwindcss';
 import { AuthStackParamList } from '.';
 import { Background, CalendarIcon, GymIcon, FootballIcon } from '~/lib/images';
 import { http } from '~/helpers/http';
+import { horizontalScale, verticalScale, moderateScale } from '~/helpers/responsive';
 
 type Props = NativeStackScreenProps<
   AuthStackParamList,
@@ -77,35 +78,35 @@ const AuthStack_MeetingTypesScreen: React.FC<Props> = ({ navigation, route }) =>
     <View style={tw`flex-1 relative bg-white`}>
       <Image source={Background} style={tw`absolute w-full h-full`} />
       <View style={tw`absolute w-full h-full bg-black opacity-5`} />
-      
+
       <ScrollView
         style={tw`flex-1`}
-        contentContainerStyle={tw`pb-24`}
+        contentContainerStyle={{ paddingBottom: verticalScale(90) }}
         showsVerticalScrollIndicator={false}
       >
-        <View style={[tw`mt-10 mb-10`, { paddingHorizontal: '8%' }]}>
+        <View style={[{ marginTop: verticalScale(37.5), marginBottom: verticalScale(37.5) }, { paddingHorizontal: '8%' }]}>
           {/* Close Button */}
-          <TouchableOpacity 
-            onPress={() => navigation.goBack()} 
-            activeOpacity={0.5} 
-            style={tw`mb-5 w-8 h-8 items-center justify-center`}
+          <TouchableOpacity
+            onPress={() => navigation.goBack()}
+            activeOpacity={0.5}
+            style={{ marginBottom: verticalScale(18.75), width: horizontalScale(30), height: horizontalScale(30), alignItems: 'center', justifyContent: 'center' }}
           >
-            <Text style={tw`text-2xl font-bold text-black`}>✕</Text>
+            <Text style={[tw`font-bold text-black`, { fontSize: moderateScale(22.5) }]}>✕</Text>
           </TouchableOpacity>
 
           {/* Title */}
-          <Text style={tw`text-[28px] font-bold font-dm leading-[36px] mb-3`}>
+          <Text style={[tw`font-bold font-dm`, { fontSize: moderateScale(26.25), lineHeight: moderateScale(33.75), marginBottom: verticalScale(11.25) }]}>
             What are you into?
           </Text>
-          
+
           {/* Instructions */}
-          <Text style={tw`text-sm text-grey leading-[21px] mb-8`}>
+          <Text style={[tw`text-grey font-dm`, { fontSize: moderateScale(13.125), lineHeight: moderateScale(19.6875), marginBottom: verticalScale(30) }]}>
             Pick up to 3 meeting types you enjoy that you want to show on your profile.
           </Text>
 
           {/* Meeting Types Grid */}
-          <View style={tw`mb-8`}>
-            <View style={tw`flex-row flex-wrap gap-4`}>
+          <View style={{ marginBottom: verticalScale(30) }}>
+            <View style={[tw`flex-row flex-wrap`, { gap: verticalScale(15) }]}>
               {meetingTypes.map((type) => {
                 const isSelected = selectedTypes.includes(type.id);
                 return (
@@ -114,23 +115,25 @@ const AuthStack_MeetingTypesScreen: React.FC<Props> = ({ navigation, route }) =>
                     onPress={() => toggleType(type.id)}
                     activeOpacity={0.7}
                     style={[
-                      tw`flex-row items-center px-4 py-3 rounded-full border-2`,
-                      isSelected 
-                        ? tw`bg-[#A3CB31] border-[#A3CB31]` 
+                      tw`flex-row items-center rounded-full border-2`,
+                      { paddingHorizontal: horizontalScale(15), paddingVertical: verticalScale(11.25) },
+                      isSelected
+                        ? tw`bg-[#A3CB31] border-[#A3CB31]`
                         : tw`bg-white border-gray-300`
                     ]}
                   >
                     <Image
                       source={type.icon}
                       style={[
-                        tw`w-6 h-6 mr-2`,
+                        { width: horizontalScale(22.5), height: horizontalScale(22.5), marginRight: horizontalScale(7.5) },
                         { tintColor: isSelected ? '#FFFFFF' : '#000000' }
                       ]}
                       resizeMode="contain"
                     />
                     <Text
                       style={[
-                        tw`font-dm text-sm font-bold`,
+                        tw`font-dm font-bold`,
+                        { fontSize: moderateScale(13.125) },
                         isSelected ? tw`text-white` : tw`text-black`
                       ]}
                     >
@@ -143,8 +146,8 @@ const AuthStack_MeetingTypesScreen: React.FC<Props> = ({ navigation, route }) =>
           </View>
 
           {/* Selection Counter */}
-          <View style={tw`mb-6`}>
-            <Text style={tw`text-base text-grey font-dm text-center`}>
+          <View style={{ marginBottom: verticalScale(22.5) }}>
+            <Text style={[tw`text-grey font-dm text-center`, { fontSize: moderateScale(15) }]}>
               {selectedTypes.length}/3 selected
             </Text>
           </View>
@@ -152,21 +155,20 @@ const AuthStack_MeetingTypesScreen: React.FC<Props> = ({ navigation, route }) =>
       </ScrollView>
 
       {/* Save Button */}
-      <View style={tw`absolute bottom-0 w-full flex-col items-center pb-10`}>
-        <TouchableOpacity 
-          onPress={handleSave} 
+      <View style={[tw`absolute bottom-0 w-full flex-col items-center`, { paddingBottom: verticalScale(37.5) }]}>
+        <TouchableOpacity
+          onPress={handleSave}
           activeOpacity={0.7}
           disabled={isSaving || selectedTypes.length === 0}
         >
           <View
-            style={tw`bg-gray-600 rounded-full h-15 w-60 justify-center items-center shadow-lg ${
-              isSaving || selectedTypes.length === 0 ? 'opacity-50' : ''
-            }`}
+            style={[tw`bg-gray-600 rounded-full justify-center items-center shadow-lg ${isSaving || selectedTypes.length === 0 ? 'opacity-50' : ''
+              }`, { height: verticalScale(56.25), width: horizontalScale(225) }]}
           >
             {isSaving ? (
               <ActivityIndicator size="small" color="#FFFFFF" />
             ) : (
-              <Text style={tw`text-white text-base font-bold font-dm`}>
+              <Text style={[tw`text-white font-bold font-dm`, { fontSize: moderateScale(15) }]}>
                 Save
               </Text>
             )}

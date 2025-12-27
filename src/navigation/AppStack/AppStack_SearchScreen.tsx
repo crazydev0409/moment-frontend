@@ -3,9 +3,10 @@ import React, { useEffect, useState } from 'react';
 import { Text, Image, View, TouchableOpacity, ScrollView, TextInput, ActivityIndicator } from 'react-native';
 import * as Contacts from 'expo-contacts';
 import { AppStackParamList } from '.';
-import tw from 'tailwindcss';
+import tw from '~/tailwindcss';
 import { Background, Search, BackArrow, Avatar } from '~/lib/images';
 import { http } from '~/helpers/http';
+import { horizontalScale, verticalScale, moderateScale } from '~/helpers/responsive';
 
 type Props = NativeStackScreenProps<AppStackParamList, 'AppStack_SearchScreen'>;
 
@@ -73,12 +74,12 @@ const AppStack_SearchScreen: React.FC<Props> = ({ navigation, route }) => {
         http.get('/users/moment-requests/received'),
         http.get('/users/moment-requests/sent')
       ]);
-      
+
       // Backend returns { requests: [...] } for both endpoints
       const received = Array.isArray(receivedResponse.data.requests) ? receivedResponse.data.requests : [];
       const sent = Array.isArray(sentResponse.data.requests) ? sentResponse.data.requests : [];
       const allMeetings = [...received, ...sent];
-      
+
       setMeetings(allMeetings);
     } catch (error) {
       console.error('Error fetching meetings:', error);
@@ -91,7 +92,7 @@ const AppStack_SearchScreen: React.FC<Props> = ({ navigation, route }) => {
   const loadLocalContactAvatars = async () => {
     try {
       const { status } = await Contacts.getPermissionsAsync();
-      
+
       if (status === 'granted') {
         const { data } = await Contacts.getContactsAsync({
           fields: [
@@ -139,7 +140,7 @@ const AppStack_SearchScreen: React.FC<Props> = ({ navigation, route }) => {
       const meetingType = meeting.meetingType?.toLowerCase() || '';
       const personName = otherPerson?.name?.toLowerCase() || '';
       const status = meeting.status.toLowerCase();
-      
+
       return (
         personName.includes(lowercaseSearch) ||
         meetingType.includes(lowercaseSearch) ||
@@ -153,11 +154,11 @@ const AppStack_SearchScreen: React.FC<Props> = ({ navigation, route }) => {
   const formatDateTime = (startTime: string, endTime: string) => {
     const start = new Date(startTime);
     const end = new Date(endTime);
-    
+
     // Format date: MMM d, yyyy
     const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
     const dateStr = `${months[start.getMonth()]} ${start.getDate()}, ${start.getFullYear()}`;
-    
+
     // Format time: h:mm a
     const formatTime = (date: Date) => {
       const hours = date.getHours();
@@ -167,7 +168,7 @@ const AppStack_SearchScreen: React.FC<Props> = ({ navigation, route }) => {
       const displayMinutes = minutes.toString().padStart(2, '0');
       return `${displayHours}:${displayMinutes} ${ampm}`;
     };
-    
+
     const timeStr = `${formatTime(start)} - ${formatTime(end)}`;
     return { dateStr, timeStr };
   };
@@ -187,65 +188,65 @@ const AppStack_SearchScreen: React.FC<Props> = ({ navigation, route }) => {
     <View style={tw`flex-1 relative bg-white`}>
       <Image source={Background} style={tw`absolute w-full h-full`} />
       <View style={tw`absolute w-full h-full bg-black opacity-5`} />
-      
-      <View style={[tw`flex-1 mt-16`, { paddingHorizontal: '4%' }]}>
+
+      <View style={[tw`flex-1`, { marginTop: verticalScale(60), paddingHorizontal: '4%' }]}>
         {/* Header */}
-        <View style={tw`flex-row items-center mb-6`}>
+        <View style={[tw`flex-row items-center`, { marginBottom: verticalScale(22.5) }]}>
           <TouchableOpacity
             onPress={() => navigation.goBack()}
             activeOpacity={0.7}
-            style={tw`mr-4`}
+            style={{ marginRight: horizontalScale(15) }}
           >
-            <Image source={BackArrow} style={tw`w-6 h-6`} />
+            <Image source={BackArrow} style={{ width: horizontalScale(22.5), height: horizontalScale(22.5) }} />
           </TouchableOpacity>
           <View style={tw`flex-1`}>
-            <Text style={tw`text-black text-2xl font-bold font-dm`}>Search Meetings</Text>
+            <Text style={[tw`text-black font-bold font-dm`, { fontSize: moderateScale(22.5) }]}>Search Meetings</Text>
           </View>
         </View>
 
         {/* Search Bar */}
-        <View style={tw`mb-6`}>
-          <View style={tw`flex-row items-center bg-white rounded-full px-4 py-3 shadow-sm`}>
+        <View style={{ marginBottom: verticalScale(22.5) }}>
+          <View style={[tw`flex-row items-center bg-white rounded-full shadow-sm`, { paddingHorizontal: horizontalScale(15), paddingVertical: verticalScale(11.25) }]}>
             <TextInput
-              style={tw`flex-1 font-dm text-sm text-black`}
+              style={[tw`flex-1 font-dm text-black`, { fontSize: moderateScale(13.125) }]}
               placeholder="Search your meetings"
               placeholderTextColor="#9CA3AF"
               value={searchText}
               onChangeText={setSearchText}
               autoFocus={true}
             />
-            <Image source={Search} style={tw`w-5 h-5`} />
+            <Image source={Search} style={{ width: horizontalScale(18.75), height: horizontalScale(18.75) }} />
           </View>
         </View>
 
         {/* Results */}
         <ScrollView
           style={tw`flex-1`}
-          contentContainerStyle={tw`pb-6`}
+          contentContainerStyle={{ paddingBottom: verticalScale(22.5) }}
           showsVerticalScrollIndicator={false}
         >
           {loading ? (
-            <View style={tw`py-10 items-center`}>
+            <View style={{ paddingVertical: verticalScale(37.5), alignItems: 'center' }}>
               <ActivityIndicator size="large" color="#A3CB31" />
             </View>
           ) : filteredMeetings.length > 0 ? (
             <>
-              <Text style={tw`text-grey text-sm font-dm mb-3`}>
+              <Text style={[tw`text-grey font-dm`, { fontSize: moderateScale(13.125), marginBottom: verticalScale(11.25) }]}>
                 {filteredMeetings.length} {filteredMeetings.length === 1 ? 'meeting' : 'meetings'} found
               </Text>
               {filteredMeetings.map((meeting) => {
                 const otherPerson = meeting.senderId === userId ? meeting.receiver : meeting.sender;
                 const localAvatar = getLocalAvatar(otherPerson?.phoneNumber);
                 const { dateStr, timeStr } = formatDateTime(meeting.startTime, meeting.endTime);
-                const statusColor = 
+                const statusColor =
                   meeting.status === 'approved' ? 'text-green-600' :
-                  meeting.status === 'pending' ? 'text-yellow-600' :
-                  'text-grey';
+                    meeting.status === 'pending' ? 'text-yellow-600' :
+                      'text-grey';
 
                 return (
                   <TouchableOpacity
                     key={meeting.id}
-                    style={tw`bg-white rounded-2xl p-4 mb-3 shadow-sm`}
+                    style={[tw`bg-white rounded-2xl shadow-sm`, { padding: horizontalScale(15), marginBottom: verticalScale(11.25) }]}
                     activeOpacity={0.7}
                     onPress={() => {
                       // Use local date components to avoid timezone issues
@@ -258,33 +259,33 @@ const AppStack_SearchScreen: React.FC<Props> = ({ navigation, route }) => {
                     }}
                   >
                     <View style={tw`flex-row items-start`}>
-                      <View style={tw`w-12 h-12 rounded-full bg-gray-200 items-center justify-center mr-4 overflow-hidden`}>
+                      <View style={[tw`rounded-full bg-gray-200 items-center justify-center overflow-hidden`, { width: horizontalScale(45), height: horizontalScale(45), marginRight: horizontalScale(15) }]}>
                         {localAvatar ? (
                           <Image
                             source={{ uri: localAvatar }}
-                            style={tw`w-12 h-12 rounded-full`}
+                            style={{ width: horizontalScale(45), height: horizontalScale(45), borderRadius: 9999 }}
                           />
                         ) : (
-                          <Image source={Avatar} style={tw`w-8 h-8`} />
+                          <Image source={Avatar} style={{ width: horizontalScale(30), height: horizontalScale(30) }} />
                         )}
                       </View>
                       <View style={tw`flex-1`}>
-                        <View style={tw`flex-row items-center justify-between mb-1`}>
-                          <Text style={tw`text-black text-base font-bold font-dm`}>
+                        <View style={[tw`flex-row items-center justify-between`, { marginBottom: verticalScale(3.75) }]}>
+                          <Text style={[tw`text-black font-bold font-dm`, { fontSize: moderateScale(15) }]}>
                             {meeting.title || meeting.notes || 'Untitled Meeting'}
                           </Text>
-                          <Text style={tw`text-xs font-dm ${statusColor} capitalize`}>
+                          <Text style={[tw`font-dm ${statusColor} capitalize`, { fontSize: moderateScale(11.25) }]}>
                             {meeting.status}
                           </Text>
                         </View>
-                        <Text style={tw`text-grey text-sm font-dm mb-1`}>{dateStr}</Text>
-                        <Text style={tw`text-grey text-sm font-dm`}>{timeStr}</Text>
-                        <View style={tw`flex-row items-center gap-2 mt-1`}>
-                          <Text style={tw`text-xs font-dm text-grey`}>With {otherPerson?.name || 'Unknown'}</Text>
+                        <Text style={[tw`text-grey font-dm`, { fontSize: moderateScale(13.125), marginBottom: verticalScale(3.75) }]}>{dateStr}</Text>
+                        <Text style={[tw`text-grey font-dm`, { fontSize: moderateScale(13.125) }]}>{timeStr}</Text>
+                        <View style={[tw`flex-row items-center`, { gap: horizontalScale(7.5), marginTop: verticalScale(3.75) }]}>
+                          <Text style={[tw`font-dm text-grey`, { fontSize: moderateScale(11.25) }]}>With {otherPerson?.name || 'Unknown'}</Text>
                           {meeting.meetingType && (
                             <>
                               <Text style={tw`text-grey`}>•</Text>
-                              <Text style={tw`text-xs font-dm text-grey`}>{getMeetingTypeIcon(meeting.meetingType)} {meeting.meetingType}</Text>
+                              <Text style={[tw`font-dm text-grey`, { fontSize: moderateScale(11.25) }]}>{getMeetingTypeIcon(meeting.meetingType)} {meeting.meetingType}</Text>
                             </>
                           )}
                         </View>
@@ -295,8 +296,8 @@ const AppStack_SearchScreen: React.FC<Props> = ({ navigation, route }) => {
               })}
             </>
           ) : (
-            <View style={tw`py-10 items-center`}>
-              <Text style={tw`text-grey text-base font-dm`}>
+            <View style={{ paddingVertical: verticalScale(37.5), alignItems: 'center' }}>
+              <Text style={[tw`text-grey font-dm`, { fontSize: moderateScale(15) }]}>
                 {searchText ? 'No meetings found' : 'Start typing to search'}
               </Text>
             </View>

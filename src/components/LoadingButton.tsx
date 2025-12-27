@@ -1,6 +1,6 @@
 import React from 'react';
 import { TouchableOpacity, ActivityIndicator, Text, View, ViewStyle } from 'react-native';
-import tw from '../../tailwindcss';
+import tw from '~/tailwindcss';
 
 interface LoadingButtonProps {
   onPress: () => void | Promise<void>;

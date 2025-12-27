@@ -8,11 +8,12 @@ import * as Location from 'expo-location';
 import * as Contacts from 'expo-contacts';
 import * as Notifications from 'expo-notifications';
 import { AppStackParamList } from '.';
-import tw from 'tailwindcss';
+import tw from '~/tailwindcss';
 import { Avatar, Background, Notification, Search, HomeIcon, CalendarIcon, BusinessIcon, ProfileIcon, AddIcon, GymIcon, FootballIcon } from '~/lib/images';
 import { http } from '~/helpers/http';
 import { useAddButton } from '~/contexts/AddButtonContext';
 import { setupSocketEventListeners, getSocket, initializeSocket } from '~/services/socketService';
+import { horizontalScale, verticalScale, moderateScale } from '~/helpers/responsive';
 
 type Props = NativeStackScreenProps<AppStackParamList, 'AppStack_HomePageScreen'>;
 
@@ -232,7 +233,7 @@ const AppStack_HomePageScreen: React.FC<Props> = ({ navigation, route }) => {
     const subscription = Notifications.addNotificationReceivedListener((notification) => {
       const data = notification.request.content.data as any;
       const eventType = data.eventType || data.type;
-      
+
       // Refresh meetings when moment-related events occur
       if (
         eventType === 'moment.request.created' ||
@@ -261,14 +262,14 @@ const AppStack_HomePageScreen: React.FC<Props> = ({ navigation, route }) => {
 
     const setupSocketListeners = async () => {
       if (!isMounted) return;
-      
+
       let socket = getSocket();
-      
+
       // If socket is not available, try to initialize it
       if (!socket) {
         console.log('[HomePage] Socket not available, attempting to initialize...');
         socket = await initializeSocket();
-        
+
         if (!socket || !isMounted) {
           console.log('[HomePage] Failed to initialize socket or component unmounted');
           return;
@@ -278,7 +279,7 @@ const AppStack_HomePageScreen: React.FC<Props> = ({ navigation, route }) => {
       // Set up listeners when socket connects
       const setupOnConnect = () => {
         if (!isMounted) return;
-        
+
         const currentSocket = getSocket();
         if (!currentSocket || !currentSocket.connected) {
           console.log('[HomePage] Socket not connected, waiting...');
@@ -286,12 +287,12 @@ const AppStack_HomePageScreen: React.FC<Props> = ({ navigation, route }) => {
         }
 
         console.log('[HomePage] Setting up Socket.IO event listeners...');
-        
+
         // Clean up previous listeners if any
         if (cleanup) {
           cleanup();
         }
-        
+
         cleanup = setupSocketEventListeners({
           // Meeting created → receiver gets update
           onMomentRequest: (data) => {
@@ -308,11 +309,11 @@ const AppStack_HomePageScreen: React.FC<Props> = ({ navigation, route }) => {
               receiverId: data.receiverId,
               fullData: data
             });
-            
+
             // Determine status from eventType
             const newStatus = data.eventType === 'moment.request.approved' ? 'approved' : 'rejected';
             console.log('[HomePage] New status:', newStatus);
-            
+
             // Immediately update the request status in state if request exists
             if (data.momentRequestId) {
               setAllMeetings(prev => {
@@ -332,7 +333,7 @@ const AppStack_HomePageScreen: React.FC<Props> = ({ navigation, route }) => {
             } else {
               console.warn('[HomePage] No momentRequestId in socket data');
             }
-            
+
             // Always refetch to ensure consistency (even if request wasn't in state)
             setTimeout(() => {
               console.log('[HomePage] Refetching meetings after socket event...');
@@ -371,7 +372,7 @@ const AppStack_HomePageScreen: React.FC<Props> = ({ navigation, route }) => {
     // Cleanup function
     return () => {
       isMounted = false;
-      
+
       // Remove reconnect handler
       if (reconnectHandler) {
         const socket = getSocket();
@@ -379,7 +380,7 @@ const AppStack_HomePageScreen: React.FC<Props> = ({ navigation, route }) => {
           socket.off('reconnect', reconnectHandler);
         }
       }
-      
+
       // Clean up event listeners
       if (cleanup) {
         cleanup();
@@ -394,14 +395,14 @@ const AppStack_HomePageScreen: React.FC<Props> = ({ navigation, route }) => {
         setUserId(response.data.id);
         const meetingTypesArray = response.data.meetingTypes || [];
         setUserMeetingTypes(meetingTypesArray);
-        
+
         // Update meetingTypes based on user's selected types
         const allTypes: MeetingType[] = [
           { id: 'meet', name: 'Meet', icon: CalendarIcon, selected: false },
           { id: 'gym', name: 'Gym', icon: GymIcon, selected: false },
           { id: 'football', name: 'Football', icon: FootballIcon, selected: false },
         ];
-        
+
         // Filter to only show user's selected types
         const filteredTypes = allTypes.filter(type => meetingTypesArray.includes(type.id));
         if (filteredTypes.length > 0) {
@@ -710,27 +711,27 @@ const AppStack_HomePageScreen: React.FC<Props> = ({ navigation, route }) => {
       <View style={tw`absolute w-full h-full bg-black opacity-5`} />
       <ScrollView
         style={tw`flex-1`}
-        contentContainerStyle={[tw`pb-24`, { paddingTop: Math.max(insets.top, 40) }]}
+        contentContainerStyle={{ paddingBottom: verticalScale(75), paddingTop: Math.max(insets.top, 40) }}
         showsVerticalScrollIndicator={false}
       >
-        <View style={[tw`flex-1`, { paddingHorizontal: '8%' }]}>
+        <View style={{ flex: 1, paddingHorizontal: '8%' }}>
           {/* Header */}
-          <View style={tw`flex-row justify-between items-center my-2`}>
+          <View style={[tw`flex-row justify-between items-center`, { marginVertical: verticalScale(7.5) }]}>
             <TouchableOpacity
               onPress={() => navigation.navigate('AppStack_ProfileScreen')}
               activeOpacity={0.5}
             >
-              <Image source={Avatar} style={tw`w-13 h-13`} />
+              <Image source={Avatar} style={{ width: horizontalScale(48.75), height: horizontalScale(48.75) }} />
             </TouchableOpacity>
             <TouchableOpacity
               onPress={() => navigation.navigate('AppStack_NotificationScreen')}
               activeOpacity={0.5}
               style={tw`relative`}
             >
-              <Image source={Notification} style={tw`w-13 h-13`} />
+              <Image source={Notification} style={{ width: horizontalScale(48.75), height: horizontalScale(48.75) }} />
               {unreadNotificationCount > 0 && (
-                <View style={tw`absolute -top-1 -right-1 bg-red-500 rounded-full w-5 h-5 items-center justify-center`}>
-                  <Text style={tw`text-white text-xs font-bold`}>
+                <View style={[tw`absolute bg-red-500 rounded-full items-center justify-center`, { top: -verticalScale(3.75), right: -horizontalScale(3.75), width: horizontalScale(18.75), height: horizontalScale(18.75) }]}>
+                  <Text style={[tw`text-white font-bold`, { fontSize: moderateScale(11.25) }]}>
                     {unreadNotificationCount > 99 ? '99+' : unreadNotificationCount}
                   </Text>
                 </View>
@@ -743,7 +744,7 @@ const AppStack_HomePageScreen: React.FC<Props> = ({ navigation, route }) => {
             <ScrollView
               horizontal
               showsHorizontalScrollIndicator={false}
-              contentContainerStyle={tw`flex-row gap-2`}
+              contentContainerStyle={{ flexDirection: 'row', gap: horizontalScale(7.5) }}
             >
               {dates.map((item, index) => {
                 const selected = isSelected(item.fullDate);
@@ -752,14 +753,14 @@ const AppStack_HomePageScreen: React.FC<Props> = ({ navigation, route }) => {
                     key={index}
                     onPress={() => setSelectedDate(item.fullDate)}
                     activeOpacity={0.7}
-                    style={tw`flex-col items-center justify-center rounded-full pt-3 ${selected ? 'bg-black' : 'bg-white'
-                      }`}
+                    style={[tw`flex-col items-center justify-center rounded-full ${selected ? 'bg-black' : 'bg-white'
+                      }`, { paddingTop: verticalScale(11.25) }]}
                   >
-                    <Text style={tw`text-sm font-dm ${selected ? 'text-white' : 'text-grey'}`}>
+                    <Text style={[tw`font-dm ${selected ? 'text-white' : 'text-grey'}`, { fontSize: moderateScale(13) }]}>
                       {item.day}
                     </Text>
-                    <View style={tw`rounded-full ${selected ? 'bg-white' : 'bg-gray-200'} m-1 flex-row items-center justify-center w-10 h-10`}>
-                      <Text style={tw`text-base font-dm`}>{item.date.toString().padStart(2, '0')}</Text>
+                    <View style={[tw`rounded-full ${selected ? 'bg-white' : 'bg-gray-200'} flex-row items-center justify-center`, { margin: moderateScale(3.75), width: horizontalScale(37.5), height: horizontalScale(37.5) }]}>
+                      <Text style={[tw`font-dm`, { fontSize: moderateScale(15) }]}>{item.date.toString().padStart(2, '0')}</Text>
                     </View>
                   </TouchableOpacity>
                 );
@@ -768,53 +769,53 @@ const AppStack_HomePageScreen: React.FC<Props> = ({ navigation, route }) => {
           </View>
 
           {/* Search Bar */}
-          <View style={tw`mt-4 mb-4`}>
+          <View style={{ marginVertical: verticalScale(15) }}>
             <TouchableOpacity
               activeOpacity={1}
               onPress={() => navigation.navigate('AppStack_SearchScreen')}
             >
-              <View style={tw`flex-row items-center bg-white rounded-full px-4 py-3`}>
-                <Text style={tw`flex-1 font-dm text-sm text-grey`}>
+              <View style={[tw`flex-row items-center bg-white rounded-full`, { paddingHorizontal: horizontalScale(15), paddingVertical: verticalScale(11.25) }]}>
+                <Text style={[tw`flex-1 font-dm text-grey`, { fontSize: moderateScale(13) }]}>
                   Search your meeting types
                 </Text>
-                <Image source={Search} style={tw`w-5 h-5`} />
+                <Image source={Search} style={{ width: horizontalScale(18.75), height: horizontalScale(18.75) }} />
               </View>
             </TouchableOpacity>
           </View>
 
           {/* Information Cards */}
-          <View style={tw`flex-row gap-2 mb-2`}>
+          <View style={{ flexDirection: 'row', gap: horizontalScale(7.5), marginBottom: verticalScale(7.5) }}>
             {/* Today's Date Card */}
-            <View style={tw`bg-[#A3CB31] rounded-2xl py-2 px-2 items-center justify-center w-[35%]`}>
-              <Text style={tw`text-white text-[14px] font-dm mb-1`}>Last</Text>
-              <Text style={tw`text-white text-[40px] font-bold font-dm mb-1`}>
+            <View style={[tw`bg-[#A3CB31] rounded-2xl items-center justify-center`, { padding: moderateScale(7.5), width: horizontalScale(131.25) }]}>
+              <Text style={[tw`text-white font-dm`, { fontSize: moderateScale(13), marginBottom: verticalScale(3.75) }]}>Last</Text>
+              <Text style={[tw`text-white font-bold font-dm`, { fontSize: moderateScale(37.5), marginBottom: verticalScale(3.75) }]}>
                 {formatDate(new Date(), 'd')}
               </Text>
-              <Text style={tw`text-white text-[14px] font-dm`}>
+              <Text style={[tw`text-white font-dm`, { fontSize: moderateScale(13) }]}>
                 {formatDate(new Date(), 'MMMM')}
               </Text>
             </View>
 
             {/* Upcoming Meeting Card */}
-            <View style={tw`flex-1 bg-white rounded-2xl p-2.5 shadow-sm justify-center`}>
+            <View style={[tw`flex-1 bg-white rounded-2xl shadow-sm justify-center`, { padding: moderateScale(9.375) }]}>
               {upcomingMeeting ? (
                 <>
-                  <Text style={tw`text-black text-sm font-bold font-dm mb-0.5`} numberOfLines={1}>
+                  <Text style={[tw`text-black font-bold font-dm`, { fontSize: moderateScale(13), marginBottom: verticalScale(1.875) }]} numberOfLines={1}>
                     {upcomingMeeting.title || upcomingMeeting.notes || 'Untitled Meeting'}
                   </Text>
-                  <Text style={tw`text-grey text-[10px] font-dm mb-0.5`} numberOfLines={1}>
+                  <Text style={[tw`text-grey font-dm`, { fontSize: moderateScale(9.375), marginBottom: verticalScale(1.875) }]} numberOfLines={1}>
                     {upcomingMeeting.sender?.id === userId
                       ? upcomingMeeting.receiver?.name
                       : upcomingMeeting.sender?.name}
                   </Text>
-                  <Text style={tw`text-grey text-[14px] font-dm`}>
+                  <Text style={[tw`text-grey font-dm`, { fontSize: moderateScale(13) }]}>
                     {formatDate(new Date(upcomingMeeting.startTime), 'MMM do')} from{' '}
                     {formatDate(new Date(upcomingMeeting.startTime), 'h:mm')} -{' '}
                     {formatDate(new Date(upcomingMeeting.endTime), 'h:mm a')}
                   </Text>
                 </>
               ) : (
-                <Text style={tw`text-grey text-[14px] font-dm text-center`}>
+                <Text style={[tw`text-grey font-dm text-center`, { fontSize: moderateScale(13) }]}>
                   No Upcoming Appointment
                 </Text>
               )}
@@ -822,59 +823,59 @@ const AppStack_HomePageScreen: React.FC<Props> = ({ navigation, route }) => {
           </View>
 
           {/* Heavy Traffic Card */}
-          <View style={tw`mb-2`}>
-            <View style={tw`bg-black rounded-2xl p-2.5 flex-row items-center justify-between`}>
+          <View style={{ marginBottom: verticalScale(7.5) }}>
+            <View style={[tw`bg-black rounded-2xl flex-row items-center justify-between`, { padding: moderateScale(9.375) }]}>
               <View style={tw`flex-1`}>
-                <Text style={tw`text-white text-xs font-dm mb-0.5`}>Heavy traffic</Text>
-                <Text style={tw`text-white text-[24px] font-bold font-dm mb-0.5`}>1.2 km away</Text>
-                <Text style={tw`text-white text-[10px] font-dm text-gray-400 mb-0.5`}>
+                <Text style={[tw`text-white font-dm`, { fontSize: moderateScale(11.25), marginBottom: verticalScale(1.875) }]}>Heavy traffic</Text>
+                <Text style={[tw`text-white font-bold font-dm`, { fontSize: moderateScale(22.5), marginBottom: verticalScale(1.875) }]}>1.2 km away</Text>
+                <Text style={[tw`text-white font-dm text-gray-400`, { fontSize: moderateScale(9.375), marginBottom: verticalScale(1.875) }]}>
                   Gardiner Expressway Near CN Tower
                 </Text>
-                <Text style={tw`text-white text-[9px] font-dm text-gray-500`}>
+                <Text style={[tw`text-white font-dm text-gray-500`, { fontSize: moderateScale(8.25) }]}>
                   4 min ago by OneLoner
                 </Text>
               </View>
-              <View style={tw`w-12 h-12 rounded-full bg-orange-500 items-center justify-center border border-white`}>
+              <View style={[tw`rounded-full bg-orange-500 items-center justify-center border border-white`, { width: horizontalScale(45), height: horizontalScale(45) }]}>
                 {/* Three cars in diagonal queue representation */}
-                <View style={tw`relative w-8 h-8`}>
+                <View style={{ position: 'relative', width: horizontalScale(30), height: horizontalScale(30) }}>
                   {/* First car (red, front) */}
-                  <View style={tw`absolute top-0 left-0 w-3 h-2 bg-red-500 rounded-sm`} />
+                  <View style={[tw`absolute top-0 left-0 bg-red-500 rounded-sm`, { width: horizontalScale(11.25), height: verticalScale(7.5) }]} />
                   {/* Second car (orange, middle) */}
-                  <View style={tw`absolute top-1.5 left-1.5 w-3 h-2 bg-orange-300 rounded-sm`} />
+                  <View style={[tw`absolute bg-orange-300 rounded-sm`, { top: verticalScale(5.625), left: horizontalScale(5.625), width: horizontalScale(11.25), height: verticalScale(7.5) }]} />
                   {/* Third car (yellow, back) */}
-                  <View style={tw`absolute top-3 left-3 w-3 h-2 bg-yellow-300 rounded-sm`} />
+                  <View style={[tw`absolute bg-yellow-300 rounded-sm`, { top: verticalScale(11.25), left: horizontalScale(11.25), width: horizontalScale(11.25), height: verticalScale(7.5) }]} />
                 </View>
               </View>
             </View>
           </View>
 
           {/* Weather Card */}
-          <View style={tw`mb-4`}>
+          <View style={{ marginBottom: verticalScale(15) }}>
             {weatherLoading ? (
-              <View style={tw`bg-black rounded-2xl p-2.5 items-center justify-center`}>
+              <View style={[tw`bg-black rounded-2xl items-center justify-center`, { padding: moderateScale(9.375) }]}>
                 <ActivityIndicator size="small" color="#FFFFFF" />
               </View>
             ) : weather ? (
-              <View style={tw`bg-black rounded-2xl p-2.5 flex-row items-center justify-between`}>
-                <Text style={tw`text-white text-[28px] font-dm`}>{weather.temperature}°</Text>
-                <View style={tw`flex-1 ml-3`}>
-                  <Text style={tw`text-white text-sm font-dm`}>{weather.description}</Text>
-                  <Text style={tw`text-white text-[10px] font-dm text-gray-400`}>
+              <View style={[tw`bg-black rounded-2xl flex-row items-center justify-between`, { padding: moderateScale(9.375) }]}>
+                <Text style={[tw`text-white font-dm`, { fontSize: moderateScale(26.25) }]}>{weather.temperature}°</Text>
+                <View style={[tw`flex-1`, { marginLeft: horizontalScale(11.25) }]}>
+                  <Text style={[tw`text-white font-dm`, { fontSize: moderateScale(13) }]}>{weather.description}</Text>
+                  <Text style={[tw`text-white font-dm text-gray-400`, { fontSize: moderateScale(9.375) }]}>
                     {formatDate(selectedDate, 'MMM do')}
                   </Text>
                 </View>
-                <Text style={tw`text-white text-2xl`}>{weather.icon}</Text>
+                <Text style={[tw`text-white`, { fontSize: moderateScale(22.5) }]}>{weather.icon}</Text>
               </View>
             ) : null}
           </View>
 
           {/* Meeting Type Filters */}
-          <View style={tw`mb-4`}>
-            <Text style={tw`text-black text-lg font-bold font-dm mb-3`}>Your meeting types</Text>
+          <View style={{ marginBottom: verticalScale(15) }}>
+            <Text style={[tw`text-black font-bold font-dm`, { fontSize: moderateScale(16.875), marginBottom: verticalScale(11.25) }]}>Your meeting types</Text>
             <ScrollView
               horizontal
               showsHorizontalScrollIndicator={false}
-              contentContainerStyle={tw`flex-row gap-3`}
+              contentContainerStyle={{ flexDirection: 'row', gap: horizontalScale(11.25) }}
             >
               {meetingTypes.map((type) => {
                 const isSelected = selectedMeetingType === type.id;
@@ -884,19 +885,21 @@ const AppStack_HomePageScreen: React.FC<Props> = ({ navigation, route }) => {
                     onPress={() => setSelectedMeetingType(type.id)}
                     activeOpacity={0.7}
                     style={[
-                      tw`flex-row items-center pl-4 pr-2 py-1 rounded-full border border-white`,
-                      { minWidth: 100 },
+                      tw`flex-row items-center rounded-full border border-white`,
+                      { paddingLeft: horizontalScale(15), paddingRight: horizontalScale(7.5), paddingVertical: verticalScale(3.75) },
+                      { minWidth: '25%' },
                       { backgroundColor: isSelected ? '#FFF' : 'transparent' }
                     ]}
                   >
                     <Text
-                      style={tw`font-dm text-sm text-black flex-1`}
+                      style={[tw`font-dm text-black flex-1`, { fontSize: moderateScale(13) }]}
                     >
                       {type.name}
                     </Text>
                     <View
                       style={[
-                        tw`w-9 h-9 items-center justify-center`,
+                        tw`items-center justify-center`,
+                        { width: horizontalScale(33.75), height: horizontalScale(33.75) },
                         { borderRadius: 99 },
                         { backgroundColor: isSelected ? '#A3CB31' : '#D9D9D9' }
                       ]}
@@ -904,7 +907,7 @@ const AppStack_HomePageScreen: React.FC<Props> = ({ navigation, route }) => {
                       <Image
                         source={type.icon}
                         style={[
-                          tw`w-5 h-5`,
+                          { width: horizontalScale(18.75), height: horizontalScale(18.75) },
                           { tintColor: isSelected ? '#FFFFFF' : '#000000' }
                         ]}
                         resizeMode="contain"
@@ -917,9 +920,9 @@ const AppStack_HomePageScreen: React.FC<Props> = ({ navigation, route }) => {
           </View>
 
           {/* Meeting List */}
-          <View style={tw`mb-4`}>
+          <View style={{ marginBottom: verticalScale(15) }}>
             {loading ? (
-              <View style={tw`py-10 items-center`}>
+              <View style={{ paddingVertical: verticalScale(37.5), alignItems: 'center' }}>
                 <ActivityIndicator size="large" color="#A3CB31" />
               </View>
             ) : filteredMeetings.length > 0 ? (
@@ -930,7 +933,7 @@ const AppStack_HomePageScreen: React.FC<Props> = ({ navigation, route }) => {
                 return (
                   <TouchableOpacity
                     key={meeting.id}
-                    style={tw`bg-white rounded-2xl p-4 mb-3 flex-row items-center shadow-sm`}
+                    style={[tw`bg-white rounded-2xl flex-row items-center shadow-sm`, { padding: moderateScale(15), marginBottom: verticalScale(11.25) }]}
                     activeOpacity={0.7}
                     onPress={() => {
                       // Use local date components to avoid timezone issues
@@ -942,35 +945,35 @@ const AppStack_HomePageScreen: React.FC<Props> = ({ navigation, route }) => {
                       navigation.navigate('AppStack_DateDetailScreen', { date: dateParam });
                     }}
                   >
-                    <View style={tw`w-12 h-12 rounded-full bg-gray-200 items-center justify-center mr-4 overflow-hidden`}>
+                    <View style={[tw`rounded-full bg-gray-200 items-center justify-center overflow-hidden`, { width: horizontalScale(45), height: horizontalScale(45), marginRight: horizontalScale(15) }]}>
                       {localAvatar ? (
                         <Image
                           source={{ uri: localAvatar }}
-                          style={tw`w-12 h-12 rounded-full`}
+                          style={{ width: horizontalScale(45), height: horizontalScale(45), borderRadius: 9999 }}
                         />
                       ) : (
-                        <Image source={Avatar} style={tw`w-8 h-8`} />
+                        <Image source={Avatar} style={{ width: horizontalScale(30), height: horizontalScale(30) }} />
                       )}
                     </View>
                     <View style={tw`flex-1`}>
-                      <Text style={tw`text-black text-sm font-bold font-dm mb-1`}>
+                      <Text style={[tw`text-black font-bold font-dm`, { fontSize: moderateScale(13), marginBottom: verticalScale(3.75) }]}>
                         {meeting.title || meeting.notes || 'Untitled Meeting'}
                       </Text>
-                      <Text style={tw`text-grey text-xs font-dm`}>
+                      <Text style={[tw`text-grey font-dm`, { fontSize: moderateScale(11.25) }]}>
                         {formatMeetingDuration(meeting.startTime, meeting.endTime)} •{' '}
                         {formatDate(new Date(meeting.startTime), 'h:mm a')}
                       </Text>
                     </View>
                     <View style={tw`items-center justify-center`}>
-                      <View style={tw`w-1 h-1 rounded-full bg-gray-400 mb-1`} />
-                      <View style={tw`w-1 h-1 rounded-full bg-gray-400`} />
+                      <View style={[tw`rounded-full bg-gray-400`, { width: horizontalScale(3.75), height: horizontalScale(3.75), marginBottom: verticalScale(3.75) }]} />
+                      <View style={[tw`rounded-full bg-gray-400`, { width: horizontalScale(3.75), height: horizontalScale(3.75) }]} />
                     </View>
                   </TouchableOpacity>
                 );
               })
             ) : (
-              <View style={tw`py-10 items-center`}>
-                <Text style={tw`text-grey text-base font-dm`}>No meetings scheduled</Text>
+              <View style={{ paddingVertical: verticalScale(37.5), alignItems: 'center' }}>
+                <Text style={[tw`text-grey font-dm`, { fontSize: moderateScale(15) }]}>No meetings scheduled</Text>
               </View>
             )}
           </View>
@@ -997,54 +1000,54 @@ const AppStack_HomePageScreen: React.FC<Props> = ({ navigation, route }) => {
           </TouchableOpacity>
 
           {/* Popup Menu */}
-          <View style={tw`absolute bottom-0 left-0 right-0 items-center pb-24`}>
-            <View style={tw`bg-white rounded-3xl w-5/6 overflow-hidden p-4`}>
+          <View style={[tw`absolute bottom-0 left-0 right-0 items-center`, { paddingBottom: verticalScale(90) }]}>
+            <View style={[tw`bg-white rounded-3xl w-5/6 overflow-hidden`, { padding: moderateScale(15) }]}>
               {/* Book a meeting */}
               <TouchableOpacity
-                style={tw`flex-row items-center px-6 py-4`}
+                style={[tw`flex-row items-center`, { paddingHorizontal: horizontalScale(22.5), paddingVertical: verticalScale(15) }]}
                 activeOpacity={0.7}
                 onPress={handleBookMeeting}
               >
-                <View style={tw`w-10 h-10 rounded-full bg-gray-200 items-center justify-center mr-4`}>
-                  <Text style={tw`text-black text-xl font-bold`}>+</Text>
+                <View style={[tw`rounded-full bg-gray-200 items-center justify-center`, { width: horizontalScale(37.5), height: horizontalScale(37.5), marginRight: horizontalScale(15) }]}>
+                  <Text style={[tw`text-black font-bold`, { fontSize: moderateScale(18.75) }]}>+</Text>
                 </View>
-                <Text style={tw`text-black text-base font-dm flex-1`}>Book a meeting</Text>
+                <Text style={[tw`text-black font-dm flex-1`, { fontSize: moderateScale(15) }]}>Book a meeting</Text>
               </TouchableOpacity>
 
               {/* Separator */}
-              <View style={tw`h-px bg-gray-200 mx-6`} />
+              <View style={[tw`bg-gray-200`, { height: verticalScale(1.125), marginHorizontal: horizontalScale(22.5) }]} />
 
               {/* Create meeting type */}
               <TouchableOpacity
                 style={[
-                  tw`flex-row items-center px-6 py-4`,
-                  tw`opacity-50`
+                  tw`flex-row items-center opacity-50`,
+                  { paddingHorizontal: horizontalScale(22.5), paddingVertical: verticalScale(15) }
                 ]}
                 activeOpacity={1}
                 disabled={true}
               >
-                <View style={tw`w-10 h-10 rounded-full bg-gray-200 items-center justify-center mr-4`}>
-                  <Text style={tw`text-black text-xl font-bold`}>+</Text>
+                <View style={[tw`rounded-full bg-gray-200 items-center justify-center`, { width: horizontalScale(37.5), height: horizontalScale(37.5), marginRight: horizontalScale(15) }]}>
+                  <Text style={[tw`text-black font-bold`, { fontSize: moderateScale(18.75) }]}>+</Text>
                 </View>
-                <Text style={tw`text-black text-base font-dm flex-1`}>Create meeting type</Text>
+                <Text style={[tw`text-black font-dm flex-1`, { fontSize: moderateScale(15) }]}>Create meeting type</Text>
               </TouchableOpacity>
 
               {/* Separator */}
-              <View style={tw`h-px bg-gray-200 mx-6`} />
+              <View style={[tw`bg-gray-200`, { height: verticalScale(1.125), marginHorizontal: horizontalScale(22.5) }]} />
 
               {/* Manage availability */}
               <TouchableOpacity
                 style={[
-                  tw`flex-row items-center px-6 py-4`,
-                  tw`opacity-50`
+                  tw`flex-row items-center opacity-50`,
+                  { paddingHorizontal: horizontalScale(22.5), paddingVertical: verticalScale(15) }
                 ]}
                 activeOpacity={1}
                 disabled={true}
               >
-                <View style={tw`w-10 h-10 rounded-full bg-gray-200 items-center justify-center mr-4`}>
-                  <Text style={tw`text-black text-xl font-bold`}>+</Text>
+                <View style={[tw`rounded-full bg-gray-200 items-center justify-center`, { width: horizontalScale(37.5), height: horizontalScale(37.5), marginRight: horizontalScale(15) }]}>
+                  <Text style={[tw`text-black font-bold`, { fontSize: moderateScale(18.75) }]}>+</Text>
                 </View>
-                <Text style={tw`text-black text-base font-dm flex-1`}>Manage availability</Text>
+                <Text style={[tw`text-black font-dm flex-1`, { fontSize: moderateScale(15) }]}>Manage availability</Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -1070,21 +1073,21 @@ const AppStack_HomePageScreen: React.FC<Props> = ({ navigation, route }) => {
           </TouchableOpacity>
 
           <View style={tw`absolute bottom-0 left-0 right-0 bg-white rounded-t-3xl`}>
-            <View style={[tw`pt-6 pb-8`, { paddingHorizontal: '4%' }]}>
+            <View style={[{ paddingTop: verticalScale(22.5), paddingBottom: verticalScale(30) }, { paddingHorizontal: '4%' }]}>
               {/* Header */}
-              <View style={tw`flex-row justify-between items-center mb-4`}>
-                <Text style={tw`text-black text-xl font-bold font-dm`}>Select Contact</Text>
+              <View style={[tw`flex-row justify-between items-center`, { marginBottom: verticalScale(15) }]}>
+                <Text style={[tw`text-black font-bold font-dm`, { fontSize: moderateScale(18.75) }]}>Select Contact</Text>
                 <TouchableOpacity
                   onPress={() => setShowContactModal(false)}
                   activeOpacity={0.7}
                 >
-                  <Text style={tw`text-[#A3CB31] text-base font-dm`}>Cancel</Text>
+                  <Text style={[tw`text-[#A3CB31] font-dm`, { fontSize: moderateScale(15) }]}>Cancel</Text>
                 </TouchableOpacity>
               </View>
 
               {/* Search Bar */}
-              <View style={tw`bg-gray-100 rounded-2xl px-4 py-3 flex-row items-center mb-4`}>
-                <Image source={Search} style={tw`w-5 h-5 mr-2`} />
+              <View style={[tw`bg-gray-100 rounded-2xl flex-row items-center`, { paddingHorizontal: horizontalScale(15), paddingVertical: verticalScale(11.25), marginBottom: verticalScale(15) }]}>
+                <Image source={Search} style={{ width: horizontalScale(18.75), height: horizontalScale(18.75), marginRight: horizontalScale(7.5) }} />
                 <TextInput
                   style={tw`flex-1 text-black font-dm`}
                   placeholder="Search contacts"
@@ -1095,45 +1098,46 @@ const AppStack_HomePageScreen: React.FC<Props> = ({ navigation, route }) => {
               </View>
 
               {/* Contacts List */}
-              <ScrollView style={tw`max-h-96`} showsVerticalScrollIndicator={false}>
+              <ScrollView style={{ maxHeight: verticalScale(337.5) }} showsVerticalScrollIndicator={false}>
                 {/* Recent Contacts Section */}
                 {recentContacts.length > 0 && !contactSearchText && (
-                  <View style={tw`mb-2`}>
-                    <Text style={tw`text-grey text-xs font-bold font-dm mb-2 px-1`}>RECENT</Text>
+                  <View style={{ marginBottom: verticalScale(7.5) }}>
+                    <Text style={[tw`text-grey font-bold font-dm`, { fontSize: moderateScale(11.25), marginBottom: verticalScale(7.5), paddingHorizontal: horizontalScale(3.75) }]}>RECENT</Text>
                     {recentContacts.map((contact) => {
                       const isDisabled = !contact.contactUser?.id;
                       return (
                         <TouchableOpacity
                           key={contact.id}
                           style={[
-                            tw`flex-row items-center py-4 border-b border-gray-100`,
+                            tw`flex-row items-center border-b border-gray-100`,
+                            { paddingVertical: verticalScale(15) },
                             isDisabled && tw`opacity-50`
                           ]}
                           activeOpacity={isDisabled ? 1 : 0.7}
                           onPress={() => !isDisabled && handleContactSelect(contact)}
                           disabled={isDisabled}
                         >
-                          <View style={tw`w-12 h-12 rounded-full bg-gray-200 items-center justify-center mr-4 overflow-hidden`}>
+                          <View style={[tw`rounded-full bg-gray-200 items-center justify-center overflow-hidden`, { width: horizontalScale(45), height: horizontalScale(45), marginRight: horizontalScale(15) }]}>
                             {contact.contactUser?.avatar ? (
                               <Image
                                 source={{ uri: contact.contactUser.avatar }}
-                                style={tw`w-12 h-12 rounded-full`}
+                                style={{ width: horizontalScale(45), height: horizontalScale(45), borderRadius: 9999 }}
                               />
                             ) : (
-                              <Image source={Avatar} style={tw`w-8 h-8`} />
+                              <Image source={Avatar} style={{ width: horizontalScale(30), height: horizontalScale(30) }} />
                             )}
                           </View>
                           <View style={tw`flex-1`}>
-                            <Text style={tw`text-black text-base font-bold font-dm`}>
+                            <Text style={[tw`text-black font-bold font-dm`, { fontSize: moderateScale(15) }]}>
                               {contact.displayName}
                             </Text>
                             {contact.contactPhone && (
-                              <Text style={tw`text-grey text-sm font-dm`}>
+                              <Text style={[tw`text-grey font-dm`, { fontSize: moderateScale(13) }]}>
                                 {contact.contactPhone}
                               </Text>
                             )}
                             {isDisabled && (
-                              <Text style={tw`text-grey text-xs font-dm mt-1`}>
+                              <Text style={[tw`text-grey font-dm`, { fontSize: moderateScale(11.25), marginTop: 1 }]}>
                                 Not registered
                               </Text>
                             )}
@@ -1148,7 +1152,7 @@ const AppStack_HomePageScreen: React.FC<Props> = ({ navigation, route }) => {
                 {filteredContacts.length > 0 && (
                   <View>
                     {recentContacts.length > 0 && !contactSearchText && (
-                      <Text style={tw`text-grey text-xs font-bold font-dm mb-2 px-1 mt-2`}>ALL CONTACTS</Text>
+                      <Text style={[tw`text-grey font-bold font-dm`, { fontSize: moderateScale(11.25), marginBottom: verticalScale(7.5), paddingHorizontal: horizontalScale(3.75), marginTop: verticalScale(7.5) }]}>ALL CONTACTS</Text>
                     )}
                     {filteredContacts.map((contact) => {
                       const isDisabled = !contact.contactUser?.id;
@@ -1156,34 +1160,35 @@ const AppStack_HomePageScreen: React.FC<Props> = ({ navigation, route }) => {
                         <TouchableOpacity
                           key={contact.id}
                           style={[
-                            tw`flex-row items-center py-4 border-b border-gray-100`,
+                            tw`flex-row items-center border-b border-gray-100`,
+                            { paddingVertical: verticalScale(15) },
                             isDisabled && tw`opacity-50`
                           ]}
                           activeOpacity={isDisabled ? 1 : 0.7}
                           onPress={() => !isDisabled && handleContactSelect(contact)}
                           disabled={isDisabled}
                         >
-                          <View style={tw`w-12 h-12 rounded-full bg-gray-200 items-center justify-center mr-4 overflow-hidden`}>
+                          <View style={[tw`rounded-full bg-gray-200 items-center justify-center overflow-hidden`, { width: horizontalScale(45), height: horizontalScale(45), marginRight: horizontalScale(15) }]}>
                             {contact.contactUser?.avatar ? (
                               <Image
                                 source={{ uri: contact.contactUser.avatar }}
-                                style={tw`w-12 h-12 rounded-full`}
+                                style={{ width: horizontalScale(45), height: horizontalScale(45), borderRadius: 9999 }}
                               />
                             ) : (
-                              <Image source={Avatar} style={tw`w-8 h-8`} />
+                              <Image source={Avatar} style={{ width: horizontalScale(30), height: horizontalScale(30) }} />
                             )}
                           </View>
                           <View style={tw`flex-1`}>
-                            <Text style={tw`text-black text-base font-bold font-dm`}>
+                            <Text style={[tw`text-black font-bold font-dm`, { fontSize: moderateScale(15) }]}>
                               {contact.displayName}
                             </Text>
                             {contact.contactPhone && (
-                              <Text style={tw`text-grey text-sm font-dm`}>
+                              <Text style={[tw`text-grey font-dm`, { fontSize: moderateScale(13) }]}>
                                 {contact.contactPhone}
                               </Text>
                             )}
                             {isDisabled && (
-                              <Text style={tw`text-grey text-xs font-dm mt-1`}>
+                              <Text style={[tw`text-grey font-dm`, { fontSize: moderateScale(11.25), marginTop: 1 }]}>
                                 Not registered
                               </Text>
                             )}
@@ -1196,8 +1201,8 @@ const AppStack_HomePageScreen: React.FC<Props> = ({ navigation, route }) => {
 
                 {/* No Contacts Message */}
                 {filteredContacts.length === 0 && recentContacts.length === 0 && (
-                  <View style={tw`py-10 items-center`}>
-                    <Text style={tw`text-grey text-base font-dm`}>No contacts found</Text>
+                  <View style={{ paddingVertical: verticalScale(37.5), alignItems: 'center' }}>
+                    <Text style={[tw`text-grey font-dm`, { fontSize: moderateScale(15) }]}>No contacts found</Text>
                   </View>
                 )}
               </ScrollView>

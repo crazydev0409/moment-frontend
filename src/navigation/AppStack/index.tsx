@@ -16,7 +16,7 @@ import {
 import { RootStackParamList } from '../../index';
 import BottomNavigationBar from '~/components/BottomNavigationBar';
 import { AddButtonProvider, useAddButton } from '~/contexts/AddButtonContext';
-import tw from 'tailwindcss';
+import tw from '~/tailwindcss';
 
 export type AppStackParamList = {
   AppStack_HomePageScreen: undefined;
@@ -77,59 +77,59 @@ const AppStackNavigator: React.FC = () => {
     <Stack.Navigator initialRouteName="AppStack_HomePageScreen">
       <Stack.Screen
         name="AppStack_HomePageScreen"
-        component={ScreenWithNav({ 
-          component: AppStack_HomePageScreen, 
-          showNav: true, 
-          selectedTab: 'home' 
+        component={ScreenWithNav({
+          component: AppStack_HomePageScreen,
+          showNav: true,
+          selectedTab: 'home'
         })}
         options={{ headerShown: false }}
       />
       <Stack.Screen
         name="AppStack_ProfileScreen"
-        component={ScreenWithNav({ 
-          component: AppStack_ProfileScreen, 
-          showNav: false 
+        component={ScreenWithNav({
+          component: AppStack_ProfileScreen,
+          showNav: false
         })}
         options={{ headerShown: false }}
       />
       <Stack.Screen
         name="AppStack_SettingsScreen"
-        component={ScreenWithNav({ 
-          component: AppStack_SettingsScreen, 
-          showNav: false 
+        component={ScreenWithNav({
+          component: AppStack_SettingsScreen,
+          showNav: false
         })}
         options={{ headerShown: false }}
       />
       <Stack.Screen
         name="AppStack_CalendarScreen"
-        component={ScreenWithNav({ 
-          component: AppStack_CalendarScreen, 
-          showNav: true, 
-          selectedTab: 'calendar' 
+        component={ScreenWithNav({
+          component: AppStack_CalendarScreen,
+          showNav: true,
+          selectedTab: 'calendar'
         })}
         options={{ headerShown: false }}
       />
       <Stack.Screen
         name="AppStack_DateDetailScreen"
-        component={ScreenWithNav({ 
-          component: AppStack_DateDetailScreen, 
-          showNav: false 
+        component={ScreenWithNav({
+          component: AppStack_DateDetailScreen,
+          showNav: false
         })}
         options={{ headerShown: false }}
       />
       <Stack.Screen
         name="AppStack_ContactScreen"
-        component={ScreenWithNav({ 
-          component: AppStack_ContactScreen, 
-          showNav: true, 
-          selectedTab: 'profile' 
+        component={ScreenWithNav({
+          component: AppStack_ContactScreen,
+          showNav: true,
+          selectedTab: 'profile'
         })}
         options={{ headerShown: false }}
       />
       <Stack.Screen
         name="AppStack_ComingSoonScreen"
-        component={ScreenWithNav({ 
-          component: AppStack_ComingSoonScreen, 
+        component={ScreenWithNav({
+          component: AppStack_ComingSoonScreen,
           showNav: true,
           selectedTab: 'business'
         })}
@@ -137,17 +137,17 @@ const AppStackNavigator: React.FC = () => {
       />
       <Stack.Screen
         name="AppStack_SearchScreen"
-        component={ScreenWithNav({ 
-          component: AppStack_SearchScreen, 
-          showNav: false 
+        component={ScreenWithNav({
+          component: AppStack_SearchScreen,
+          showNav: false
         })}
         options={{ headerShown: false }}
       />
       <Stack.Screen
         name="AppStack_NotificationScreen"
-        component={ScreenWithNav({ 
-          component: AppStack_NotificationScreen, 
-          showNav: false 
+        component={ScreenWithNav({
+          component: AppStack_NotificationScreen,
+          showNav: false
         })}
         options={{ headerShown: false }}
       />

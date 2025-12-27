@@ -10,13 +10,15 @@ import {
 } from 'react-native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { useFocusEffect } from '@react-navigation/native';
-import tw from '../../../tailwindcss';
+import tw from '~/tailwindcss';
 import { AppStackParamList } from '.';
 import { useAtom } from 'jotai';
 import { userAtom } from '../../store';
 import { BackArrow, Background, Avatar, Settings } from '~/lib/images';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { http } from '~/helpers/http';
+import { horizontalScale, verticalScale, moderateScale } from '~/helpers/responsive';
+
 type Props = NativeStackScreenProps<
   AppStackParamList,
   'AppStack_ProfileScreen'
@@ -36,7 +38,7 @@ const AppStack_ProfileScreen: React.FC<Props> = ({ navigation, route }) => {
   const [showToast, setShowToast] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [user, setUser] = useAtom(userAtom);
-  
+
   // Fetch and update user profile
   const fetchUserProfile = useCallback(async () => {
     try {
@@ -120,7 +122,7 @@ const AppStack_ProfileScreen: React.FC<Props> = ({ navigation, route }) => {
 
     if (!valid) return;
     if (isSaving) return;
-    
+
     const payload = {
       name, bio, email, birthday
     }
@@ -161,62 +163,73 @@ const AppStack_ProfileScreen: React.FC<Props> = ({ navigation, route }) => {
       <Image source={Background} style={tw`absolute w-full h-full`} />
       <View style={tw`absolute w-full h-full bg-black opacity-5`} />
 
-      <View style={[tw`mt-16 mb-10`, { paddingHorizontal: '8%' }]}>
+      <View style={[tw``, { marginTop: verticalScale(60), marginBottom: verticalScale(37.5), paddingHorizontal: '8%' }]}>
         {/* Header with back arrow and settings */}
-        <View style={tw`flex-row justify-between items-center -mb-2`}>
+        <View style={[tw`flex-row justify-between items-center`, { marginBottom: -verticalScale(7.5) }]}>
           <TouchableOpacity onPress={navigateToMainPage} activeOpacity={0.5}>
-            <Image source={BackArrow} />
+            <Image source={BackArrow} style={[tw``, { width: horizontalScale(30), height: horizontalScale(30) }]} resizeMode="contain" />
           </TouchableOpacity>
-          <TouchableOpacity 
+          <TouchableOpacity
             activeOpacity={0.5}
             onPress={() => navigation.navigate('AppStack_SettingsScreen')}
           >
-            <Image source={Settings} />
+            <Image source={Settings} style={[tw``, { width: horizontalScale(30), height: horizontalScale(30) }]} resizeMode="contain" />
           </TouchableOpacity>
         </View>
 
         {/* Profile Picture */}
-        <View style={tw`items-center mb-8`}>
-          <View style={tw`w-[86px] h-[86px] rounded-full bg-white items-center justify-center shadow-sm`}>
-            <Image source={Avatar} />
+        <View style={[tw`items-center`, { marginBottom: verticalScale(30) }]}>
+          <View style={[tw`rounded-full bg-white items-center justify-center shadow-sm`, { width: horizontalScale(82.5), height: horizontalScale(82.5) }]}>
+            <Image source={Avatar} style={[tw``, { width: horizontalScale(75), height: horizontalScale(75) }]} resizeMode="contain" />
           </View>
         </View>
         <View style={tw``}>
-          <Text style={tw`text-xs text-grey leading-[21px] mb-2`}>Name</Text>
+          <Text style={[tw`text-grey`, { fontSize: moderateScale(12), lineHeight: verticalScale(19), marginBottom: verticalScale(7.5) }]}>Name</Text>
           <TextInput
             autoCapitalize="words"
             autoCorrect={false}
-            style={tw`bg-white rounded-full w-full h-13.5 self-center px-5 font-dm font-normal text-[14px] font-bold tracking-[0.5px]`}
+            style={[tw`bg-white rounded-full w-full self-center font-dm font-normal font-bold tracking-[0.5px]`, {
+              height: verticalScale(51),
+              paddingHorizontal: horizontalScale(19),
+              fontSize: moderateScale(13)
+            }]}
             value={name}
             onChangeText={(t) => { setName(t); setNameError(''); }}
             placeholder="Name"
           />
           {nameError ? (
-            <Text style={tw`text-red-500 text-xs mb-3 mt-3`}>{nameError}</Text>
-          ) : <View style={tw`mb-3 mt-3`} />}
+            <Text style={[tw`text-red-500`, { fontSize: moderateScale(11), marginBottom: verticalScale(11), marginTop: verticalScale(11) }]}>{nameError}</Text>
+          ) : <View style={{ marginBottom: verticalScale(11), marginTop: verticalScale(11) }} />}
         </View>
         <View style={tw``}>
-          <Text style={tw`text-xs text-grey leading-[21px] mb-2`}>BIO</Text>
+          <Text style={[tw`text-grey`, { fontSize: moderateScale(12), lineHeight: verticalScale(19), marginBottom: verticalScale(7.5) }]}>BIO</Text>
           <TextInput
             autoCapitalize="words"
             autoCorrect={false}
-            style={tw`bg-white rounded-full w-full h-13.5 self-center px-5 font-dm font-normal text-[14px] font-bold tracking-[0.5px]`}
+            style={[tw`bg-white rounded-full w-full self-center font-dm font-normal font-bold tracking-[0.5px]`, {
+              height: verticalScale(51),
+              paddingHorizontal: horizontalScale(19),
+              fontSize: moderateScale(13)
+            }]}
             value={bio}
             onChangeText={setBio}
             placeholder="Text"
           />
-          <View style={tw`mb-6`}></View>
+          <View style={{ marginBottom: verticalScale(22.5) }}></View>
         </View>
         <View style={tw``}>
-          <Text style={tw`text-xs text-grey leading-[21px] mb-2`}>Birthday</Text>
+          <Text style={[tw`text-grey`, { fontSize: moderateScale(12), lineHeight: verticalScale(19), marginBottom: verticalScale(7.5) }]}>Birthday</Text>
 
           {/* Fake input container to match UI */}
           <TouchableOpacity
             onPress={() => setShowBirthdayPicker(true)}
             activeOpacity={0.7}
-            style={tw`bg-white rounded-full w-full h-13.5 justify-center px-5`}
+            style={[tw`bg-white rounded-full w-full justify-center`, {
+              height: verticalScale(51),
+              paddingHorizontal: horizontalScale(19)
+            }]}
           >
-            <Text style={tw`font-dm font-normal text-[14px] tracking-[0.5px] text-black`}>
+            <Text style={[tw`font-dm font-normal tracking-[0.5px] text-black`, { fontSize: moderateScale(13) }]}>
               {birthday ? formatBirthday(birthday) : "18.08.1986"}
             </Text>
           </TouchableOpacity>
@@ -234,13 +247,17 @@ const AppStack_ProfileScreen: React.FC<Props> = ({ navigation, route }) => {
           )}
 
           {birthdayError ? (
-            <Text style={tw`text-red-500 text-xs mb-3 mt-3`}>{birthdayError}</Text>
-          ) : <View style={tw`mb-3 mt-3`} />}
+            <Text style={[tw`text-red-500`, { fontSize: moderateScale(11), marginBottom: verticalScale(11), marginTop: verticalScale(11) }]}>{birthdayError}</Text>
+          ) : <View style={{ marginBottom: verticalScale(11), marginTop: verticalScale(11) }} />}
         </View>
         <View style={tw``}>
-          <Text style={tw`text-xs text-grey leading-[21px] mb-2`}>Email</Text>
+          <Text style={[tw`text-grey`, { fontSize: moderateScale(12), lineHeight: verticalScale(19), marginBottom: verticalScale(7.5) }]}>Email</Text>
           <TextInput
-            style={tw`bg-white rounded-full w-full h-13.5 self-center px-5 font-dm font-normal text-[14px] font-bold tracking-[0.5px]`}
+            style={[tw`bg-white rounded-full w-full self-center font-dm font-normal font-bold tracking-[0.5px]`, {
+              height: verticalScale(51),
+              paddingHorizontal: horizontalScale(19),
+              fontSize: moderateScale(13)
+            }]}
             value={email}
             keyboardType="email-address"
             autoCapitalize="none"
@@ -250,13 +267,17 @@ const AppStack_ProfileScreen: React.FC<Props> = ({ navigation, route }) => {
           />
 
           {emailError ? (
-            <Text style={tw`text-red-500 text-xs mb-3 mt-3`}>{emailError}</Text>
-          ) : <View style={tw`mb-3 mt-3`} />}
+            <Text style={[tw`text-red-500`, { fontSize: moderateScale(11), marginBottom: verticalScale(11), marginTop: verticalScale(11) }]}>{emailError}</Text>
+          ) : <View style={{ marginBottom: verticalScale(11), marginTop: verticalScale(11) }} />}
         </View>
         <View style={tw``}>
-          <Text style={tw`text-xs text-grey leading-[21px] mb-2`}>Confirm Email</Text>
+          <Text style={[tw`text-grey`, { fontSize: moderateScale(12), lineHeight: verticalScale(19), marginBottom: verticalScale(7.5) }]}>Confirm Email</Text>
           <TextInput
-            style={tw`bg-white rounded-full w-full h-13.5 self-center px-5 font-dm font-normal text-[14px] font-bold tracking-[0.5px]`}
+            style={[tw`bg-white rounded-full w-full self-center font-dm font-normal font-bold tracking-[0.5px]`, {
+              height: verticalScale(51),
+              paddingHorizontal: horizontalScale(19),
+              fontSize: moderateScale(13)
+            }]}
             value={confirmEmail}
             keyboardType="email-address"
             autoCapitalize="none"
@@ -266,22 +287,26 @@ const AppStack_ProfileScreen: React.FC<Props> = ({ navigation, route }) => {
           />
 
           {confirmEmailError ? (
-            <Text style={tw`text-red-500 text-xs mb-3 mt-3`}>{confirmEmailError}</Text>
-          ) : <View style={tw`mb-3 mt-3`} />}
+            <Text style={[tw`text-red-500`, { fontSize: moderateScale(11), marginBottom: verticalScale(11), marginTop: verticalScale(11) }]}>{confirmEmailError}</Text>
+          ) : <View style={{ marginBottom: verticalScale(11), marginTop: verticalScale(11) }} />}
         </View>
       </View>
       <View style={tw`absolute bottom-0 w-full flex-col items-center`}>
-        <TouchableOpacity 
-          onPress={navigateToPlanPage} 
+        <TouchableOpacity
+          onPress={navigateToPlanPage}
           activeOpacity={0.7}
           disabled={isSaving}
         >
           <View
-            style={tw`bg-[#A3CB31] rounded-full h-15 w-60 mb-10 justify-center items-center shadow-lg ${isSaving ? 'opacity-50' : ''}`}>
+            style={[tw`bg-[#A3CB31] rounded-full justify-center items-center shadow-lg ${isSaving ? 'opacity-50' : ''}`, {
+              height: verticalScale(56),
+              width: horizontalScale(225),
+              marginBottom: verticalScale(37.5)
+            }]}>
             {isSaving ? (
               <ActivityIndicator size="small" color="#FFFFFF" />
             ) : (
-              <Text style={tw`text-white text-base font-bold font-dm`}>
+              <Text style={[tw`text-white font-bold font-dm`, { fontSize: moderateScale(15) }]}>
                 Save
               </Text>
             )}

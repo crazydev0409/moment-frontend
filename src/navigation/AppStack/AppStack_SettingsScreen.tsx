@@ -11,7 +11,7 @@ import {
 } from 'react-native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import tw from '../../../tailwindcss';
+import tw from '~/tailwindcss';
 import { AppStackParamList } from '.';
 import { BackArrow, Background } from '~/lib/images';
 import { http } from '~/helpers/http';
@@ -19,6 +19,7 @@ import { disconnectSocket } from '~/services/socketService';
 import { useAtom } from 'jotai';
 import { userAtom } from '../../store';
 import { navigationRef } from '~/index';
+import { horizontalScale, verticalScale, moderateScale } from '~/helpers/responsive';
 
 type Props = NativeStackScreenProps<
     AppStackParamList,
@@ -73,13 +74,13 @@ const AppStack_SettingsScreen: React.FC<Props> = ({ navigation, route }) => {
                             // Clear tokens from storage
                             await AsyncStorage.removeItem('accessToken');
                             await AsyncStorage.removeItem('refreshToken');
-                            
+
                             // Clear authorization header
                             delete http.defaults.headers.common['Authorization'];
-                            
+
                             // Disconnect socket
                             disconnectSocket();
-                            
+
                             // Clear user atom
                             setUser({
                                 id: '',
@@ -91,7 +92,7 @@ const AppStack_SettingsScreen: React.FC<Props> = ({ navigation, route }) => {
                                 meetingTypes: [],
                                 verified: false
                             });
-                            
+
                             // Navigate to AuthStack - use reset to clear navigation stack
                             if (navigationRef.isReady()) {
                                 navigationRef.reset({
@@ -167,17 +168,17 @@ const AppStack_SettingsScreen: React.FC<Props> = ({ navigation, route }) => {
                                         try {
                                             // Call delete account API
                                             await http.delete('/users/account');
-                                            
+
                                             // Clear tokens from storage
                                             await AsyncStorage.removeItem('accessToken');
                                             await AsyncStorage.removeItem('refreshToken');
-                                            
+
                                             // Clear authorization header
                                             delete http.defaults.headers.common['Authorization'];
-                                            
+
                                             // Disconnect socket
                                             disconnectSocket();
-                                            
+
                                             // Clear user atom
                                             setUser({
                                                 id: '',
@@ -189,7 +190,7 @@ const AppStack_SettingsScreen: React.FC<Props> = ({ navigation, route }) => {
                                                 meetingTypes: [],
                                                 verified: false
                                             });
-                                            
+
                                             // Navigate to AuthStack - use reset to clear navigation stack
                                             if (navigationRef.isReady()) {
                                                 navigationRef.reset({
@@ -237,81 +238,84 @@ const AppStack_SettingsScreen: React.FC<Props> = ({ navigation, route }) => {
                 contentContainerStyle={tw`pb-10`}
                 showsVerticalScrollIndicator={false}
             >
-                <View style={[tw`mt-16 mb-10`, { paddingHorizontal: '8%' }]}>
-          {/* Header */}
-          <View style={tw`flex-row items-center mb-8 relative`}>
-            <TouchableOpacity onPress={navigateToProfile} activeOpacity={0.5} style={tw`absolute left-0 z-10`}>
-              <Image source={BackArrow} />
-            </TouchableOpacity>
-            <Text style={tw`text-2xl font-bold font-dm text-black flex-1 text-center`}>Settings</Text>
-          </View>
+                <View style={[{ marginTop: verticalScale(60), marginBottom: verticalScale(37.5) }, { paddingHorizontal: '8%' }]}>
+                    {/* Header */}
+                    <View style={[tw`flex-row items-center relative`, { marginBottom: verticalScale(30) }]}>
+                        <TouchableOpacity onPress={navigateToProfile} activeOpacity={0.5} style={tw`absolute left-0 z-10`}>
+                            <Image source={BackArrow} style={{ width: horizontalScale(30), height: horizontalScale(30) }} resizeMode="contain" />
+                        </TouchableOpacity>
+                        <Text style={[tw`font-bold font-dm text-black flex-1 text-center`, { fontSize: moderateScale(22.5) }]}>Settings</Text>
+                    </View>
 
                     {/* Application Theme Section */}
-                    <View style={tw`mb-6`}>
-                        <Text style={tw`text-lg font-bold font-dm text-black mb-3`}>
+                    <View style={{ marginBottom: verticalScale(22.5) }}>
+                        <Text style={[tw`font-bold font-dm text-black`, { fontSize: moderateScale(16.875), marginBottom: verticalScale(11.25) }]}>
                             Application theme
                         </Text>
                         <View style={tw`bg-white rounded-2xl overflow-hidden`}>
                             {/* Light */}
                             <TouchableOpacity
-                                style={tw`flex-row items-center justify-between px-5 py-4 border-b border-gray-100`}
+                                style={[tw`flex-row items-center justify-between border-b border-gray-100`, { paddingHorizontal: horizontalScale(18.75), paddingVertical: verticalScale(15) }]}
                                 activeOpacity={0.7}
                                 onPress={() => handleThemeChange('light')}
                             >
-                                <Text style={tw`text-base font-dm text-black`}>Light</Text>
+                                <Text style={[tw`font-dm text-black`, { fontSize: moderateScale(15) }]}>Light</Text>
                                 <Switch
                                     value={lightTheme}
                                     onValueChange={() => handleThemeChange('light')}
                                     trackColor={{ false: '#E5E7EB', true: '#E5E7EB' }}
                                     thumbColor={lightTheme ? '#000000' : '#9CA3AF'}
+                                    style={{ transform: [{ scaleX: 0.8 }, { scaleY: 0.8 }] }}
                                 />
                             </TouchableOpacity>
 
                             {/* Dark */}
                             <TouchableOpacity
-                                style={tw`flex-row items-center justify-between px-5 py-4 border-b border-gray-100`}
+                                style={[tw`flex-row items-center justify-between border-b border-gray-100`, { paddingHorizontal: horizontalScale(18.75), paddingVertical: verticalScale(15) }]}
                                 activeOpacity={0.7}
                                 onPress={() => handleThemeChange('dark')}
                             >
-                                <Text style={tw`text-base font-dm text-black`}>Dark</Text>
+                                <Text style={[tw`font-dm text-black`, { fontSize: moderateScale(15) }]}>Dark</Text>
                                 <Switch
                                     value={darkTheme}
                                     onValueChange={() => handleThemeChange('dark')}
                                     trackColor={{ false: '#E5E7EB', true: '#E5E7EB' }}
                                     thumbColor={darkTheme ? '#000000' : '#9CA3AF'}
+                                    style={{ transform: [{ scaleX: 0.8 }, { scaleY: 0.8 }] }}
                                 />
                             </TouchableOpacity>
 
                             {/* Automatically */}
                             <TouchableOpacity
-                                style={tw`flex-row items-center justify-between px-5 py-4`}
+                                style={[tw`flex-row items-center justify-between`, { paddingHorizontal: horizontalScale(18.75), paddingVertical: verticalScale(15) }]}
                                 activeOpacity={0.7}
                                 onPress={() => handleThemeChange('auto')}
                             >
-                                <Text style={tw`text-base font-dm text-black`}>Automatically</Text>
+                                <Text style={[tw`font-dm text-black`, { fontSize: moderateScale(15) }]}>Automatically</Text>
                                 <Switch
                                     value={autoTheme}
                                     onValueChange={() => handleThemeChange('auto')}
                                     trackColor={{ false: '#E5E7EB', true: '#E5E7EB' }}
                                     thumbColor={autoTheme ? '#000000' : '#9CA3AF'}
+                                    style={{ transform: [{ scaleX: 0.8 }, { scaleY: 0.8 }] }}
                                 />
                             </TouchableOpacity>
                         </View>
                     </View>
 
                     {/* Notifications Section */}
-                    <View style={tw`mb-6`}>
-                        <Text style={tw`text-lg font-bold font-dm text-black mb-3`}>
+                    <View style={{ marginBottom: verticalScale(22.5) }}>
+                        <Text style={[tw`font-bold font-dm text-black`, { fontSize: moderateScale(16.875), marginBottom: verticalScale(11.25) }]}>
                             Notifications
                         </Text>
                         <View style={tw`bg-white rounded-2xl overflow-hidden`}>
                             {/* Notifications in the system */}
                             <TouchableOpacity
-                                style={tw`flex-row items-center justify-between px-5 py-4 border-b border-gray-100`}
+                                style={[tw`flex-row items-center justify-between border-b border-gray-100`, { paddingHorizontal: horizontalScale(18.75), paddingVertical: verticalScale(15) }]}
                                 activeOpacity={0.7}
                                 onPress={() => setSystemNotifications(!systemNotifications)}
                             >
-                                <Text style={tw`text-base font-dm text-black`}>
+                                <Text style={[tw`font-dm text-black`, { fontSize: moderateScale(15) }]}>
                                     Notifications in the system
                                 </Text>
                                 <Switch
@@ -319,16 +323,17 @@ const AppStack_SettingsScreen: React.FC<Props> = ({ navigation, route }) => {
                                     onValueChange={setSystemNotifications}
                                     trackColor={{ false: '#E5E7EB', true: '#E5E7EB' }}
                                     thumbColor={systemNotifications ? '#000000' : '#9CA3AF'}
+                                    style={{ transform: [{ scaleX: 0.8 }, { scaleY: 0.8 }] }}
                                 />
                             </TouchableOpacity>
 
                             {/* Notifications by mail */}
                             <TouchableOpacity
-                                style={tw`flex-row items-center justify-between px-5 py-4`}
+                                style={[tw`flex-row items-center justify-between`, { paddingHorizontal: horizontalScale(18.75), paddingVertical: verticalScale(15) }]}
                                 activeOpacity={0.7}
                                 onPress={() => setMailNotifications(!mailNotifications)}
                             >
-                                <Text style={tw`text-base font-dm text-black`}>
+                                <Text style={[tw`font-dm text-black`, { fontSize: moderateScale(15) }]}>
                                     Notifications by mail
                                 </Text>
                                 <Switch
@@ -336,28 +341,29 @@ const AppStack_SettingsScreen: React.FC<Props> = ({ navigation, route }) => {
                                     onValueChange={setMailNotifications}
                                     trackColor={{ false: '#E5E7EB', true: '#E5E7EB' }}
                                     thumbColor={mailNotifications ? '#000000' : '#9CA3AF'}
+                                    style={{ transform: [{ scaleX: 0.8 }, { scaleY: 0.8 }] }}
                                 />
                             </TouchableOpacity>
                         </View>
                     </View>
 
                     {/* Application Version */}
-                    <View style={tw`items-center mt-4`}>
-                        <Text style={tw`text-sm font-dm text-grey`}>
+                    <View style={[tw`items-center`, { marginTop: verticalScale(15) }]}>
+                        <Text style={[tw`font-dm text-grey`, { fontSize: moderateScale(13.125) }]}>
                             Application version 1.86
                         </Text>
                     </View>
 
                     {/* Logout Section */}
-                    <View style={tw`mt-8`}>
+                    <View style={{ marginTop: verticalScale(30) }}>
                         <TouchableOpacity
                             style={tw`bg-white rounded-2xl overflow-hidden`}
                             activeOpacity={0.7}
                             onPress={handleLogout}
                             disabled={isLoggingOut || isDeletingAccount}
                         >
-                            <View style={tw`flex-row items-center justify-between px-5 py-4`}>
-                                <Text style={tw`text-base font-dm text-black`}>
+                            <View style={[tw`flex-row items-center justify-between`, { paddingHorizontal: horizontalScale(18.75), paddingVertical: verticalScale(15) }]}>
+                                <Text style={[tw`font-dm text-black`, { fontSize: moderateScale(15) }]}>
                                     Logout
                                 </Text>
                                 {isLoggingOut ? (
@@ -368,15 +374,15 @@ const AppStack_SettingsScreen: React.FC<Props> = ({ navigation, route }) => {
                     </View>
 
                     {/* Delete Account Section */}
-                    <View style={tw`mt-4 mb-8`}>
+                    <View style={{ marginTop: verticalScale(15), marginBottom: verticalScale(30) }}>
                         <TouchableOpacity
                             style={tw`bg-white rounded-2xl overflow-hidden border border-red-500`}
                             activeOpacity={0.7}
                             onPress={handleDeleteAccount}
                             disabled={isLoggingOut || isDeletingAccount}
                         >
-                            <View style={tw`flex-row items-center justify-between px-5 py-4`}>
-                                <Text style={tw`text-base font-dm text-red-500`}>
+                            <View style={[tw`flex-row items-center justify-between`, { paddingHorizontal: horizontalScale(18.75), paddingVertical: verticalScale(15) }]}>
+                                <Text style={[tw`font-dm text-red-500`, { fontSize: moderateScale(15) }]}>
                                     Delete Account
                                 </Text>
                                 {isDeletingAccount ? (

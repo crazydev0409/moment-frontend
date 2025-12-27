@@ -8,8 +8,10 @@ import {
   Linking,
 } from 'react-native';
 import { AuthStackParamList } from '.';
-import tw from 'tailwindcss';
+import tw from '~/tailwindcss';
 import { CreateAccountBackground } from '~/lib/images';
+import { horizontalScale, verticalScale, moderateScale } from '~/helpers/responsive';
+
 type Props = NativeStackScreenProps<
   AuthStackParamList,
   'AuthStack_CreateAccountScreen'
@@ -26,11 +28,18 @@ const AuthStack_CreateAccountScreen: React.FC<Props> = ({ navigation, route }) =
   return (
     <View style={tw`flex-1 relative bg-white`}>
       <Image source={CreateAccountBackground} style={tw`absolute w-full h-full`} />
-      <View style={tw`absolute bottom-20 w-full flex-col items-center`}>
+      <View style={[tw`absolute w-full flex-col items-center`, { bottom: verticalScale(75) }]}>
         <TouchableOpacity onPress={onPressSignUp} activeOpacity={0.7}>
           <View
-            style={tw`bg-[#A3CB31] rounded-full h-15 w-60 mb-10 justify-center items-center shadow-lg`}>
-            <Text style={tw`text-white text-base font-bold font-dm`}>
+            style={[
+              tw`bg-[#A3CB31] rounded-full justify-center items-center shadow-lg`,
+              {
+                height: verticalScale(56),
+                width: horizontalScale(225),
+                marginBottom: verticalScale(37.5)
+              }
+            ]}>
+            <Text style={[tw`text-white font-bold font-dm`, { fontSize: moderateScale(15) }]}>
               Create Account
             </Text>
           </View>
@@ -39,9 +48,9 @@ const AuthStack_CreateAccountScreen: React.FC<Props> = ({ navigation, route }) =
           {/* Privacy Policy */}
           <TouchableOpacity
             onPress={() => Linking.openURL("https://your-privacy-policy-url.com")}
-            style={tw`mr-10`}
+            style={{ marginRight: horizontalScale(37.5) }}
           >
-            <Text style={tw`underline text-black font-semibold`}>
+            <Text style={[tw`underline text-black font-semibold`, { fontSize: moderateScale(13) }]}>
               Privacy Policy
             </Text>
           </TouchableOpacity>
@@ -50,7 +59,7 @@ const AuthStack_CreateAccountScreen: React.FC<Props> = ({ navigation, route }) =
           <TouchableOpacity
             onPress={() => Linking.openURL("https://your-terms-url.com")}
           >
-            <Text style={tw`underline text-black font-semibold`}>
+            <Text style={[tw`underline text-black font-semibold`, { fontSize: moderateScale(13) }]}>
               Terms & Conditions
             </Text>
           </TouchableOpacity>

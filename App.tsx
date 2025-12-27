@@ -12,6 +12,8 @@ import { userAtom } from '~/store';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { http } from '~/helpers/http';
 import { jwtDecode } from 'jwt-decode';
+import { useDeviceContext } from 'twrnc';
+import tw from '~/tailwindcss';
 import {
   requestNotificationPermissions,
   registerForPushNotificationsAsync,
@@ -23,6 +25,7 @@ import { initializeSocket, disconnectSocket } from '~/services/socketService';
 SplashScreen.preventAutoHideAsync(); // don't let Expo hide it automatically
 
 export default function App() {
+  useDeviceContext(tw);
   const [appIsReady, setAppIsReady] = useState(false);
   const [showCustomSplash, setShowCustomSplash] = useState(true);
   const [__, setUser] = useAtom(userAtom);
@@ -43,10 +46,10 @@ export default function App() {
 
           // Register for push notifications after authentication
           await setupNotifications();
-          
+
           // Initialize Socket.IO for real-time updates
           await initializeSocket();
-          
+
           // Show pending moment requests as notifications
           await showPendingRequests();
         } else {
@@ -134,7 +137,7 @@ export default function App() {
                   } catch (visibilityError: any) {
                     // If error is about calendar not found, log it but continue
                     if (visibilityError.response?.data?.error?.includes('calendar not found') ||
-                        visibilityError.response?.data?.error?.includes('Default calendar not found')) {
+                      visibilityError.response?.data?.error?.includes('Default calendar not found')) {
                       console.warn(`Cannot grant visibility to ${contact.displayName}: They don't have a default calendar yet`);
                     } else if (!visibilityError.response?.data?.error?.includes('already')) {
                       console.error(`Failed to grant visibility to ${contact.displayName}:`, visibilityError.response?.data?.error || visibilityError.message);

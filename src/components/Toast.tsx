@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { Text, View, Animated } from 'react-native';
-import tw from 'tailwindcss';
+import tw from '~/tailwindcss';
+import { horizontalScale, verticalScale, moderateScale } from '~/helpers/responsive';
 
 interface ToastProps {
   message: string;
@@ -41,11 +42,11 @@ const Toast: React.FC<ToastProps> = ({ message, visible, duration = 3000, onHide
   return (
     <Animated.View
       style={[
-        tw`absolute bottom-24 left-5 right-5 bg-black rounded-2xl px-4 py-3`,
-        { opacity: fadeAnim }
+        tw`absolute bg-black rounded-2xl`,
+        { bottom: verticalScale(90), left: horizontalScale(18.75), right: horizontalScale(18.75), paddingHorizontal: horizontalScale(15), paddingVertical: verticalScale(11.25), opacity: fadeAnim }
       ]}
     >
-      <Text style={tw`text-white text-center font-dm text-sm`}>{message}</Text>
+      <Text style={[tw`text-white text-center font-dm`, { fontSize: moderateScale(13.125) }]}>{message}</Text>
     </Animated.View>
   );
 };

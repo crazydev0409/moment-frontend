@@ -2,8 +2,9 @@ import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import React, { useEffect, useState } from 'react';
 import { Text, View, TouchableOpacity, ScrollView, ActivityIndicator, RefreshControl } from 'react-native';
 import { AppStackParamList } from '.';
-import tw from 'tailwindcss';
+import tw from '~/tailwindcss';
 import { http } from '~/helpers/http';
+import { horizontalScale, verticalScale, moderateScale } from '~/helpers/responsive';
 
 type Props = NativeStackScreenProps<AppStackParamList, 'AppStack_NotificationScreen'>;
 
@@ -63,7 +64,7 @@ const AppStack_NotificationScreen: React.FC<Props> = ({ navigation }) => {
 
   const markAllAsRead = async () => {
     if (isMarkingAllRead) return;
-    
+
     try {
       setIsMarkingAllRead(true);
       await http.post('/users/notifications/read-all');
@@ -86,7 +87,7 @@ const AppStack_NotificationScreen: React.FC<Props> = ({ navigation }) => {
     if (notification.data) {
       const data = typeof notification.data === 'string' ? JSON.parse(notification.data) : notification.data;
       const eventType = data.eventType || notification.type;
-      
+
       // For moment request created, navigate to DateDetailScreen with momentRequestId
       if (eventType === 'moment.request.created' && data.momentRequestId) {
         // Extract date from startTime if available
@@ -100,7 +101,7 @@ const AppStack_NotificationScreen: React.FC<Props> = ({ navigation }) => {
         } else {
           dateParam = new Date().toISOString().split('T')[0];
         }
-        
+
         // Navigate to date detail screen with momentRequestId to auto-open modal
         navigation.navigate('AppStack_DateDetailScreen', {
           date: dateParam,
@@ -119,7 +120,7 @@ const AppStack_NotificationScreen: React.FC<Props> = ({ navigation }) => {
         } else {
           dateParam = new Date().toISOString().split('T')[0];
         }
-        
+
         navigation.navigate('AppStack_DateDetailScreen', {
           date: dateParam,
           momentRequestId: data.momentRequestId
@@ -140,7 +141,7 @@ const AppStack_NotificationScreen: React.FC<Props> = ({ navigation }) => {
     if (minutes < 60) return `${minutes}m ago`;
     if (hours < 24) return `${hours}h ago`;
     if (days < 7) return `${days}d ago`;
-    
+
     return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
   };
 
@@ -164,16 +165,16 @@ const AppStack_NotificationScreen: React.FC<Props> = ({ navigation }) => {
   return (
     <View style={tw`flex-1 bg-white`}>
       {/* Header */}
-      <View style={[tw`mt-12 pb-4 border-b border-gray-200`, { paddingHorizontal: '4%' }]}>
+      <View style={[tw`border-b border-gray-200`, { marginTop: verticalScale(45), paddingBottom: verticalScale(15), paddingHorizontal: '4%' }]}>
         <View style={tw`flex-row justify-between items-center`}>
           <TouchableOpacity
             onPress={() => navigation.goBack()}
             activeOpacity={0.7}
-            style={tw`w-10 h-10 items-center justify-center`}
+            style={[tw`items-center justify-center`, { width: horizontalScale(37.5), height: horizontalScale(37.5) }]}
           >
-            <Text style={tw`text-2xl`}>←</Text>
+            <Text style={[tw``, { fontSize: moderateScale(22.5) }]}>←</Text>
           </TouchableOpacity>
-          <Text style={tw`text-black text-xl font-bold font-dm flex-1 text-center`}>
+          <Text style={[tw`text-black font-bold font-dm flex-1 text-center`, { fontSize: moderateScale(18.75) }]}>
             Notifications
           </Text>
           {unreadCount > 0 && (
@@ -185,11 +186,11 @@ const AppStack_NotificationScreen: React.FC<Props> = ({ navigation }) => {
               {isMarkingAllRead ? (
                 <ActivityIndicator size="small" color="#A3CB31" />
               ) : (
-                <Text style={tw`text-[#A3CB31] text-sm font-dm`}>Mark all read</Text>
+                <Text style={[tw`text-[#A3CB31] font-dm`, { fontSize: moderateScale(13) }]}>Mark all read</Text>
               )}
             </TouchableOpacity>
           )}
-          {unreadCount === 0 && <View style={tw`w-10`} />}
+          {unreadCount === 0 && <View style={{ width: horizontalScale(37.5) }} />}
         </View>
       </View>
 
@@ -201,7 +202,7 @@ const AppStack_NotificationScreen: React.FC<Props> = ({ navigation }) => {
       ) : (
         <ScrollView
           style={tw`flex-1`}
-          contentContainerStyle={tw`pb-6`}
+          contentContainerStyle={{ paddingBottom: verticalScale(22.5) }}
           showsVerticalScrollIndicator={false}
           refreshControl={
             <RefreshControl
@@ -212,39 +213,38 @@ const AppStack_NotificationScreen: React.FC<Props> = ({ navigation }) => {
           }
         >
           {notifications.length === 0 ? (
-            <View style={tw`flex-1 items-center justify-center py-20`}>
-              <Text style={tw`text-6xl mb-4`}>🔔</Text>
-              <Text style={tw`text-grey text-base font-dm`}>No notifications yet</Text>
+            <View style={[tw`flex-1 items-center justify-center`, { paddingVertical: verticalScale(75) }]}>
+              <Text style={{ fontSize: moderateScale(56), marginBottom: verticalScale(15) }}>🔔</Text>
+              <Text style={[tw`text-grey font-dm`, { fontSize: moderateScale(15) }]}>No notifications yet</Text>
             </View>
           ) : (
             notifications.map((notification) => (
               <TouchableOpacity
                 key={notification.id}
-                style={tw`px-6 py-4 flex-row items-start border-b border-gray-100 ${
-                  !notification.isRead ? 'bg-[#A3CB31]/5' : ''
-                }`}
+                style={[tw`flex-row items-start border-b border-gray-100 ${!notification.isRead ? 'bg-[#A3CB31]/5' : ''
+                  }`, { paddingHorizontal: horizontalScale(22.5), paddingVertical: verticalScale(15) }]}
                 activeOpacity={0.7}
                 onPress={() => handleNotificationPress(notification)}
               >
                 {/* Icon */}
-                <View style={tw`w-12 h-12 rounded-full bg-gray-200 items-center justify-center mr-4`}>
-                  <Text style={tw`text-2xl`}>{getNotificationIcon(notification.type)}</Text>
+                <View style={[tw`rounded-full bg-gray-200 items-center justify-center`, { width: horizontalScale(45), height: horizontalScale(45), marginRight: horizontalScale(15) }]}>
+                  <Text style={{ fontSize: moderateScale(22.5) }}>{getNotificationIcon(notification.type)}</Text>
                 </View>
 
                 {/* Content */}
                 <View style={tw`flex-1`}>
-                  <View style={tw`flex-row items-start justify-between mb-1`}>
-                    <Text style={tw`text-black text-sm font-bold font-dm flex-1 pr-2`}>
+                  <View style={[tw`flex-row items-start justify-between`, { marginBottom: verticalScale(3.75) }]}>
+                    <Text style={[tw`text-black font-bold font-dm flex-1`, { fontSize: moderateScale(13), paddingRight: horizontalScale(7.5) }]}>
                       {notification.title}
                     </Text>
                     {!notification.isRead && (
-                      <View style={tw`w-2 h-2 rounded-full bg-[#A3CB31] mt-1`} />
+                      <View style={[tw`rounded-full bg-[#A3CB31]`, { width: horizontalScale(7.5), height: horizontalScale(7.5), marginTop: verticalScale(3.75) }]} />
                     )}
                   </View>
-                  <Text style={tw`text-grey text-sm font-dm mb-2`}>
+                  <Text style={[tw`text-grey font-dm`, { fontSize: moderateScale(13), marginBottom: verticalScale(7.5) }]}>
                     {notification.body}
                   </Text>
-                  <Text style={tw`text-grey text-xs font-dm`}>
+                  <Text style={[tw`text-grey font-dm`, { fontSize: moderateScale(11) }]}>
                     {formatTime(notification.createdAt)}
                   </Text>
                 </View>

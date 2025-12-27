@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { AuthStackParamList } from '.';
 import { View, Text, Image, TextInput, TouchableOpacity, ActivityIndicator } from 'react-native';
-import tw from '../../../tailwindcss';
+import tw from '~/tailwindcss';
 import { http } from '../../helpers/http';
 import { useAtom } from 'jotai';
 import { userAtom } from '../../store';
@@ -10,6 +10,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import Loading from '../../components/Loading';
 import { BackArrow, Background, SMSVerification } from '~/lib/images';
 import { registerForPushNotificationsAsync } from '../../services/notificationService';
+import { horizontalScale, verticalScale, moderateScale } from '~/helpers/responsive';
 
 type Props = NativeStackScreenProps<AuthStackParamList, 'AuthStack_OTPScreen'>;
 
@@ -98,17 +99,17 @@ const AuthStack_OTPScreen: React.FC<Props> = ({ navigation, route }) => {
     <View style={tw`flex-1 relative bg-white`}>
       <Image source={Background} style={tw`absolute w-full h-full`} />
       <View style={tw`absolute w-full h-full bg-black opacity-5`} />
-      <View style={[tw`mt-10 mb-10`, { paddingHorizontal: '8%' }]}>
-        <TouchableOpacity onPress={() => navigation.goBack()} activeOpacity={0.5} style={tw`mb-5`}>
+      <View style={[{ marginTop: verticalScale(37.5), marginBottom: verticalScale(37.5) }, { paddingHorizontal: '8%' }]}>
+        <TouchableOpacity onPress={() => navigation.goBack()} activeOpacity={0.5} style={{ marginBottom: verticalScale(18.75) }}>
           <Image source={BackArrow} />
         </TouchableOpacity>
-        <Image source={SMSVerification} style={tw`self-center mb-10`} />
-        <Text style={tw`text-[22px] font-bold font-dm w-2/3 leading-[32px]`}>Enter Verification Code:</Text>
-        <View style={tw`flex-row w-full justify-center mb-5`}>
+        <Image source={SMSVerification} style={[tw`self-center`, { marginBottom: verticalScale(37.5) }]} />
+        <Text style={[tw`font-bold font-dm w-2/3`, { fontSize: moderateScale(20.625), lineHeight: moderateScale(30) }]}>Enter Verification Code:</Text>
+        <View style={[tw`flex-row w-full justify-center`, { marginBottom: verticalScale(18.75) }]}>
           <View
-            style={tw`flex-row items-center h-15 w-full bg-white rounded-full mt-10`}>
+            style={[tw`flex-row items-center w-full bg-white rounded-full`, { height: verticalScale(56.25), marginTop: verticalScale(37.5) }]}>
             <TextInput
-              style={tw`bg-white rounded-lg flex-1 font-dm font-bold text-[18px]`}
+              style={[tw`bg-white rounded-lg flex-1 font-dm font-bold`, { fontSize: moderateScale(16.875) }]}
               value={code}
               placeholder="Code"
               onChangeText={setCode}
@@ -143,11 +144,11 @@ const AuthStack_OTPScreen: React.FC<Props> = ({ navigation, route }) => {
           disabled={loading}
         >
           <View
-            style={tw`bg-[#A3CB31] rounded-full h-15 w-60 mb-10 justify-center items-center shadow-lg ${loading ? 'opacity-50' : ''}`}>
+            style={[tw`bg-[#A3CB31] rounded-full justify-center items-center shadow-lg ${loading ? 'opacity-50' : ''}`, { height: verticalScale(56.25), width: horizontalScale(225), marginBottom: verticalScale(37.5) }]}>
             {loading ? (
               <ActivityIndicator size="small" color="#FFFFFF" />
             ) : (
-              <Text style={tw`text-white text-base font-bold font-dm`}>
+              <Text style={[tw`text-white font-bold font-dm`, { fontSize: moderateScale(15) }]}>
                 Send
               </Text>
             )}
