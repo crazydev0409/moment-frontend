@@ -18,6 +18,7 @@ import { Background, Notification, Avatar, AddIcon, HomeIcon, CalendarIcon, Busi
 import { http } from '~/helpers/http';
 import { useAddButton } from '~/contexts/AddButtonContext';
 import { horizontalScale, verticalScale, moderateScale } from '~/helpers/responsive';
+import { hashPhoneNumber } from '~/utils/phoneHash';
 
 type Props = NativeStackScreenProps<
     AppStackParamList,
@@ -76,20 +77,22 @@ const AppStack_ContactScreen: React.FC<Props> = ({ navigation, route }) => {
                     ],
                 });
 
-                // Create a map of phone numbers to local contact avatars
+                // Create a map of hashed phone numbers to local contact avatars
                 const phoneToAvatarMap = new Map<string, string>();
-                data.forEach(contact => {
+
+                await Promise.all(data.map(async (contact) => {
                     if (contact.phoneNumbers && contact.phoneNumbers.length > 0 && contact.image?.uri) {
                         const avatarUri = contact.image.uri;
-                        contact.phoneNumbers.forEach(phone => {
-                            // Normalize phone number (remove spaces, dashes, parentheses)
+                        await Promise.all(contact.phoneNumbers.map(async (phone) => {
+                            // Normalize phone number
                             const normalized = phone.number?.replace(/[\s\-\(\)]/g, '') || '';
                             if (normalized && avatarUri) {
-                                phoneToAvatarMap.set(normalized, avatarUri);
+                                const hashed = await hashPhoneNumber(normalized);
+                                phoneToAvatarMap.set(hashed, avatarUri);
                             }
-                        });
+                        }));
                     }
-                });
+                }));
 
                 // Import contacts to backend first
                 await importContactsToBackend(data);
@@ -100,15 +103,9 @@ const AppStack_ContactScreen: React.FC<Props> = ({ navigation, route }) => {
 
                 // Format for display, matching local avatars to backend contacts
                 const formattedContacts: Contact[] = backendContacts.map((contact: any) => {
-                    // Try to find matching local avatar by phone number
-                    const normalizedContactPhone = contact.contactPhone?.replace(/[\s\-\(\)]/g, '') || '';
-                    let localAvatar = phoneToAvatarMap.get(normalizedContactPhone);
-
-                    // Try without country code if no match
-                    if (!localAvatar && normalizedContactPhone.startsWith('+')) {
-                        const withoutCountryCode = normalizedContactPhone.substring(1);
-                        localAvatar = phoneToAvatarMap.get(withoutCountryCode);
-                    }
+                    // Backend returns hashed phone numbers
+                    const hashedContactPhone = contact.contactPhone || '';
+                    let localAvatar = phoneToAvatarMap.get(hashedContactPhone);
 
                     return {
                         id: contact.id,
@@ -131,7 +128,7 @@ const AppStack_ContactScreen: React.FC<Props> = ({ navigation, route }) => {
         }
     };
 
-    const importContactsToBackend = async (contactsData: Contacts.ExistingContact[]) => {
+    const importContactsToBackend = async (contactsData: Contacts.Contact[]) => {
         try {
             // Prepare contacts for API
             const contactsToImport = contactsData
@@ -258,7 +255,7 @@ const AppStack_ContactScreen: React.FC<Props> = ({ navigation, route }) => {
                             onPress={() => navigation.goBack()}
                             activeOpacity={0.5}
                         >
-                            <Image source={BackArrow} style={{ width: horizontalScale(30), height: horizontalScale(30) }} resizeMode="contain" />
+                            <Image source={BackArrow} style={{ width: horizontalScale(24), height: horizontalScale(24) }} resizeMode="contain" />
                         </TouchableOpacity>
                         <TouchableOpacity
                             activeOpacity={0.5}

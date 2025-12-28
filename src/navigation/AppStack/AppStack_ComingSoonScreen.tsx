@@ -25,7 +25,7 @@ const AppStack_ComingSoonScreen: React.FC<Props> = ({ navigation }) => {
             activeOpacity={0.7}
             style={{ marginRight: horizontalScale(15) }}
           >
-            <Image source={BackArrow} style={{ width: horizontalScale(22.5), height: horizontalScale(22.5) }} />
+            <Image source={BackArrow} style={{ width: horizontalScale(24), height: horizontalScale(24) }} resizeMode="contain" />
           </TouchableOpacity>
           <Text style={[tw`font-bold font-dm text-black`, { fontSize: moderateScale(18.75) }]}>Business</Text>
         </View>

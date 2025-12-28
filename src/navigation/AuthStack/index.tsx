@@ -20,6 +20,7 @@ export type AuthStackParamList = {
   AuthStack_OTPScreen: {
     phoneNumber: string;
     countryCode: string;
+    rememberMe?: boolean;
     from?: string;
     type?: string;
     value?: string;

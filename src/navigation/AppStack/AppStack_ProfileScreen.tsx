@@ -167,7 +167,7 @@ const AppStack_ProfileScreen: React.FC<Props> = ({ navigation, route }) => {
         {/* Header with back arrow and settings */}
         <View style={[tw`flex-row justify-between items-center`, { marginBottom: -verticalScale(7.5) }]}>
           <TouchableOpacity onPress={navigateToMainPage} activeOpacity={0.5}>
-            <Image source={BackArrow} style={[tw``, { width: horizontalScale(30), height: horizontalScale(30) }]} resizeMode="contain" />
+            <Image source={BackArrow} style={[tw``, { width: horizontalScale(24), height: horizontalScale(24) }]} resizeMode="contain" />
           </TouchableOpacity>
           <TouchableOpacity
             activeOpacity={0.5}

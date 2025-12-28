@@ -69,7 +69,7 @@ const AuthStack_OTPScreen: React.FC<Props> = ({ navigation, route }) => {
 
                 // Register device for push notifications after successful OTP verification
                 try {
-                  await registerForPushNotificationsAsync();
+                  await registerForPushNotificationsAsync(route.params.rememberMe || false);
                   console.log('✅ Push notifications registered after OTP verification');
                 } catch (error) {
                   console.error('Failed to register push notifications:', error);
@@ -101,7 +101,7 @@ const AuthStack_OTPScreen: React.FC<Props> = ({ navigation, route }) => {
       <View style={tw`absolute w-full h-full bg-black opacity-5`} />
       <View style={[{ marginTop: verticalScale(37.5), marginBottom: verticalScale(37.5) }, { paddingHorizontal: '8%' }]}>
         <TouchableOpacity onPress={() => navigation.goBack()} activeOpacity={0.5} style={{ marginBottom: verticalScale(18.75) }}>
-          <Image source={BackArrow} />
+          <Image source={BackArrow} style={{ width: horizontalScale(24), height: horizontalScale(24) }} resizeMode="contain" />
         </TouchableOpacity>
         <Image source={SMSVerification} style={[tw`self-center`, { marginBottom: verticalScale(37.5) }]} />
         <Text style={[tw`font-bold font-dm w-2/3`, { fontSize: moderateScale(20.625), lineHeight: moderateScale(30) }]}>Enter Verification Code:</Text>

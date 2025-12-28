@@ -14,6 +14,7 @@ import { http } from '~/helpers/http';
 import { useAddButton } from '~/contexts/AddButtonContext';
 import { setupSocketEventListeners, getSocket, initializeSocket } from '~/services/socketService';
 import { horizontalScale, verticalScale, moderateScale } from '~/helpers/responsive';
+import { hashPhoneNumber } from '~/utils/phoneHash';
 
 type Props = NativeStackScreenProps<AppStackParamList, 'AppStack_HomePageScreen'>;
 
@@ -137,6 +138,7 @@ const AppStack_HomePageScreen: React.FC<Props> = ({ navigation, route }) => {
   const [showContactModal, setShowContactModal] = useState(false);
   const [contacts, setContacts] = useState<Contact[]>([]);
   const [contactSearchText, setContactSearchText] = useState('');
+  const [phoneNumberMap, setPhoneNumberMap] = useState<Map<string, string>>(new Map());
 
   // Meetings data
   const [allMeetings, setAllMeetings] = useState<MomentRequest[]>([]);
@@ -201,6 +203,7 @@ const AppStack_HomePageScreen: React.FC<Props> = ({ navigation, route }) => {
     fetchUnreadNotificationCount();
     requestLocationAndFetchWeather();
     loadLocalContactAvatars();
+    loadPhoneNumberMapping();
   }, []);
 
   // Refresh meetings when screen comes into focus
@@ -464,25 +467,60 @@ const AppStack_HomePageScreen: React.FC<Props> = ({ navigation, route }) => {
           ],
         });
 
-        // Create a map of phone numbers to local contact avatars
+        // Create a map of hashed phone numbers to local contact avatars
         const phoneToAvatarMap = new Map<string, string>();
-        data.forEach(contact => {
+
+        // Process contacts sequentially or in parallel? Parallel is faster.
+        await Promise.all(data.map(async (contact) => {
           if (contact.phoneNumbers && contact.phoneNumbers.length > 0 && contact.image?.uri) {
             const avatarUri = contact.image.uri;
-            contact.phoneNumbers.forEach(phone => {
-              // Normalize phone number (remove spaces, dashes, parentheses)
+            await Promise.all(contact.phoneNumbers.map(async (phone) => {
+              // Normalize phone number
               const normalized = phone.number?.replace(/[\s\-\(\)]/g, '') || '';
               if (normalized && avatarUri) {
-                phoneToAvatarMap.set(normalized, avatarUri);
+                // Determine if it already looks like a hash or needs hashing
+                // During transition, some might be raw, some might be hashed
+                // But specifically for local contacts, we ALWAYS hash them to match backend hashes
+                const hashed = await hashPhoneNumber(normalized);
+                phoneToAvatarMap.set(hashed, avatarUri);
               }
-            });
+            }));
           }
-        });
+        }));
 
         setLocalAvatars(phoneToAvatarMap);
       }
     } catch (error) {
       console.error('Error loading local contact avatars:', error);
+    }
+  };
+
+  // Load local contacts to create a mapping from hashed to original phone numbers
+  const loadPhoneNumberMapping = async () => {
+    try {
+      const { status } = await Contacts.getPermissionsAsync();
+      if (status === 'granted') {
+        const { data } = await Contacts.getContactsAsync({
+          fields: [Contacts.Fields.PhoneNumbers],
+        });
+
+        const mapping = new Map<string, string>();
+        await Promise.all(data.map(async (contact) => {
+          if (contact.phoneNumbers && contact.phoneNumbers.length > 0) {
+            await Promise.all(contact.phoneNumbers.map(async (phone) => {
+              const normalized = phone.number?.replace(/[\s\-\(\)]/g, '') || '';
+              if (normalized) {
+                const hashed = await hashPhoneNumber(normalized);
+                mapping.set(hashed, phone.number || normalized);
+              }
+            }));
+          }
+        }));
+
+        setPhoneNumberMap(mapping);
+      }
+    } catch (error) {
+      console.error('Error loading phone number mapping:', error);
     }
   };
 
@@ -700,8 +738,11 @@ const AppStack_HomePageScreen: React.FC<Props> = ({ navigation, route }) => {
   // Get local avatar for a phone number
   const getLocalAvatar = (phoneNumber?: string) => {
     if (!phoneNumber) return null;
-    const normalized = phoneNumber.replace(/[\s\-\(\)]/g, '');
-    return localAvatars.get(normalized) || null;
+    // Since backend returns hashed phone numbers, if phoneNumber is a 64-char hex string,
+    // it's already hashed and we can look it up directly.
+    // If it's not a hash (legacy data), we would need to hash it, but here we assume
+    // it's either the hash from the backend or nothing.
+    return localAvatars.get(phoneNumber) || null;
   };
 
 
@@ -784,7 +825,7 @@ const AppStack_HomePageScreen: React.FC<Props> = ({ navigation, route }) => {
           </View>
 
           {/* Information Cards */}
-          <View style={{ flexDirection: 'row', gap: horizontalScale(7.5), marginBottom: verticalScale(7.5) }}>
+          <View style={{ flexDirection: 'row', gap: horizontalScale(7.5), marginBottom: verticalScale(7.5), height: verticalScale(150) }}>
             {/* Today's Date Card */}
             <View style={[tw`bg-[#A3CB31] rounded-2xl items-center justify-center`, { padding: moderateScale(7.5), width: horizontalScale(131.25) }]}>
               <Text style={[tw`text-white font-dm`, { fontSize: moderateScale(13), marginBottom: verticalScale(3.75) }]}>Last</Text>
@@ -796,8 +837,8 @@ const AppStack_HomePageScreen: React.FC<Props> = ({ navigation, route }) => {
               </Text>
             </View>
 
-            {/* Upcoming Meeting Card */}
-            <View style={[tw`flex-1 bg-white rounded-2xl shadow-sm justify-center`, { padding: moderateScale(9.375) }]}>
+            {/* Upcoming Meeting Card - flex: 6 */}
+            <View style={[tw`bg-white rounded-2xl shadow-sm justify-center`, { flex: 6, padding: moderateScale(9.375) }]}>
               {upcomingMeeting ? (
                 <>
                   <Text style={[tw`text-black font-bold font-dm`, { fontSize: moderateScale(13), marginBottom: verticalScale(1.875) }]} numberOfLines={1}>
@@ -822,9 +863,9 @@ const AppStack_HomePageScreen: React.FC<Props> = ({ navigation, route }) => {
             </View>
           </View>
 
-          {/* Heavy Traffic Card */}
-          <View style={{ marginBottom: verticalScale(7.5) }}>
-            <View style={[tw`bg-black rounded-2xl flex-row items-center justify-between`, { padding: moderateScale(9.375) }]}>
+          {/* Heavy Traffic Card - flex: 3 */}
+          <View style={{ marginBottom: verticalScale(7.5), height: verticalScale(90) }}>
+            <View style={[tw`bg-black rounded-2xl flex-row items-center justify-between`, { padding: moderateScale(9.375), flex: 1 }]}>
               <View style={tw`flex-1`}>
                 <Text style={[tw`text-white font-dm`, { fontSize: moderateScale(11.25), marginBottom: verticalScale(1.875) }]}>Heavy traffic</Text>
                 <Text style={[tw`text-white font-bold font-dm`, { fontSize: moderateScale(22.5), marginBottom: verticalScale(1.875) }]}>1.2 km away</Text>
@@ -849,22 +890,22 @@ const AppStack_HomePageScreen: React.FC<Props> = ({ navigation, route }) => {
             </View>
           </View>
 
-          {/* Weather Card */}
-          <View style={{ marginBottom: verticalScale(15) }}>
+          {/* Weather Card - flex: 1 */}
+          <View style={{ marginBottom: verticalScale(15), height: verticalScale(50) }}>
             {weatherLoading ? (
-              <View style={[tw`bg-black rounded-2xl items-center justify-center`, { padding: moderateScale(9.375) }]}>
-                <ActivityIndicator size="small" color="#FFFFFF" />
+              <View style={[tw`bg-white rounded-2xl items-center justify-center`, { padding: moderateScale(9.375), flex: 1 }]}>
+                <ActivityIndicator size="small" color="#000000" />
               </View>
             ) : weather ? (
-              <View style={[tw`bg-black rounded-2xl flex-row items-center justify-between`, { padding: moderateScale(9.375) }]}>
-                <Text style={[tw`text-white font-dm`, { fontSize: moderateScale(26.25) }]}>{weather.temperature}°</Text>
+              <View style={[tw`bg-white rounded-2xl flex-row items-center justify-between`, { padding: moderateScale(9.375), flex: 1 }]}>
+                <Text style={[tw`text-black font-dm`, { fontSize: moderateScale(26.25) }]}>{weather.temperature}°</Text>
                 <View style={[tw`flex-1`, { marginLeft: horizontalScale(11.25) }]}>
-                  <Text style={[tw`text-white font-dm`, { fontSize: moderateScale(13) }]}>{weather.description}</Text>
-                  <Text style={[tw`text-white font-dm text-gray-400`, { fontSize: moderateScale(9.375) }]}>
+                  <Text style={[tw`text-black font-dm`, { fontSize: moderateScale(13) }]}>{weather.description}</Text>
+                  <Text style={[tw`text-gray-500 font-dm`, { fontSize: moderateScale(9.375) }]}>
                     {formatDate(selectedDate, 'MMM do')}
                   </Text>
                 </View>
-                <Text style={[tw`text-white`, { fontSize: moderateScale(22.5) }]}>{weather.icon}</Text>
+                <Text style={{ fontSize: moderateScale(22.5) }}>{weather.icon}</Text>
               </View>
             ) : null}
           </View>

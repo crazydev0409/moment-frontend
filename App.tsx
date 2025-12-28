@@ -21,6 +21,7 @@ import {
   setupNotificationReceivedHandler,
 } from '~/services/notificationService';
 import { initializeSocket, disconnectSocket } from '~/services/socketService';
+import { checkDeviceRegistration } from '~/services/deviceService';
 
 SplashScreen.preventAutoHideAsync(); // don't let Expo hide it automatically
 
@@ -33,13 +34,19 @@ export default function App() {
   useEffect(() => {
     const checkAuth = async () => {
       try {
-        const accessToken = await AsyncStorage.getItem('accessToken');
-        if (accessToken) {
-          // request navigation to profile once the container is ready
-          http.defaults.headers.common['Authorization'] = `Bearer ${accessToken}`;
-          const response = await http.get('/users/profile');
-          // Set to your global atom
-          setUser(response.data);
+        // First, check if device is registered with remember me
+        const deviceCheck = await checkDeviceRegistration();
+
+        if (deviceCheck.registered && deviceCheck.accessToken && deviceCheck.user) {
+          // Device is registered with remember me - auto login
+          console.log('✅ Device registered with remember me - auto logging in');
+
+          // Save access token
+          await AsyncStorage.setItem('accessToken', deviceCheck.accessToken);
+          http.defaults.headers.common['Authorization'] = `Bearer ${deviceCheck.accessToken}`;
+
+          // Set user data
+          setUser(deviceCheck.user);
 
           // Import and sync contacts after authentication
           await importAndSyncContacts();
@@ -53,9 +60,35 @@ export default function App() {
           // Show pending moment requests as notifications
           await showPendingRequests();
         } else {
-          // Disconnect Socket.IO if user is not authenticated
-          disconnectSocket();
+          // No device registration, check for existing access token
+          const accessToken = await AsyncStorage.getItem('accessToken');
+          if (accessToken) {
+            // request navigation to profile once the container is ready
+            http.defaults.headers.common['Authorization'] = `Bearer ${accessToken}`;
+            const response = await http.get('/users/profile');
+            // Set to your global atom
+            setUser(response.data);
+
+            // Import and sync contacts after authentication
+            await importAndSyncContacts();
+
+            // Register for push notifications after authentication
+            await setupNotifications();
+
+            // Initialize Socket.IO for real-time updates
+            await initializeSocket();
+
+            // Show pending moment requests as notifications
+            await showPendingRequests();
+          } else {
+            // Disconnect Socket.IO if user is not authenticated
+            disconnectSocket();
+          }
         }
+      } catch (error) {
+        console.error('Error during auth check:', error);
+        // On error, disconnect socket and continue to login screen
+        disconnectSocket();
       } finally {
         setAppIsReady(true);
       }

@@ -2,6 +2,7 @@ import * as Notifications from 'expo-notifications';
 import { Platform } from 'react-native';
 import Constants from 'expo-constants';
 import { http } from '~/helpers/http';
+import { getDeviceInfo } from './deviceService';
 
 // Configure how notifications are handled when app is in foreground
 Notifications.setNotificationHandler({
@@ -73,7 +74,7 @@ export async function requestNotificationPermissions(): Promise<boolean> {
 
 // Request notification permissions and get push token
 // Note: This should be called after user authentication
-export async function registerForPushNotificationsAsync(): Promise<string | null> {
+export async function registerForPushNotificationsAsync(rememberMe: boolean = false): Promise<string | null> {
   let token: string | null = null;
 
   try {
@@ -116,25 +117,18 @@ export async function registerForPushNotificationsAsync(): Promise<string | null
     // Register device with backend
     if (token) {
       try {
-        // Generate a unique device ID
-        const deviceId = `${Platform.OS}-${Date.now()}`;
-        // Get app version from Constants or use default
-        const appVersion = Constants.expoConfig?.version || '1.0.0';
-        const expoVersion = Constants.expoVersion || '52.0.0';
+        // Get proper device info from deviceService
+        const deviceInfo = await getDeviceInfo();
 
         console.log('📤 Registering device with backend...', {
-          platform: Platform.OS,
-          deviceId,
-          appVersion,
-          expoVersion,
+          ...deviceInfo,
+          rememberMe,
         });
 
         await http.post('/devices/register', {
           expoPushToken: token,
-          platform: Platform.OS,
-          deviceId: deviceId,
-          appVersion: appVersion,
-          expoVersion: expoVersion,
+          ...deviceInfo,
+          rememberMe,
         });
         console.log('✅ Device registered successfully with backend');
         console.log('📲 Push token:', token.substring(0, 20) + '...');
@@ -269,7 +263,7 @@ async function handleAcceptRequest(requestId: string, onAccept: (requestId: stri
       approved: true,
     });
     console.log('✅ Moment request accepted via notification:', requestId);
-    
+
     // Trigger refresh by sending a silent local notification
     // This will be caught by notification listeners in DateDetailScreen and HomePage
     // to refresh the receiver's screen immediately
@@ -290,7 +284,7 @@ async function handleAcceptRequest(requestId: string, onAccept: (requestId: stri
     } catch (err) {
       // Ignore notification scheduling errors
     }
-    
+
     onAccept(requestId);
   } catch (error: any) {
     console.error('Error accepting moment request:', error);
@@ -305,7 +299,7 @@ async function handleRejectRequest(requestId: string, onReject: (requestId: stri
       approved: false,
     });
     console.log('❌ Moment request rejected via notification:', requestId);
-    
+
     // Trigger refresh by sending a silent local notification
     // This will be caught by notification listeners in DateDetailScreen and HomePage
     // to refresh the receiver's screen immediately
@@ -326,7 +320,7 @@ async function handleRejectRequest(requestId: string, onReject: (requestId: stri
     } catch (err) {
       // Ignore notification scheduling errors
     }
-    
+
     onReject(requestId);
   } catch (error: any) {
     console.error('Error rejecting moment request:', error);

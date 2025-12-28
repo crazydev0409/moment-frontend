@@ -24,6 +24,7 @@ const AuthStack_SignupScreen: React.FC<Props> = ({ navigation, route }) => {
   const [phone, setPhone] = useState('');
   const [countryCode, setCountryCode] = useState(initialCode);
   const [isSending, setIsSending] = useState(false);
+  const [rememberMe, setRememberMe] = useState(false);
   const countryNumber = countries.find(
     country => country.code === countryCode,
   )?.dial_code;
@@ -43,6 +44,7 @@ const AuthStack_SignupScreen: React.FC<Props> = ({ navigation, route }) => {
           navigation.navigate('AuthStack_OTPScreen', {
             phoneNumber,
             countryCode,
+            rememberMe,
           });
         } else {
           alert('Failed to send OTP. Please try again.');
@@ -73,7 +75,7 @@ const AuthStack_SignupScreen: React.FC<Props> = ({ navigation, route }) => {
       <View style={tw`absolute w-full h-full bg-black opacity-5`} />
       <View style={[{ marginTop: verticalScale(37.5), marginBottom: verticalScale(37.5) }, { paddingHorizontal: '8%' }]}>
         <TouchableOpacity onPress={() => navigation.goBack()} activeOpacity={0.5} style={{ marginBottom: verticalScale(18.75) }}>
-          <Image source={BackArrow} />
+          <Image source={BackArrow} style={{ width: horizontalScale(24), height: horizontalScale(24) }} resizeMode="contain" />
         </TouchableOpacity>
         <Image source={PhoneNumberpad} style={[tw`self-center`, { marginBottom: verticalScale(37.5) }]} />
         <Text style={[tw`font-bold font-dm w-2/3`, { fontSize: moderateScale(20.625), lineHeight: moderateScale(30) }]}>What's your phone number?</Text>
@@ -101,6 +103,28 @@ const AuthStack_SignupScreen: React.FC<Props> = ({ navigation, route }) => {
 
           </View>
         </View>
+
+        {/* Remember Me Checkbox */}
+        <TouchableOpacity
+          onPress={() => setRememberMe(!rememberMe)}
+          activeOpacity={0.7}
+          style={[tw`flex-row items-center`, { marginTop: verticalScale(15) }]}
+        >
+          <View
+            style={[
+              tw`border-2 rounded-md items-center justify-center`,
+              { width: horizontalScale(20), height: horizontalScale(20), borderColor: rememberMe ? '#A3CB31' : '#D1D5DB' },
+              rememberMe && tw`bg-[#A3CB31]`
+            ]}
+          >
+            {rememberMe && (
+              <Text style={[tw`text-white font-bold`, { fontSize: moderateScale(14) }]}>✓</Text>
+            )}
+          </View>
+          <Text style={[tw`text-black font-dm ml-2`, { fontSize: moderateScale(13) }]}>
+            Remember me on this device
+          </Text>
+        </TouchableOpacity>
       </View>
       <View style={tw`absolute bottom-0 w-full flex-col items-center`}>
         <TouchableOpacity

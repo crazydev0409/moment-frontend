@@ -7,6 +7,7 @@ import tw from '~/tailwindcss';
 import { Background, Search, BackArrow, Avatar } from '~/lib/images';
 import { http } from '~/helpers/http';
 import { horizontalScale, verticalScale, moderateScale } from '~/helpers/responsive';
+import { hashPhoneNumber } from '~/utils/phoneHash';
 
 type Props = NativeStackScreenProps<AppStackParamList, 'AppStack_SearchScreen'>;
 
@@ -102,18 +103,21 @@ const AppStack_SearchScreen: React.FC<Props> = ({ navigation, route }) => {
           ],
         });
 
+        // Create a map of hashed phone numbers to local contact avatars
         const phoneToAvatarMap = new Map<string, string>();
-        data.forEach(contact => {
+
+        await Promise.all(data.map(async (contact) => {
           if (contact.phoneNumbers && contact.phoneNumbers.length > 0 && contact.image?.uri) {
             const avatarUri = contact.image.uri;
-            contact.phoneNumbers.forEach(phone => {
+            await Promise.all(contact.phoneNumbers.map(async (phone) => {
               const normalized = phone.number?.replace(/[\s\-\(\)]/g, '') || '';
               if (normalized && avatarUri) {
-                phoneToAvatarMap.set(normalized, avatarUri);
+                const hashed = await hashPhoneNumber(normalized);
+                phoneToAvatarMap.set(hashed, avatarUri);
               }
-            });
+            }));
           }
-        });
+        }));
 
         setLocalAvatars(phoneToAvatarMap);
       }
@@ -124,8 +128,8 @@ const AppStack_SearchScreen: React.FC<Props> = ({ navigation, route }) => {
 
   const getLocalAvatar = (phoneNumber?: string) => {
     if (!phoneNumber) return null;
-    const normalized = phoneNumber.replace(/[\s\-\(\)]/g, '');
-    return localAvatars.get(normalized) || null;
+    // Backend returns hashed phone numbers
+    return localAvatars.get(phoneNumber) || null;
   };
 
   const filterMeetings = () => {
@@ -197,7 +201,7 @@ const AppStack_SearchScreen: React.FC<Props> = ({ navigation, route }) => {
             activeOpacity={0.7}
             style={{ marginRight: horizontalScale(15) }}
           >
-            <Image source={BackArrow} style={{ width: horizontalScale(22.5), height: horizontalScale(22.5) }} />
+            <Image source={BackArrow} style={{ width: horizontalScale(24), height: horizontalScale(24) }} resizeMode="contain" />
           </TouchableOpacity>
           <View style={tw`flex-1`}>
             <Text style={[tw`text-black font-bold font-dm`, { fontSize: moderateScale(22.5) }]}>Search Meetings</Text>

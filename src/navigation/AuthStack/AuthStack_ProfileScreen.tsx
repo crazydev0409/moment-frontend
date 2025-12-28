@@ -118,7 +118,7 @@ const AuthStack_ProfileScreen: React.FC<Props> = ({ navigation, route }) => {
       <View style={tw`absolute w-full h-full bg-black opacity-5`} />
       <View style={[{ marginTop: verticalScale(37.5), marginBottom: verticalScale(37.5) }, { paddingHorizontal: '8%' }]}>
         <TouchableOpacity onPress={navigateToMainPage} activeOpacity={0.5} style={{ marginBottom: verticalScale(18.75) }}>
-          <Image source={BackArrow} />
+          <Image source={BackArrow} style={{ width: horizontalScale(24), height: horizontalScale(24) }} resizeMode="contain" />
         </TouchableOpacity>
         <Text style={[tw`font-bold font-dm w-2/3`, { fontSize: moderateScale(20.625), lineHeight: moderateScale(30), marginBottom: verticalScale(26.25) }]}>Fill in your profile details</Text>
         <View style={tw``}>

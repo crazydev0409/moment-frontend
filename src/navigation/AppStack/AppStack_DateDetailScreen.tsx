@@ -15,6 +15,7 @@ import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { useFocusEffect } from '@react-navigation/native';
 import * as Notifications from 'expo-notifications';
 import { BlurView } from 'expo-blur';
+import * as Contacts from 'expo-contacts';
 import { useAtom } from 'jotai';
 import tw from '~/tailwindcss';
 import { AppStackParamList } from '.';
@@ -24,6 +25,7 @@ import { userAtom } from '~/store';
 import Toast from '~/components/Toast';
 import { setupSocketEventListeners, getSocket, initializeSocket } from '~/services/socketService';
 import { horizontalScale, verticalScale, moderateScale } from '~/helpers/responsive';
+import { hashPhoneNumber } from '~/utils/phoneHash';
 
 type Props = NativeStackScreenProps<
   AppStackParamList,
@@ -106,6 +108,7 @@ const AppStack_DateDetailScreen: React.FC<Props> = ({ navigation, route }) => {
   const [showContactModal, setShowContactModal] = useState(false);
   const [contacts, setContacts] = useState<Contact[]>([]);
   const [contactSearchText, setContactSearchText] = useState('');
+  const [phoneNumberMap, setPhoneNumberMap] = useState<Map<string, string>>(new Map());
 
   // Animation values for smooth modal transitions
   const createModalSlideAnim = useRef(new Animated.Value(0)).current;
@@ -868,35 +871,9 @@ const AppStack_DateDetailScreen: React.FC<Props> = ({ navigation, route }) => {
     // If no contact is selected, show contact selection first
     if (!selectedContact) {
       setShowContactModal(true);
-      // Animate contact modal in
-      Animated.parallel([
-        Animated.timing(contactModalSlideAnim, {
-          toValue: 1,
-          duration: 300,
-          useNativeDriver: true,
-        }),
-        Animated.timing(contactModalOpacityAnim, {
-          toValue: 1,
-          duration: 300,
-          useNativeDriver: true,
-        }),
-      ]).start();
     } else {
       // If contact is already selected, show create modal directly
       setShowCreateModal(true);
-      // Animate create modal in
-      Animated.parallel([
-        Animated.timing(createModalSlideAnim, {
-          toValue: 1,
-          duration: 300,
-          useNativeDriver: true,
-        }),
-        Animated.timing(createModalOpacityAnim, {
-          toValue: 1,
-          duration: 300,
-          useNativeDriver: true,
-        }),
-      ]).start();
     }
   };
 
@@ -966,10 +943,40 @@ const AppStack_DateDetailScreen: React.FC<Props> = ({ navigation, route }) => {
     }
   };
 
-  // Load contacts on mount
+  // Load contacts and phone number mapping on mount
   useEffect(() => {
     loadContacts();
+    loadPhoneNumberMapping();
   }, []);
+
+  // Load local contacts to create a mapping from hashed to original phone numbers
+  const loadPhoneNumberMapping = async () => {
+    try {
+      const { status } = await Contacts.getPermissionsAsync();
+      if (status === 'granted') {
+        const { data } = await Contacts.getContactsAsync({
+          fields: [Contacts.Fields.PhoneNumbers],
+        });
+
+        const mapping = new Map<string, string>();
+        await Promise.all(data.map(async (contact) => {
+          if (contact.phoneNumbers && contact.phoneNumbers.length > 0) {
+            await Promise.all(contact.phoneNumbers.map(async (phone) => {
+              const normalized = phone.number?.replace(/[\s\-\(\)]/g, '') || '';
+              if (normalized) {
+                const hashed = await hashPhoneNumber(normalized);
+                mapping.set(hashed, phone.number || normalized);
+              }
+            }));
+          }
+        }));
+
+        setPhoneNumberMap(mapping);
+      }
+    } catch (error) {
+      console.error('Error loading phone number mapping:', error);
+    }
+  };
 
   // Handle contact selection
   const handleContactSelect = (contact: Contact) => {
@@ -1051,9 +1058,12 @@ const AppStack_DateDetailScreen: React.FC<Props> = ({ navigation, route }) => {
     return 30; // default
   };
 
-  const handleCreateAppointment = () => {
-    // Show the modal instead of directly creating
-    setShowCreateModal(true);
+  const handleBookMeetingPress = () => {
+    if (!selectedContact) {
+      setShowContactModal(true);
+    } else {
+      setShowCreateModal(true);
+    }
   };
 
   const handleSubmitAppointment = async () => {
@@ -1178,7 +1188,7 @@ const AppStack_DateDetailScreen: React.FC<Props> = ({ navigation, route }) => {
             onPress={() => navigation.goBack()}
             activeOpacity={0.5}
           >
-            <Image source={BackArrow} style={{ width: horizontalScale(30), height: horizontalScale(30) }} resizeMode="contain" />
+            <Image source={BackArrow} style={{ width: horizontalScale(24), height: horizontalScale(24) }} resizeMode="contain" />
           </TouchableOpacity>
           <Text style={[tw`font-bold font-dm text-black`, { fontSize: moderateScale(16.875) }]}>
             When do you want to meet?
@@ -1282,7 +1292,7 @@ const AppStack_DateDetailScreen: React.FC<Props> = ({ navigation, route }) => {
       {/* Scrollable Time Slots List */}
       <ScrollView
         style={tw`flex-1`}
-        contentContainerStyle={[{ paddingHorizontal: '4%' }, { paddingBottom: selectedContact ? verticalScale(120) : verticalScale(60) }]}
+        contentContainerStyle={[{ paddingHorizontal: '4%' }, { paddingBottom: verticalScale(120) }]}
         showsVerticalScrollIndicator={false}
       >
         <View style={{ marginTop: verticalScale(15) }}>
@@ -1636,23 +1646,21 @@ const AppStack_DateDetailScreen: React.FC<Props> = ({ navigation, route }) => {
       </ScrollView>
 
 
-      {/* Bottom Fixed Bar - Show when contact is selected */}
-      {selectedContact && (
-        <View style={tw`absolute bottom-0 left-0 right-0 bg-white rounded-t-3xl shadow-lg border-t border-gray-200`}>
-          <View style={[{ paddingTop: verticalScale(15), paddingBottom: verticalScale(30) }, { paddingHorizontal: '4%' }]}>
-            {/* Create Button */}
-            <TouchableOpacity
-              onPress={handleCreateAppointment}
-              activeOpacity={0.7}
-              style={[tw`bg-[#A3CB31] rounded-2xl items-center`, { paddingVertical: verticalScale(11.25) }]}
-            >
-              <Text style={[tw`text-white font-bold font-dm`, { fontSize: moderateScale(15) }]}>
-                Create Meeting
-              </Text>
-            </TouchableOpacity>
-          </View>
+      {/* Bottom Fixed Bar */}
+      <View style={tw`absolute bottom-0 left-0 right-0 bg-white rounded-t-3xl shadow-lg border-t border-gray-200`}>
+        <View style={[{ paddingTop: verticalScale(15), paddingBottom: verticalScale(30) }, { paddingHorizontal: '4%' }]}>
+          {/* Book Meeting Button */}
+          <TouchableOpacity
+            onPress={handleBookMeetingPress}
+            activeOpacity={0.7}
+            style={[tw`bg-[#A3CB31] rounded-2xl items-center`, { paddingVertical: verticalScale(11.25) }]}
+          >
+            <Text style={[tw`text-white font-bold font-dm`, { fontSize: moderateScale(15) }]}>
+              Book a meeting
+            </Text>
+          </TouchableOpacity>
         </View>
-      )}
+      </View>
 
       {/* Create Appointment Modal */}
       <Modal
@@ -2233,7 +2241,7 @@ const AppStack_DateDetailScreen: React.FC<Props> = ({ navigation, route }) => {
                             </Text>
                             {contact.contactPhone && (
                               <Text style={[tw`text-grey font-dm`, { fontSize: moderateScale(13.125) }]}>
-                                {contact.contactPhone}
+                                {phoneNumberMap.get(contact.contactPhone) || contact.contactPhone}
                               </Text>
                             )}
                             {isDisabled && (

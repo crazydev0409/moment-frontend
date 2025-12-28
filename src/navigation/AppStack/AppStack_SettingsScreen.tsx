@@ -242,7 +242,7 @@ const AppStack_SettingsScreen: React.FC<Props> = ({ navigation, route }) => {
                     {/* Header */}
                     <View style={[tw`flex-row items-center relative`, { marginBottom: verticalScale(30) }]}>
                         <TouchableOpacity onPress={navigateToProfile} activeOpacity={0.5} style={tw`absolute left-0 z-10`}>
-                            <Image source={BackArrow} style={{ width: horizontalScale(30), height: horizontalScale(30) }} resizeMode="contain" />
+                            <Image source={BackArrow} style={{ width: horizontalScale(24), height: horizontalScale(24) }} resizeMode="contain" />
                         </TouchableOpacity>
                         <Text style={[tw`font-bold font-dm text-black flex-1 text-center`, { fontSize: moderateScale(22.5) }]}>Settings</Text>
                     </View>
