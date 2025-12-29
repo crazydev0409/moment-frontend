@@ -46,7 +46,7 @@
       "**/*"
     ],
     "ios": {
-      "supportsTablet": true,
+      "supportsTablet": false,
       "bundleIdentifier": "com.crazydev0409.catchapp",
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false,

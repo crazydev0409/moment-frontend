@@ -51,11 +51,6 @@ const AuthStack_OTPScreen: React.FC<Props> = ({ navigation, route }) => {
           http
             .post('/auth/register', { phoneNumber: route.params.phoneNumber })
             .then(async res => {
-              if (res.data.isVerifiedUser) {
-                navigation.navigate('AppStack');
-              } else {
-                navigation.navigate('AuthStack_ProfileScreen');
-              }
               if (res.data.accessToken) {
                 const token = res.data.accessToken;
                 console.log({ token });
@@ -75,6 +70,11 @@ const AuthStack_OTPScreen: React.FC<Props> = ({ navigation, route }) => {
                   console.error('Failed to register push notifications:', error);
                   // Don't block navigation if notification registration fails
                 }
+              }
+              if (res.data.isVerifiedUser) {
+                navigation.navigate('AppStack');
+              } else {
+                navigation.navigate('AuthStack_ProfileScreen');
               }
 
               setLoading(false);
