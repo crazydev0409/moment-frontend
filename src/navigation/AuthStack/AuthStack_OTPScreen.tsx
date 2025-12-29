@@ -9,7 +9,7 @@ import { userAtom } from '../../store';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import Loading from '../../components/Loading';
 import { BackArrow, Background, SMSVerification } from '~/lib/images';
-import { registerForPushNotificationsAsync } from '../../services/notificationService';
+import { getDeviceInfo } from '../../services/deviceService';
 import { horizontalScale, verticalScale, moderateScale } from '~/helpers/responsive';
 
 type Props = NativeStackScreenProps<AuthStackParamList, 'AuthStack_OTPScreen'>;
@@ -62,13 +62,22 @@ const AuthStack_OTPScreen: React.FC<Props> = ({ navigation, route }) => {
                 // Set to your global atom
                 setUser(response.data);
 
-                // Register device for push notifications after successful OTP verification
+                // Register device
                 try {
-                  await registerForPushNotificationsAsync(route.params.rememberMe || false);
-                  console.log('✅ Push notifications registered after OTP verification');
+                  const deviceInfo = await getDeviceInfo();
+
+                  console.log('📤 Registering device with backend...', {
+                    ...deviceInfo,
+                    rememberMe: route.params.rememberMe || false,
+                  });
+
+                  await http.post('/devices/register', {
+                    ...deviceInfo,
+                    rememberMe: route.params.rememberMe || false,
+                  });
+                  console.log('✅ Device registered successfully');
                 } catch (error) {
-                  console.error('Failed to register push notifications:', error);
-                  // Don't block navigation if notification registration fails
+                  console.error('Failed to register device:', error);
                 }
               }
               if (res.data.isVerifiedUser) {

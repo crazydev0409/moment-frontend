@@ -31,7 +31,6 @@ export const getDeviceInfo = async () => {
         deviceId,
         platform: Device.osName?.toLowerCase() || 'unknown',
         appVersion: Application.nativeApplicationVersion || Constants.expoConfig?.version || '1.0.0',
-        expoVersion: Constants.expoVersion || 'unknown'
     };
 };
 
@@ -40,7 +39,6 @@ export const getDeviceInfo = async () => {
  */
 export const registerDevice = async (
     userId: string,
-    expoPushToken: string,
     rememberMe: boolean
 ): Promise<boolean> => {
     try {
@@ -48,7 +46,6 @@ export const registerDevice = async (
         console.log({ rememberMe })
         const response = await http.post('/devices/register', {
             userId,
-            expoPushToken,
             rememberMe,
             ...deviceInfo,
         });

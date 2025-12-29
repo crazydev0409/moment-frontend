@@ -74,74 +74,7 @@ export async function requestNotificationPermissions(): Promise<boolean> {
 
 // Request notification permissions and get push token
 // Note: This should be called after user authentication
-export async function registerForPushNotificationsAsync(rememberMe: boolean = false): Promise<string | null> {
-  let token: string | null = null;
 
-  try {
-    // Check if permission is already granted
-    const { status } = await Notifications.getPermissionsAsync();
-    if (status !== 'granted') {
-      console.log('❌ Notification permission not granted. Please request permission first.');
-      return null;
-    }
-
-    // Get the Expo push token
-    // Get projectId from Constants or app config
-    const projectId = (Constants.expoConfig as any)?.extra?.eas?.projectId ||
-      (Constants.expoConfig as any)?.projectId ||
-      (Constants.manifest as any)?.extra?.eas?.projectId ||
-      (Constants.manifest2 as any)?.extra?.eas?.projectId;
-
-    // Expo SDK 52 requires projectId for push tokens
-    if (!projectId) {
-      // Silently skip push notifications if projectId is not available
-      // This prevents error spam in development
-      console.log('ℹ️ Push notifications disabled: projectId not configured');
-      console.log('   To enable: Run "eas init" or add projectId to app.json');
-      return null;
-    }
-
-    // Get push token with projectId
-    try {
-      token = (await Notifications.getExpoPushTokenAsync({ projectId })).data;
-    } catch (error: any) {
-      // Only log error if it's not about projectId (already handled above)
-      if (!error.message?.includes('projectId')) {
-        console.error('Failed to get push token:', error.message);
-      }
-      return null;
-    }
-
-    // Categories should already be registered from permission request
-
-    // Register device with backend
-    if (token) {
-      try {
-        // Get proper device info from deviceService
-        const deviceInfo = await getDeviceInfo();
-
-        console.log('📤 Registering device with backend...', {
-          ...deviceInfo,
-          rememberMe,
-        });
-
-        await http.post('/devices/register', {
-          expoPushToken: token,
-          ...deviceInfo,
-          rememberMe,
-        });
-        console.log('✅ Device registered successfully with backend');
-        console.log('📲 Push token:', token.substring(0, 20) + '...');
-      } catch (error: any) {
-        console.error('❌ Failed to register device:', error.response?.data || error.message);
-      }
-    }
-  } catch (error) {
-    console.error('Error registering for push notifications:', error);
-  }
-
-  return token;
-}
 
 // Helper function to navigate to DateDetailScreen with meeting date
 function navigateToMeetingDate(data: any) {
