@@ -1,6 +1,6 @@
 import React, { useEffect } from 'react';
 import AuthStack_SignupScreen from './AuthStack_SignupScreen';
-import AuthStack_CountryScreen from './AuthStack_CountryScreen';
+
 import AuthStack_OTPScreen from './AuthStack_OTPScreen';
 import {
   NativeStackScreenProps,
@@ -25,7 +25,7 @@ export type AuthStackParamList = {
     type?: string;
     value?: string;
   };
-  AuthStack_CountryScreen: undefined;
+
   AuthStack_CreateAccountScreen: undefined;
   AuthStack_ProfileScreen: undefined;
   AuthStack_MeetingTypesScreen: undefined;
@@ -49,11 +49,7 @@ const AuthStack: React.FC<Props> = ({ navigation, route }) => {
         component={AuthStack_OTPScreen}
         options={{ headerShown: false }}
       />
-      <Stack.Screen
-        name="AuthStack_CountryScreen"
-        component={AuthStack_CountryScreen}
-        options={{ headerShown: false }}
-      />
+
       <Stack.Screen
         name="AuthStack_CreateAccountScreen"
         component={AuthStack_CreateAccountScreen}

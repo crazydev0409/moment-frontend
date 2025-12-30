@@ -19,7 +19,7 @@ import * as Contacts from 'expo-contacts';
 import { useAtom } from 'jotai';
 import tw from '~/tailwindcss';
 import { AppStackParamList } from '.';
-import { Background, Notification, Avatar, AddIcon, HomeIcon, CalendarIcon, BusinessIcon, ProfileIcon, BackArrow, Search, GymIcon, FootballIcon } from '~/lib/images';
+import { Background, Notification, Avatar, AddIcon, HomeIcon, CalendarIcon, BusinessIcon, ProfileIcon, BackArrow, Search, GymIcon, FootballIcon, TimeIcon } from '~/lib/images';
 import { http } from '~/helpers/http';
 import { userAtom } from '~/store';
 import Toast from '~/components/Toast';
@@ -2013,9 +2013,7 @@ const AppStack_DateDetailScreen: React.FC<Props> = ({ navigation, route }) => {
                         {/* Date and Time */}
                         <View style={[tw`border-b border-gray-200`, { marginBottom: verticalScale(15), paddingBottom: verticalScale(15) }]}>
                           <View style={[tw`flex-row items-center`, { marginBottom: verticalScale(7.5) }]}>
-                            <Text style={[tw`font-bold font-dm text-black`, { fontSize: moderateScale(16.875), marginRight: horizontalScale(7.5) }]}>
-                              📅
-                            </Text>
+                            <Image source={CalendarIcon} style={{ width: moderateScale(20), height: moderateScale(20), marginRight: horizontalScale(7.5) }} resizeMode="contain" tintColor="black" />
                             <View style={tw`flex-1`}>
                               <Text style={[tw`font-dm text-grey`, { fontSize: moderateScale(13.125), marginBottom: verticalScale(3.75) }]}>Date</Text>
                               <Text style={[tw`font-dm text-black`, { fontSize: moderateScale(15) }]}>
@@ -2029,9 +2027,7 @@ const AppStack_DateDetailScreen: React.FC<Props> = ({ navigation, route }) => {
                             </View>
                           </View>
                           <View style={[tw`flex-row items-center`, { marginTop: verticalScale(11.25) }]}>
-                            <Text style={[tw`font-bold font-dm text-black`, { fontSize: moderateScale(16.875), marginRight: horizontalScale(7.5) }]}>
-                              🕐
-                            </Text>
+                            <Image source={TimeIcon} style={{ width: moderateScale(20), height: moderateScale(20), marginRight: horizontalScale(7.5) }} resizeMode="contain" tintColor="black" />
                             <View style={tw`flex-1`}>
                               <Text style={[tw`font-dm text-grey`, { fontSize: moderateScale(13.125), marginBottom: verticalScale(3.75) }]}>Time</Text>
                               <Text style={[tw`font-dm text-black`, { fontSize: moderateScale(15) }]}>
@@ -2044,9 +2040,7 @@ const AppStack_DateDetailScreen: React.FC<Props> = ({ navigation, route }) => {
                         {/* Participants */}
                         <View style={[tw`border-b border-gray-200`, { marginBottom: verticalScale(15), paddingBottom: verticalScale(15) }]}>
                           <View style={tw`flex-row items-center`}>
-                            <Text style={[tw`font-bold font-dm text-black`, { fontSize: moderateScale(16.875), marginRight: horizontalScale(7.5) }]}>
-                              👤
-                            </Text>
+                            <Image source={ProfileIcon} style={{ width: moderateScale(20), height: moderateScale(20), marginRight: horizontalScale(7.5) }} resizeMode="contain" tintColor="black" />
                             <View style={tw`flex-1`}>
                               <Text style={[tw`font-dm text-grey`, { fontSize: moderateScale(13.125), marginBottom: verticalScale(7.5) }]}>
                                 {selectedRequest.receiverId === user.id ? 'From' : 'To'}
@@ -2078,12 +2072,12 @@ const AppStack_DateDetailScreen: React.FC<Props> = ({ navigation, route }) => {
                               onPress={handleCancelMeeting}
                               activeOpacity={0.7}
                               disabled={isCanceling}
-                              style={[tw`bg-red-500 rounded-2xl items-center ${isCanceling ? 'opacity-50' : ''}`, { paddingVertical: verticalScale(15) }]}
+                              style={[tw`bg-bg-[#F0F0F0] rounded-2xl items-center ${isCanceling ? 'opacity-50' : ''}`, { paddingVertical: verticalScale(15) }]}
                             >
                               {isCanceling ? (
                                 <ActivityIndicator size="small" color="#FFFFFF" />
                               ) : (
-                                <Text style={[tw`text-white font-bold font-dm`, { fontSize: moderateScale(15) }]}>
+                                <Text style={[tw`text-black font-bold font-dm`, { fontSize: moderateScale(15) }]}>
                                   {selectedRequest.status === 'pending' ? 'Cancel Request' : 'Cancel Meeting'}
                                 </Text>
                               )}
@@ -2096,12 +2090,12 @@ const AppStack_DateDetailScreen: React.FC<Props> = ({ navigation, route }) => {
                               onPress={handleRejectRequest}
                               activeOpacity={0.7}
                               disabled={isRejecting || isAccepting}
-                              style={[tw`flex-1 bg-red-500 rounded-2xl items-center ${isRejecting || isAccepting ? 'opacity-50' : ''}`, { paddingVertical: verticalScale(15) }]}
+                              style={[tw`flex-1 bg-[#F0F0F0] rounded-2xl items-center ${isRejecting || isAccepting ? 'opacity-50' : ''}`, { paddingVertical: verticalScale(15) }]}
                             >
                               {isRejecting ? (
                                 <ActivityIndicator size="small" color="#FFFFFF" />
                               ) : (
-                                <Text style={[tw`text-white font-bold font-dm`, { fontSize: moderateScale(15) }]}>
+                                <Text style={[tw`text-black font-bold font-dm`, { fontSize: moderateScale(15) }]}>
                                   Reject
                                 </Text>
                               )}
@@ -2110,7 +2104,7 @@ const AppStack_DateDetailScreen: React.FC<Props> = ({ navigation, route }) => {
                               onPress={handleAcceptRequest}
                               activeOpacity={0.7}
                               disabled={isAccepting || isRejecting}
-                              style={[tw`flex-1 bg-[#A3CB31] rounded-2xl items-center ${isAccepting || isRejecting ? 'opacity-50' : ''}`, { paddingVertical: verticalScale(15) }]}
+                              style={[tw`flex-1 bg-black rounded-2xl items-center ${isAccepting || isRejecting ? 'opacity-50' : ''}`, { paddingVertical: verticalScale(15) }]}
                             >
                               {isAccepting ? (
                                 <ActivityIndicator size="small" color="#FFFFFF" />

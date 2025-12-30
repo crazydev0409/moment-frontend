@@ -7,30 +7,34 @@ import {
   Image,
   TouchableOpacity,
   ActivityIndicator,
+  Modal,
+  TouchableWithoutFeedback,
 } from 'react-native';
 import tw from '~/tailwindcss';
-import countries from '../../lib/countryCode';
 import { AuthStackParamList } from '.';
 import { http } from '../../helpers/http';
 import { BackArrow, Background, PhoneNumberpad } from '~/lib/images';
 import { horizontalScale, verticalScale, moderateScale } from '~/helpers/responsive';
+import CountryPicker, { Country } from 'react-native-country-picker-modal';
+
 type Props = NativeStackScreenProps<
   AuthStackParamList,
   'AuthStack_SignupScreen'
 >;
 const regexp = /^\+[0-9]?()[0-9](\s|\S)(\d[0-9]{8,16})$/;
 const initialCode = 'US';
+const initialCallingCode = '1';
+
 const AuthStack_SignupScreen: React.FC<Props> = ({ navigation, route }) => {
   const [phone, setPhone] = useState('');
   const [countryCode, setCountryCode] = useState(initialCode);
+  const [callingCode, setCallingCode] = useState(initialCallingCode);
   const [isSending, setIsSending] = useState(false);
   const [rememberMe, setRememberMe] = useState(false);
-  const countryNumber = countries.find(
-    country => country.code === countryCode,
-  )?.dial_code;
+  const [pickerVisible, setPickerVisible] = useState(false);
 
   const onSendCode = () => {
-    const phoneNumber = `${countryNumber}${phone}`;
+    const phoneNumber = `+${callingCode}${phone}`;
     if (!regexp.test(phoneNumber)) {
       alert('Please Enter Phone Number');
       return;
@@ -59,15 +63,8 @@ const AuthStack_SignupScreen: React.FC<Props> = ({ navigation, route }) => {
       });
   }
 
-  useEffect(() => {
-    if (route.params?.countryCode) {
-      setCountryCode(route.params.countryCode);
-    }
-  }, [route.params?.countryCode]);
-
-  const onPressCountry = () => {
-    navigation.navigate('AuthStack_CountryScreen');
-  };
+  // Removed useEffect for route params since we use local state for picker
+  // Removed onPressCountry since we use the modal picker directly
 
   return (
     <View style={tw`flex-1 relative bg-white`}>
@@ -82,17 +79,67 @@ const AuthStack_SignupScreen: React.FC<Props> = ({ navigation, route }) => {
         <View style={tw`flex-row w-full justify-center`}>
           <View
             style={[tw`flex-row items-center w-full bg-white rounded-full`, { height: verticalScale(56.25), marginTop: verticalScale(37.5) }]}>
-            <TouchableOpacity onPress={onPressCountry} activeOpacity={0.5}>
-              <Image
-                source={{
-                  uri: `https://flagcdn.com/w320/${countryCode.toLowerCase()}.png`,
-                }}
-                style={{ marginHorizontal: horizontalScale(9.375), width: horizontalScale(56.25), height: verticalScale(28.125) }}
-                resizeMode="cover"
-              />
-            </TouchableOpacity>
+
+            <View style={{ marginLeft: horizontalScale(9.375), marginRight: horizontalScale(5) }}>
+              <TouchableOpacity onPress={() => setPickerVisible(true)} activeOpacity={0.5} style={tw`flex-row items-center`}>
+                <Image
+                  source={{
+                    uri: `https://flagcdn.com/w320/${countryCode.toLowerCase()}.png`,
+                  }}
+                  style={{ width: horizontalScale(56.25), height: verticalScale(28.125) }}
+                  resizeMode="cover"
+                />
+              </TouchableOpacity>
+
+              <Modal
+                visible={pickerVisible}
+                transparent={true}
+                animationType="slide"
+                onRequestClose={() => setPickerVisible(false)}
+              >
+                <View style={tw`flex-1 justify-center bg-black/50`}>
+                  <TouchableWithoutFeedback onPress={() => setPickerVisible(false)}>
+                    <View style={tw`absolute w-full h-full`} />
+                  </TouchableWithoutFeedback>
+                  <View style={{
+                    height: verticalScale(500),
+                    marginTop: verticalScale(150),
+                    backgroundColor: 'white',
+                    marginHorizontal: horizontalScale(20),
+                    borderRadius: 20,
+                    shadowColor: '#000',
+                    shadowOffset: {
+                      width: 0,
+                      height: 2,
+                    },
+                    shadowOpacity: 0.25,
+                    shadowRadius: 4,
+                    elevation: 5,
+                    overflow: 'hidden',
+                    padding: horizontalScale(20),
+                  }}>
+                    <CountryPicker
+                      countryCode={countryCode as any}
+                      withFilter
+                      withFlag
+                      withCallingCode
+                      withAlphaFilter={false}
+                      withCurrencyButton={false}
+                      onSelect={(country: Country) => {
+                        setCountryCode(country.cca2);
+                        setCallingCode(country.callingCode[0]);
+                        setPickerVisible(false);
+                      }}
+                      visible={true}
+                      withModal={false}
+                    />
+                  </View>
+                </View>
+              </Modal>
+            </View>
+
             <Text style={[tw`text-black font-dm font-bold`, { fontSize: moderateScale(16.875) }]}>
-              {countryNumber}
+              +{callingCode}
             </Text>
             <TextInput
               style={[tw`bg-white rounded-lg flex-1 font-dm font-bold`, { fontSize: moderateScale(16.875), marginTop: verticalScale(2.625) }]}

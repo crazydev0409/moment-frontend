@@ -11,6 +11,7 @@ export const HomeIcon = require(`../../assets/images/icon_home.png`);
 export const BusinessIcon = require(`../../assets/images/icon_bussines.png`);
 export const ProfileIcon = require(`../../assets/images/icon_profile.png`);
 export const CalendarIcon = require(`../../assets/images/icon_calendar.png`);
+export const TimeIcon = require('../../assets/images/icon_time.png')
 export const GymIcon = require(`../../assets/images/icon_gym.png`);
 export const FootballIcon = require(`../../assets/images/icon_football.png`);
 export const AddIcon = require(`../../assets/images/icon_add.png`);

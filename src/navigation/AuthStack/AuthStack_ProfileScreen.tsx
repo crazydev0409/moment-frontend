@@ -126,7 +126,7 @@ const AuthStack_ProfileScreen: React.FC<Props> = ({ navigation, route }) => {
           <TextInput
             autoCapitalize="words"
             autoCorrect={false}
-            style={[tw`bg-white rounded-full w-full self-center font-dm font-normal font-bold`, { height: verticalScale(50.625), fontSize: moderateScale(13.125), letterSpacing: horizontalScale(0.375) }]}
+            style={[tw`bg-white rounded-full w-full self-center font-dm font-normal font-bold`, { height: verticalScale(50.625), fontSize: moderateScale(13.125), letterSpacing: horizontalScale(0.375), paddingHorizontal: horizontalScale(19), }]}
             value={name}
             onChangeText={(t) => { setName(t); setNameError(''); }}
             placeholder="Name"
@@ -140,7 +140,7 @@ const AuthStack_ProfileScreen: React.FC<Props> = ({ navigation, route }) => {
           <TextInput
             autoCapitalize="words"
             autoCorrect={false}
-            style={[tw`bg-white rounded-full w-full self-center font-dm font-normal font-bold`, { height: verticalScale(50.625), fontSize: moderateScale(13.125), letterSpacing: horizontalScale(0.375) }]}
+            style={[tw`bg-white rounded-full w-full self-center font-dm font-normal font-bold`, { height: verticalScale(50.625), fontSize: moderateScale(13.125), letterSpacing: horizontalScale(0.375), paddingHorizontal: horizontalScale(19), }]}
             value={bio}
             onChangeText={setBio}
             placeholder="Bio"
@@ -180,7 +180,7 @@ const AuthStack_ProfileScreen: React.FC<Props> = ({ navigation, route }) => {
         <View style={tw``}>
           <Text style={[tw`text-grey font-dm`, { fontSize: moderateScale(11.25), lineHeight: moderateScale(19.6875), marginBottom: verticalScale(7.5) }]}>Email</Text>
           <TextInput
-            style={[tw`bg-white rounded-full w-full self-center font-dm font-normal font-bold`, { height: verticalScale(50.625), fontSize: moderateScale(13.125), letterSpacing: horizontalScale(0.375) }]}
+            style={[tw`bg-white rounded-full w-full self-center font-dm font-normal font-bold`, { height: verticalScale(50.625), fontSize: moderateScale(13.125), letterSpacing: horizontalScale(0.375), paddingHorizontal: horizontalScale(19), }]}
             value={email}
             keyboardType="email-address"
             autoCapitalize="none"
@@ -196,7 +196,7 @@ const AuthStack_ProfileScreen: React.FC<Props> = ({ navigation, route }) => {
         <View style={tw``}>
           <Text style={[tw`text-grey font-dm`, { fontSize: moderateScale(11.25), lineHeight: moderateScale(19.6875), marginBottom: verticalScale(7.5) }]}>Confirm Email</Text>
           <TextInput
-            style={[tw`bg-white rounded-full w-full self-center font-dm font-normal font-bold`, { height: verticalScale(50.625), fontSize: moderateScale(13.125), letterSpacing: horizontalScale(0.375) }]}
+            style={[tw`bg-white rounded-full w-full self-center font-dm font-normal font-bold`, { height: verticalScale(50.625), fontSize: moderateScale(13.125), letterSpacing: horizontalScale(0.375), paddingHorizontal: horizontalScale(19) }]}
             value={confirmEmail}
             keyboardType="email-address"
             autoCapitalize="none"
