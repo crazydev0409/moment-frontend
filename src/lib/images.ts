@@ -16,5 +16,3 @@ export const GymIcon = require(`../../assets/images/icon_gym.png`);
 export const FootballIcon = require(`../../assets/images/icon_football.png`);
 export const AddIcon = require(`../../assets/images/icon_add.png`);
 export const Settings = require(`../../assets/images/settings.png`);
-export const Cancel = require(`../../assets/images/cancel.png`);
-export const Cross = require(`../../assets/images/cross.png`);
