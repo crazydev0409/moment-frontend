@@ -11,7 +11,7 @@ import { AppStackParamList } from '.';
 import tw from '~/tailwindcss';
 import { Avatar, Background, Notification, Search, HomeIcon, CalendarIcon, BusinessIcon, ProfileIcon, AddIcon, GymIcon, FootballIcon } from '~/lib/images';
 import { http } from '~/helpers/http';
-import { useAddButton } from '~/contexts/AddButtonContext';
+
 import { setupSocketEventListeners, getSocket, initializeSocket } from '~/services/socketService';
 import { horizontalScale, verticalScale, moderateScale } from '~/helpers/responsive';
 import { hashPhoneNumber } from '~/utils/phoneHash';
@@ -126,18 +126,12 @@ const formatDate = (date: Date, formatStr: string): string => {
 };
 
 const AppStack_HomePageScreen: React.FC<Props> = ({ navigation, route }) => {
-  const { setOnAddPress } = useAddButton();
   const insets = useSafeAreaInsets();
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
   const [dates, setDates] = useState<DateItem[]>([]);
   const [searchText, setSearchText] = useState('');
   const [selectedMeetingType, setSelectedMeetingType] = useState('meet');
-  const [showAddMenu, setShowAddMenu] = useState(false);
 
-  // Contact selection
-  const [showContactModal, setShowContactModal] = useState(false);
-  const [contacts, setContacts] = useState<Contact[]>([]);
-  const [contactSearchText, setContactSearchText] = useState('');
   const [phoneNumberMap, setPhoneNumberMap] = useState<Map<string, string>>(new Map());
 
   // Meetings data
@@ -221,15 +215,7 @@ const AppStack_HomePageScreen: React.FC<Props> = ({ navigation, route }) => {
     }
   }, [selectedDate, location]);
 
-  // Register add button handler
-  useEffect(() => {
-    setOnAddPress(() => () => setShowAddMenu(true));
 
-    // Cleanup on unmount
-    return () => {
-      setOnAddPress(undefined);
-    };
-  }, [setOnAddPress]);
 
   // Listen for notifications and refresh meetings when moment-related notifications are received
   useEffect(() => {
@@ -665,77 +651,7 @@ const AppStack_HomePageScreen: React.FC<Props> = ({ navigation, route }) => {
     return `${durationMinutes} min`;
   };
 
-  // Load contacts when modal opens
-  useEffect(() => {
-    if (showContactModal) {
-      loadContacts();
-    }
-  }, [showContactModal]);
 
-  const loadContacts = async () => {
-    try {
-      const response = await http.get('/users/contacts');
-      setContacts(response.data.contacts || []);
-    } catch (error) {
-      console.error('Error loading contacts:', error);
-    }
-  };
-
-  // Calculate recent contacts based on meeting frequency
-  const getRecentContacts = () => {
-    if (!allMeetings || !Array.isArray(allMeetings)) return [];
-    const contactFrequency: Record<string, number> = {};
-
-    // Count meetings per contact
-    allMeetings.forEach(meeting => {
-      const otherPersonId = meeting.sender?.id === userId ? meeting.receiver?.id : meeting.sender?.id;
-      if (otherPersonId) {
-        contactFrequency[otherPersonId] = (contactFrequency[otherPersonId] || 0) + 1;
-      }
-    });
-
-    // Sort contacts by frequency and get top 3
-    const recentContacts = contacts
-      .filter(contact => contactFrequency[contact.contactUser?.id || ''] > 0)
-      .sort((a, b) => {
-        const freqA = contactFrequency[a.contactUser?.id || ''] || 0;
-        const freqB = contactFrequency[b.contactUser?.id || ''] || 0;
-        return freqB - freqA;
-      })
-      .slice(0, 3);
-
-    return recentContacts;
-  };
-
-  const recentContacts = getRecentContacts();
-  const recentContactIds = new Set(recentContacts.map(c => c.id));
-
-  // Filter out recent contacts from main list
-  const filteredContacts = contacts
-    .filter(contact => !recentContactIds.has(contact.id))
-    .filter(contact => contact.displayName.toLowerCase().includes(contactSearchText.toLowerCase()));
-  const handleBookMeeting = () => {
-    setShowAddMenu(false);
-    // Close menu first, then navigate after a brief delay to ensure modal closes
-    setTimeout(() => {
-      const today = new Date().toISOString().split('T')[0];
-      navigation.navigate('AppStack_DateDetailScreen', {
-        date: today
-      });
-    }, 100);
-  };
-
-  const handleContactSelect = (contact: Contact) => {
-    setShowContactModal(false);
-    // Navigate to DateDetailScreen with selected contact
-    const today = new Date().toISOString().split('T')[0];
-    navigation.navigate('AppStack_DateDetailScreen', {
-      date: today,
-      contact: contact
-    });
-  };
-
-  // Get local avatar for a phone number
   const getLocalAvatar = (phoneNumber?: string) => {
     if (!phoneNumber) return null;
     // Since backend returns hashed phone numbers, if phoneNumber is a 64-char hex string,
@@ -1022,235 +938,7 @@ const AppStack_HomePageScreen: React.FC<Props> = ({ navigation, route }) => {
       </ScrollView>
 
       {/* Add Menu Popup Modal */}
-      <Modal
-        visible={showAddMenu}
-        transparent={true}
-        animationType="fade"
-        onRequestClose={() => setShowAddMenu(false)}
-      >
-        <View style={tw`flex-1`}>
-          {/* Blurred and Darkened Background */}
-          <TouchableOpacity
-            style={tw`flex-1`}
-            activeOpacity={1}
-            onPress={() => setShowAddMenu(false)}
-          >
-            <BlurView intensity={20} tint="dark" style={tw`absolute inset-0`}>
-              <View style={tw`flex-1 bg-black opacity-40`} />
-            </BlurView>
-          </TouchableOpacity>
 
-          {/* Popup Menu */}
-          <View style={[tw`absolute bottom-0 left-0 right-0 items-center`, { paddingBottom: verticalScale(90) }]}>
-            <View style={[tw`bg-white rounded-3xl w-5/6 overflow-hidden`, { padding: moderateScale(15) }]}>
-              {/* Book a meeting */}
-              <TouchableOpacity
-                style={[tw`flex-row items-center`, { paddingHorizontal: horizontalScale(22.5), paddingVertical: verticalScale(15) }]}
-                activeOpacity={0.7}
-                onPress={handleBookMeeting}
-              >
-                <View style={[tw`rounded-full bg-gray-200 items-center justify-center`, { width: horizontalScale(37.5), height: horizontalScale(37.5), marginRight: horizontalScale(15) }]}>
-                  <Text style={[tw`text-black font-bold`, { fontSize: moderateScale(18.75) }]}>+</Text>
-                </View>
-                <Text style={[tw`text-black font-dm flex-1`, { fontSize: moderateScale(15) }]}>Book a meeting</Text>
-              </TouchableOpacity>
-
-              {/* Separator */}
-              <View style={[tw`bg-gray-200`, { height: verticalScale(1.125), marginHorizontal: horizontalScale(22.5) }]} />
-
-              {/* Create meeting type */}
-              <TouchableOpacity
-                style={[
-                  tw`flex-row items-center opacity-50`,
-                  { paddingHorizontal: horizontalScale(22.5), paddingVertical: verticalScale(15) }
-                ]}
-                activeOpacity={1}
-                disabled={true}
-              >
-                <View style={[tw`rounded-full bg-gray-200 items-center justify-center`, { width: horizontalScale(37.5), height: horizontalScale(37.5), marginRight: horizontalScale(15) }]}>
-                  <Text style={[tw`text-black font-bold`, { fontSize: moderateScale(18.75) }]}>+</Text>
-                </View>
-                <Text style={[tw`text-black font-dm flex-1`, { fontSize: moderateScale(15) }]}>Create meeting type</Text>
-              </TouchableOpacity>
-
-              {/* Separator */}
-              <View style={[tw`bg-gray-200`, { height: verticalScale(1.125), marginHorizontal: horizontalScale(22.5) }]} />
-
-              {/* Manage availability */}
-              <TouchableOpacity
-                style={[
-                  tw`flex-row items-center opacity-50`,
-                  { paddingHorizontal: horizontalScale(22.5), paddingVertical: verticalScale(15) }
-                ]}
-                activeOpacity={1}
-                disabled={true}
-              >
-                <View style={[tw`rounded-full bg-gray-200 items-center justify-center`, { width: horizontalScale(37.5), height: horizontalScale(37.5), marginRight: horizontalScale(15) }]}>
-                  <Text style={[tw`text-black font-bold`, { fontSize: moderateScale(18.75) }]}>+</Text>
-                </View>
-                <Text style={[tw`text-black font-dm flex-1`, { fontSize: moderateScale(15) }]}>Manage availability</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-        </View>
-      </Modal>
-
-      {/* Contact Selection Modal */}
-      <Modal
-        visible={showContactModal}
-        transparent={true}
-        animationType="slide"
-        onRequestClose={() => setShowContactModal(false)}
-      >
-        <View style={tw`flex-1`}>
-          <TouchableOpacity
-            style={tw`flex-1`}
-            activeOpacity={1}
-            onPress={() => setShowContactModal(false)}
-          >
-            <BlurView intensity={20} tint="dark" style={tw`absolute inset-0`}>
-              <View style={tw`flex-1 bg-black opacity-40`} />
-            </BlurView>
-          </TouchableOpacity>
-
-          <View style={tw`absolute bottom-0 left-0 right-0 bg-white rounded-t-3xl`}>
-            <View style={[{ paddingTop: verticalScale(22.5), paddingBottom: verticalScale(30) }, { paddingHorizontal: '4%' }]}>
-              {/* Header */}
-              <View style={[tw`flex-row justify-between items-center`, { marginBottom: verticalScale(15) }]}>
-                <Text style={[tw`text-black font-bold font-dm`, { fontSize: moderateScale(18.75) }]}>Select Contact</Text>
-                <TouchableOpacity
-                  onPress={() => setShowContactModal(false)}
-                  activeOpacity={0.7}
-                >
-                  <Text style={[tw`text-[#A3CB31] font-dm`, { fontSize: moderateScale(15) }]}>Cancel</Text>
-                </TouchableOpacity>
-              </View>
-
-              {/* Search Bar */}
-              <View style={[tw`bg-gray-100 rounded-2xl flex-row items-center`, { paddingHorizontal: horizontalScale(15), paddingVertical: verticalScale(11.25), marginBottom: verticalScale(15) }]}>
-                <Image source={Search} style={{ width: horizontalScale(18.75), height: horizontalScale(18.75), marginRight: horizontalScale(7.5) }} />
-                <TextInput
-                  style={tw`flex-1 text-black font-dm`}
-                  placeholder="Search contacts"
-                  placeholderTextColor="#999"
-                  value={contactSearchText}
-                  onChangeText={setContactSearchText}
-                />
-              </View>
-
-              {/* Contacts List */}
-              <ScrollView style={{ maxHeight: verticalScale(337.5) }} showsVerticalScrollIndicator={false}>
-                {/* Recent Contacts Section */}
-                {recentContacts.length > 0 && !contactSearchText && (
-                  <View style={{ marginBottom: verticalScale(7.5) }}>
-                    <Text style={[tw`text-grey font-bold font-dm`, { fontSize: moderateScale(11.25), marginBottom: verticalScale(7.5), paddingHorizontal: horizontalScale(3.75) }]}>RECENT</Text>
-                    {recentContacts.map((contact) => {
-                      const isDisabled = !contact.contactUser?.id;
-                      return (
-                        <TouchableOpacity
-                          key={contact.id}
-                          style={[
-                            tw`flex-row items-center border-b border-gray-100`,
-                            { paddingVertical: verticalScale(15) },
-                            isDisabled && tw`opacity-50`
-                          ]}
-                          activeOpacity={isDisabled ? 1 : 0.7}
-                          onPress={() => !isDisabled && handleContactSelect(contact)}
-                          disabled={isDisabled}
-                        >
-                          <View style={[tw`rounded-full bg-gray-200 items-center justify-center overflow-hidden`, { width: horizontalScale(45), height: horizontalScale(45), marginRight: horizontalScale(15) }]}>
-                            {contact.contactUser?.avatar ? (
-                              <Image
-                                source={{ uri: contact.contactUser.avatar }}
-                                style={{ width: horizontalScale(45), height: horizontalScale(45), borderRadius: 9999 }}
-                              />
-                            ) : (
-                              <Image source={Avatar} style={{ width: horizontalScale(30), height: horizontalScale(30) }} />
-                            )}
-                          </View>
-                          <View style={tw`flex-1`}>
-                            <Text style={[tw`text-black font-bold font-dm`, { fontSize: moderateScale(15) }]}>
-                              {contact.displayName}
-                            </Text>
-                            {contact.contactPhone && (
-                              <Text style={[tw`text-grey font-dm`, { fontSize: moderateScale(13) }]}>
-                                {contact.contactPhone}
-                              </Text>
-                            )}
-                            {isDisabled && (
-                              <Text style={[tw`text-grey font-dm`, { fontSize: moderateScale(11.25), marginTop: 1 }]}>
-                                Not registered
-                              </Text>
-                            )}
-                          </View>
-                        </TouchableOpacity>
-                      );
-                    })}
-                  </View>
-                )}
-
-                {/* All Contacts Section */}
-                {filteredContacts.length > 0 && (
-                  <View>
-                    {recentContacts.length > 0 && !contactSearchText && (
-                      <Text style={[tw`text-grey font-bold font-dm`, { fontSize: moderateScale(11.25), marginBottom: verticalScale(7.5), paddingHorizontal: horizontalScale(3.75), marginTop: verticalScale(7.5) }]}>ALL CONTACTS</Text>
-                    )}
-                    {filteredContacts.map((contact) => {
-                      const isDisabled = !contact.contactUser?.id;
-                      return (
-                        <TouchableOpacity
-                          key={contact.id}
-                          style={[
-                            tw`flex-row items-center border-b border-gray-100`,
-                            { paddingVertical: verticalScale(15) },
-                            isDisabled && tw`opacity-50`
-                          ]}
-                          activeOpacity={isDisabled ? 1 : 0.7}
-                          onPress={() => !isDisabled && handleContactSelect(contact)}
-                          disabled={isDisabled}
-                        >
-                          <View style={[tw`rounded-full bg-gray-200 items-center justify-center overflow-hidden`, { width: horizontalScale(45), height: horizontalScale(45), marginRight: horizontalScale(15) }]}>
-                            {contact.contactUser?.avatar ? (
-                              <Image
-                                source={{ uri: contact.contactUser.avatar }}
-                                style={{ width: horizontalScale(45), height: horizontalScale(45), borderRadius: 9999 }}
-                              />
-                            ) : (
-                              <Image source={Avatar} style={{ width: horizontalScale(30), height: horizontalScale(30) }} />
-                            )}
-                          </View>
-                          <View style={tw`flex-1`}>
-                            <Text style={[tw`text-black font-bold font-dm`, { fontSize: moderateScale(15) }]}>
-                              {contact.displayName}
-                            </Text>
-                            {contact.contactPhone && (
-                              <Text style={[tw`text-grey font-dm`, { fontSize: moderateScale(13) }]}>
-                                {contact.contactPhone}
-                              </Text>
-                            )}
-                            {isDisabled && (
-                              <Text style={[tw`text-grey font-dm`, { fontSize: moderateScale(11.25), marginTop: 1 }]}>
-                                Not registered
-                              </Text>
-                            )}
-                          </View>
-                        </TouchableOpacity>
-                      );
-                    })}
-                  </View>
-                )}
-
-                {/* No Contacts Message */}
-                {filteredContacts.length === 0 && recentContacts.length === 0 && (
-                  <View style={{ paddingVertical: verticalScale(37.5), alignItems: 'center' }}>
-                    <Text style={[tw`text-grey font-dm`, { fontSize: moderateScale(15) }]}>No contacts found</Text>
-                  </View>
-                )}
-              </ScrollView>
-            </View>
-          </View>
-        </View>
-      </Modal>
     </View>
   );
 };

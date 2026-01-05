@@ -15,7 +15,6 @@ import {
 } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../../index';
 import BottomNavigationBar from '~/components/BottomNavigationBar';
-import { AddButtonProvider, useAddButton } from '~/contexts/AddButtonContext';
 import tw from '~/tailwindcss';
 
 export type AppStackParamList = {
@@ -57,14 +56,12 @@ const SCREENS_WITHOUT_NAV_BAR = [
 // Wrapper component that adds bottom navigation to screens
 const ScreenWithNav = ({ component: Component, showNav, selectedTab }: any) => {
   return (props: any) => {
-    const { onAddPress } = useAddButton();
     return (
       <View style={tw`flex-1`}>
         <Component {...props} />
         {showNav && (
           <BottomNavigationBar
             selectedTab={selectedTab}
-            onAddPress={onAddPress}
           />
         )}
       </View>
@@ -157,9 +154,7 @@ const AppStackNavigator: React.FC = () => {
 
 const AppStack: React.FC<Props> = ({ navigation, route }) => {
   return (
-    <AddButtonProvider>
-      <AppStackNavigator />
-    </AddButtonProvider>
+    <AppStackNavigator />
   );
 };
 

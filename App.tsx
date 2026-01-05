@@ -16,7 +16,6 @@ import { useDeviceContext } from 'twrnc';
 import tw from '~/tailwindcss';
 import {
   requestNotificationPermissions,
-  registerForPushNotificationsAsync,
   setupNotificationResponseHandler,
   setupNotificationReceivedHandler,
 } from '~/services/notificationService';
@@ -51,9 +50,6 @@ export default function App() {
           // Import and sync contacts after authentication
           await importAndSyncContacts();
 
-          // Register for push notifications after authentication
-          await setupNotifications();
-
           // Initialize Socket.IO for real-time updates
           await initializeSocket();
 
@@ -71,9 +67,6 @@ export default function App() {
 
             // Import and sync contacts after authentication
             await importAndSyncContacts();
-
-            // Register for push notifications after authentication
-            await setupNotifications();
 
             // Initialize Socket.IO for real-time updates
             await initializeSocket();
@@ -221,21 +214,6 @@ export default function App() {
         await requestNotificationPermissions();
       } catch (error) {
         console.error('Error requesting notification permissions:', error);
-      }
-    };
-
-    // Register device for push notifications (only after authentication)
-    const setupNotifications = async () => {
-      try {
-        const token = await registerForPushNotificationsAsync();
-        if (token) {
-          console.log('✅ Push notifications registered successfully');
-        } else {
-          console.log('ℹ️ Push notifications not available (projectId required)');
-        }
-      } catch (error) {
-        console.error('Error setting up notifications:', error);
-        // Don't block app initialization if notifications fail
       }
     };
 

@@ -15,7 +15,7 @@ import tw from '~/tailwindcss';
 import { AppStackParamList } from '.';
 import { Background, Notification, Avatar, AddIcon, HomeIcon, CalendarIcon, BusinessIcon, ProfileIcon, Search } from '~/lib/images';
 import { http } from '~/helpers/http';
-import { useAddButton } from '~/contexts/AddButtonContext';
+
 import { horizontalScale, verticalScale, moderateScale } from '~/helpers/responsive';
 
 type Props = NativeStackScreenProps<
@@ -24,7 +24,7 @@ type Props = NativeStackScreenProps<
 >;
 
 const AppStack_CalendarScreen: React.FC<Props> = ({ navigation, route }) => {
-  const { setOnAddPress } = useAddButton();
+
 
   // Initialize with current month
   const today = new Date();
@@ -34,36 +34,16 @@ const AppStack_CalendarScreen: React.FC<Props> = ({ navigation, route }) => {
 
   const [visibleMonth, setVisibleMonth] = useState(currentMonthString);
   const [selectedDate, setSelectedDate] = useState(`${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`);
-  const [showAddMenu, setShowAddMenu] = useState(false);
 
-  // Contact selection
-  const [showContactModal, setShowContactModal] = useState(false);
-  const [contacts, setContacts] = useState<any[]>([]);
-  const [contactSearchText, setContactSearchText] = useState('');
 
   // Meetings data
   const [meetings, setMeetings] = useState<any[]>([]);
 
-  // Load contacts when modal opens
   useEffect(() => {
     fetchMeetings();
   }, []);
 
-  useEffect(() => {
-    if (showContactModal) {
-      loadContacts();
-    }
-  }, [showContactModal]);
 
-  // Register add button handler
-  useEffect(() => {
-    setOnAddPress(() => () => setShowAddMenu(true));
-
-    // Cleanup on unmount
-    return () => {
-      setOnAddPress(undefined);
-    };
-  }, [setOnAddPress]);
 
   const fetchMeetings = async () => {
     try {
@@ -85,32 +65,7 @@ const AppStack_CalendarScreen: React.FC<Props> = ({ navigation, route }) => {
     }
   };
 
-  const loadContacts = async () => {
-    try {
-      const response = await http.get('/users/contacts');
-      setContacts(response.data.contacts || []);
-    } catch (error) {
-      console.error('Error loading contacts:', error);
-    }
-  };
 
-  const filteredContacts = contacts.filter(contact =>
-    contact.displayName.toLowerCase().includes(contactSearchText.toLowerCase())
-  );
-
-  const handleBookMeeting = () => {
-    setShowAddMenu(false);
-    setShowContactModal(true);
-  };
-
-  const handleContactSelect = (contact: any) => {
-    setShowContactModal(false);
-    // Navigate to DateDetailScreen with selected date and contact
-    navigation.navigate('AppStack_DateDetailScreen', {
-      date: selectedDate,
-      contact: contact
-    });
-  };
 
   const getMonthAbbreviation = (dateString: string) => {
     // dateString is in format "YYYY-MM", extract month directly
@@ -280,167 +235,7 @@ const AppStack_CalendarScreen: React.FC<Props> = ({ navigation, route }) => {
         calendarStyle={{ paddingHorizontal: '8%' }}
       />
 
-      {/* Add Menu Popup Modal */}
-      <Modal
-        visible={showAddMenu}
-        transparent={true}
-        animationType="fade"
-        onRequestClose={() => setShowAddMenu(false)}
-      >
-        <View style={tw`flex-1`}>
-          <TouchableOpacity
-            style={tw`flex-1`}
-            activeOpacity={1}
-            onPress={() => setShowAddMenu(false)}
-          >
-            <BlurView intensity={20} tint="dark" style={tw`absolute inset-0`}>
-              <View style={tw`flex-1 bg-black opacity-40`} />
-            </BlurView>
-          </TouchableOpacity>
 
-          <View style={[tw`absolute bottom-0 left-0 right-0 items-center`, { paddingBottom: verticalScale(90) }]}>
-            <View style={[tw`bg-white rounded-3xl w-11/12 overflow-hidden`, { paddingHorizontal: horizontalScale(15) }]}>
-              <TouchableOpacity
-                style={[tw`flex-row items-center`, { paddingHorizontal: horizontalScale(22.5), paddingVertical: verticalScale(15) }]}
-                activeOpacity={0.7}
-                onPress={handleBookMeeting}
-              >
-                <View style={[tw`rounded-full bg-gray-200 items-center justify-center`, { width: horizontalScale(37.5), height: horizontalScale(37.5), marginRight: horizontalScale(15) }]}>
-                  <Text style={[tw`text-black font-bold`, { fontSize: moderateScale(18.75) }]}>+</Text>
-                </View>
-                <Text style={[tw`text-black font-dm flex-1`, { fontSize: moderateScale(15) }]}>Book a meeting</Text>
-              </TouchableOpacity>
-              <View style={[tw`bg-gray-200`, { height: verticalScale(1.125), marginHorizontal: horizontalScale(22.5) }]} />
-              <TouchableOpacity
-                style={[
-                  tw`flex-row items-center opacity-50`,
-                  { paddingHorizontal: horizontalScale(22.5), paddingVertical: verticalScale(15) }
-                ]}
-                activeOpacity={1}
-                disabled={true}
-              >
-                <View style={[tw`rounded-full bg-gray-200 items-center justify-center`, { width: horizontalScale(37.5), height: horizontalScale(37.5), marginRight: horizontalScale(15) }]}>
-                  <Text style={[tw`text-black font-bold`, { fontSize: moderateScale(18.75) }]}>+</Text>
-                </View>
-                <Text style={[tw`text-black font-dm flex-1`, { fontSize: moderateScale(15) }]}>Create meeting type</Text>
-              </TouchableOpacity>
-              <View style={[tw`bg-gray-200`, { height: verticalScale(1.125), marginHorizontal: horizontalScale(22.5) }]} />
-              <TouchableOpacity
-                style={[
-                  tw`flex-row items-center opacity-50`,
-                  { paddingHorizontal: horizontalScale(22.5), paddingVertical: verticalScale(15) }
-                ]}
-                activeOpacity={1}
-                disabled={true}
-              >
-                <View style={[tw`rounded-full bg-gray-200 items-center justify-center`, { width: horizontalScale(37.5), height: horizontalScale(37.5), marginRight: horizontalScale(15) }]}>
-                  <Text style={[tw`text-black font-bold`, { fontSize: moderateScale(18.75) }]}>+</Text>
-                </View>
-                <Text style={[tw`text-black font-dm flex-1`, { fontSize: moderateScale(15) }]}>Manage availability</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-        </View>
-      </Modal>
-
-      {/* Contact Selection Modal */}
-      <Modal
-        visible={showContactModal}
-        transparent={true}
-        animationType="slide"
-        onRequestClose={() => setShowContactModal(false)}
-      >
-        <View style={tw`flex-1`}>
-          <TouchableOpacity
-            style={tw`flex-1`}
-            activeOpacity={1}
-            onPress={() => setShowContactModal(false)}
-          >
-            <BlurView intensity={20} tint="dark" style={tw`absolute inset-0`}>
-              <View style={tw`flex-1 bg-black opacity-40`} />
-            </BlurView>
-          </TouchableOpacity>
-
-          <View style={tw`absolute bottom-0 left-0 right-0 bg-white rounded-t-3xl`}>
-            <View style={[{ paddingTop: verticalScale(22.5), paddingBottom: verticalScale(30) }, { paddingHorizontal: '4%' }]}>
-              {/* Header */}
-              <View style={[tw`flex-row justify-between items-center`, { marginBottom: verticalScale(15) }]}>
-                <Text style={[tw`text-black font-bold font-dm`, { fontSize: moderateScale(18.75) }]}>Select Contact</Text>
-                <TouchableOpacity
-                  onPress={() => setShowContactModal(false)}
-                  activeOpacity={0.7}
-                >
-                  <Text style={[tw`text-[#A3CB31] font-dm`, { fontSize: moderateScale(15) }]}>Cancel</Text>
-                </TouchableOpacity>
-              </View>
-
-              {/* Search Bar */}
-              <View style={[tw`bg-gray-100 rounded-2xl flex-row items-center`, { paddingHorizontal: horizontalScale(15), paddingVertical: verticalScale(11.25), marginBottom: verticalScale(15) }]}>
-                <Image source={Search} style={{ width: horizontalScale(18.75), height: horizontalScale(18.75), marginRight: horizontalScale(7.5) }} />
-                <TextInput
-                  style={[tw`flex-1 text-black font-dm`, { fontSize: moderateScale(13.125) }]}
-                  placeholder="Search contacts"
-                  placeholderTextColor="#999"
-                  value={contactSearchText}
-                  onChangeText={setContactSearchText}
-                />
-              </View>
-
-              {/* Contacts List */}
-              <ScrollView style={{ maxHeight: verticalScale(337.5) }} showsVerticalScrollIndicator={false}>
-                {filteredContacts.length > 0 ? (
-                  filteredContacts.map((contact) => {
-                    const isDisabled = !contact.contactUser?.id;
-                    return (
-                      <TouchableOpacity
-                        key={contact.id}
-                        style={[
-                          tw`flex-row items-center border-b border-gray-100`,
-                          { paddingVertical: verticalScale(15) },
-                          isDisabled && tw`opacity-50`
-                        ]}
-                        activeOpacity={isDisabled ? 1 : 0.7}
-                        onPress={() => !isDisabled && handleContactSelect(contact)}
-                        disabled={isDisabled}
-                      >
-                        <View style={[tw`rounded-full bg-gray-200 items-center justify-center overflow-hidden`, { width: horizontalScale(45), height: horizontalScale(45), marginRight: horizontalScale(15) }]}>
-                          {contact.contactUser?.avatar ? (
-                            <Image
-                              source={{ uri: contact.contactUser.avatar }}
-                              style={{ width: horizontalScale(45), height: horizontalScale(45), borderRadius: 9999 }}
-                            />
-                          ) : (
-                            <Image source={Avatar} style={{ width: horizontalScale(30), height: horizontalScale(30) }} />
-                          )}
-                        </View>
-                        <View style={tw`flex-1`}>
-                          <Text style={[tw`text-black font-bold font-dm`, { fontSize: moderateScale(15) }]}>
-                            {contact.displayName}
-                          </Text>
-                          {contact.contactPhone && (
-                            <Text style={[tw`text-grey font-dm`, { fontSize: moderateScale(13.125) }]}>
-                              {contact.contactPhone}
-                            </Text>
-                          )}
-                          {isDisabled && (
-                            <Text style={[tw`text-grey font-dm`, { fontSize: moderateScale(11.25), marginTop: 1 }]}>
-                              Not registered
-                            </Text>
-                          )}
-                        </View>
-                      </TouchableOpacity>
-                    );
-                  })
-                ) : (
-                  <View style={{ paddingVertical: verticalScale(37.5), alignItems: 'center' }}>
-                    <Text style={[tw`text-grey font-dm`, { fontSize: moderateScale(15) }]}>No contacts found</Text>
-                  </View>
-                )}
-              </ScrollView>
-            </View>
-          </View>
-        </View>
-      </Modal>
     </View>
   );
 };
