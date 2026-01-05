@@ -16,3 +16,18 @@ export const GymIcon = require(`../../assets/images/icon_gym.png`);
 export const FootballIcon = require(`../../assets/images/icon_football.png`);
 export const AddIcon = require(`../../assets/images/icon_add.png`);
 export const Settings = require(`../../assets/images/settings.png`);
+export const BellIcon = require('../../assets/images/icon_bell.png')
+export const BellRinging = require('../../assets/images/bell_ringing.png')
+export const TwoPeople = require('../../assets/images/two_people.png')
+export const TrafficJam = require('../../assets/images/traffic_jam.png')
+
+//Weather Icons
+
+export const WeClearSky = require('../../assets/images/we_clear_sky.png')
+export const WeFoggy = require('../../assets/images/we_foggy.png')
+export const WePartlyCloudy = require('../../assets/images/we_partly_cloudy.png')
+export const WeRainy = require('../../assets/images/we_rainy.png')
+export const WeSnowy = require('../../assets/images/we_snowy.png')
+export const WeRainShower = require('../../assets/images/we_rain_shower.png')
+export const WeSnowShower = require('../../assets/images/we_snow_shower.png')
+export const WeThunderstorm = require('../../assets/images/we_thunderstorm.png')

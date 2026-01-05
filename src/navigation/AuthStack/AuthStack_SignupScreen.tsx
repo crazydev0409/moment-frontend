@@ -86,7 +86,7 @@ const AuthStack_SignupScreen: React.FC<Props> = ({ navigation, route }) => {
                   source={{
                     uri: `https://flagcdn.com/w320/${countryCode.toLowerCase()}.png`,
                   }}
-                  style={{ width: horizontalScale(56.25), height: verticalScale(28.125) }}
+                  style={{ width: horizontalScale(30), height: verticalScale(20) }}
                   resizeMode="cover"
                 />
               </TouchableOpacity>

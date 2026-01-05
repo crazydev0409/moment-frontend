@@ -9,7 +9,7 @@ import * as Contacts from 'expo-contacts';
 import * as Notifications from 'expo-notifications';
 import { AppStackParamList } from '.';
 import tw from '~/tailwindcss';
-import { Avatar, Background, Notification, Search, HomeIcon, CalendarIcon, BusinessIcon, ProfileIcon, AddIcon, GymIcon, FootballIcon } from '~/lib/images';
+import { Avatar, Background, Notification, Search, HomeIcon, CalendarIcon, BusinessIcon, ProfileIcon, AddIcon, GymIcon, FootballIcon, TrafficJam, WeClearSky, WeFoggy, WePartlyCloudy, WeRainy, WeSnowy, WeRainShower, WeSnowShower, WeThunderstorm } from '~/lib/images';
 import { http } from '~/helpers/http';
 
 import { setupSocketEventListeners, getSocket, initializeSocket } from '~/services/socketService';
@@ -150,7 +150,7 @@ const AppStack_HomePageScreen: React.FC<Props> = ({ navigation, route }) => {
   const [weather, setWeather] = useState<{
     temperature: number;
     description: string;
-    icon: string;
+    icon: any;
   } | null>(null);
   const [weatherLoading, setWeatherLoading] = useState(true);
 
@@ -565,15 +565,15 @@ const AppStack_HomePageScreen: React.FC<Props> = ({ navigation, route }) => {
 
         // Map weather codes to descriptions and emojis
         const getWeatherInfo = (code: number) => {
-          if (code === 0) return { description: 'Clear sky', icon: '☀️' };
-          if (code <= 3) return { description: 'Partly cloudy', icon: '⛅' };
-          if (code <= 48) return { description: 'Foggy', icon: '🌫️' };
-          if (code <= 67) return { description: 'Rainy', icon: '🌧️' };
-          if (code <= 77) return { description: 'Snowy', icon: '❄️' };
-          if (code <= 82) return { description: 'Rain showers', icon: '🌦️' };
-          if (code <= 86) return { description: 'Snow showers', icon: '🌨️' };
-          if (code <= 99) return { description: 'Thunderstorm', icon: '⛈️' };
-          return { description: 'Cloudy', icon: '☁️' };
+          if (code === 0) return { description: 'Clear sky', icon: WeClearSky };
+          if (code <= 3) return { description: 'Partly cloudy', icon: WePartlyCloudy };
+          if (code <= 48) return { description: 'Foggy', icon: WeFoggy };
+          if (code <= 67) return { description: 'Rainy', icon: WeRainy };
+          if (code <= 77) return { description: 'Snowy', icon: WeSnowy };
+          if (code <= 82) return { description: 'Rain showers', icon: WeRainShower };
+          if (code <= 86) return { description: 'Snow showers', icon: WeSnowShower };
+          if (code <= 99) return { description: 'Thunderstorm', icon: WeThunderstorm };
+          return { description: 'Cloudy', icon: WePartlyCloudy };
         };
 
         const weatherInfo = getWeatherInfo(weatherCode);
@@ -590,7 +590,7 @@ const AppStack_HomePageScreen: React.FC<Props> = ({ navigation, route }) => {
       setWeather({
         temperature: 28,
         description: 'Cloudy',
-        icon: '☁️☀️',
+        icon: WePartlyCloudy,
       });
     } finally {
       setWeatherLoading(false);
@@ -792,16 +792,8 @@ const AppStack_HomePageScreen: React.FC<Props> = ({ navigation, route }) => {
                   4 min ago by OneLoner
                 </Text>
               </View>
-              <View style={[tw`rounded-full bg-orange-500 items-center justify-center border border-white`, { width: horizontalScale(45), height: horizontalScale(45) }]}>
-                {/* Three cars in diagonal queue representation */}
-                <View style={{ position: 'relative', width: horizontalScale(30), height: horizontalScale(30) }}>
-                  {/* First car (red, front) */}
-                  <View style={[tw`absolute top-0 left-0 bg-red-500 rounded-sm`, { width: horizontalScale(11.25), height: verticalScale(7.5) }]} />
-                  {/* Second car (orange, middle) */}
-                  <View style={[tw`absolute bg-orange-300 rounded-sm`, { top: verticalScale(5.625), left: horizontalScale(5.625), width: horizontalScale(11.25), height: verticalScale(7.5) }]} />
-                  {/* Third car (yellow, back) */}
-                  <View style={[tw`absolute bg-yellow-300 rounded-sm`, { top: verticalScale(11.25), left: horizontalScale(11.25), width: horizontalScale(11.25), height: verticalScale(7.5) }]} />
-                </View>
+              <View style={[tw`rounded-full bg-white items-center justify-center border border-white`, { width: horizontalScale(45), height: horizontalScale(45) }]}>
+                <Image source={TrafficJam} style={{ width: horizontalScale(22.5), height: horizontalScale(22.5) }} />
               </View>
             </View>
           </View>
@@ -821,7 +813,7 @@ const AppStack_HomePageScreen: React.FC<Props> = ({ navigation, route }) => {
                     {formatDate(selectedDate, 'MMM do')}
                   </Text>
                 </View>
-                <Text style={{ fontSize: moderateScale(22.5) }}>{weather.icon}</Text>
+                <Image source={weather.icon} style={{ width: horizontalScale(30), height: horizontalScale(30) }} resizeMode="contain" />
               </View>
             ) : null}
           </View>
@@ -843,29 +835,28 @@ const AppStack_HomePageScreen: React.FC<Props> = ({ navigation, route }) => {
                     activeOpacity={0.7}
                     style={[
                       tw`flex-row items-center rounded-full border border-white`,
-                      { paddingLeft: horizontalScale(15), paddingRight: horizontalScale(7.5), paddingVertical: verticalScale(3.75) },
+                      { paddingLeft: horizontalScale(10), paddingRight: horizontalScale(7.5), paddingVertical: verticalScale(3.75) },
                       { minWidth: '25%' },
-                      { backgroundColor: isSelected ? '#FFF' : 'transparent' }
+                      { backgroundColor: isSelected ? '#000' : '#FFF' }
                     ]}
                   >
                     <Text
-                      style={[tw`font-dm text-black flex-1`, { fontSize: moderateScale(13) }]}
+                      style={[tw`font-dm flex-1`, { fontSize: moderateScale(13), marginRight: horizontalScale(5) }, { color: isSelected ? "#FFF" : "#000" }]}
                     >
                       {type.name}
                     </Text>
                     <View
                       style={[
-                        tw`items-center justify-center`,
+                        tw`items-center justify-center ${isSelected ? 'bg-white' : 'bg-gray-200'}`,
                         { width: horizontalScale(33.75), height: horizontalScale(33.75) },
                         { borderRadius: 99 },
-                        { backgroundColor: isSelected ? '#A3CB31' : '#D9D9D9' }
                       ]}
                     >
                       <Image
                         source={type.icon}
                         style={[
                           { width: horizontalScale(18.75), height: horizontalScale(18.75) },
-                          { tintColor: isSelected ? '#FFFFFF' : '#000000' }
+                          { tintColor: '#000000' }
                         ]}
                         resizeMode="contain"
                       />

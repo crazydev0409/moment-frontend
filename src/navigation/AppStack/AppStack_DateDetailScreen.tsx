@@ -2072,7 +2072,7 @@ const AppStack_DateDetailScreen: React.FC<Props> = ({ navigation, route }) => {
                               onPress={handleCancelMeeting}
                               activeOpacity={0.7}
                               disabled={isCanceling}
-                              style={[tw`bg-bg-[#F0F0F0] rounded-2xl items-center ${isCanceling ? 'opacity-50' : ''}`, { paddingVertical: verticalScale(15) }]}
+                              style={[tw`bg-white rounded-2xl border-black border-[1px] items-center ${isCanceling ? 'opacity-50' : ''}`, { paddingVertical: verticalScale(15) }]}
                             >
                               {isCanceling ? (
                                 <ActivityIndicator size="small" color="#FFFFFF" />
@@ -2090,7 +2090,7 @@ const AppStack_DateDetailScreen: React.FC<Props> = ({ navigation, route }) => {
                               onPress={handleRejectRequest}
                               activeOpacity={0.7}
                               disabled={isRejecting || isAccepting}
-                              style={[tw`flex-1 bg-[#F0F0F0] rounded-2xl items-center ${isRejecting || isAccepting ? 'opacity-50' : ''}`, { paddingVertical: verticalScale(15) }]}
+                              style={[tw`flex-1 bg-white rounded-2xl border-[#F0F0F0] border-[1px] items-center ${isRejecting || isAccepting ? 'opacity-50' : ''}`, { paddingVertical: verticalScale(15) }]}
                             >
                               {isRejecting ? (
                                 <ActivityIndicator size="small" color="#FFFFFF" />

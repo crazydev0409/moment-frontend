@@ -1,10 +1,11 @@
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import React, { useEffect, useState } from 'react';
-import { Text, View, TouchableOpacity, ScrollView, ActivityIndicator, RefreshControl } from 'react-native';
+import { Text, View, TouchableOpacity, ScrollView, ActivityIndicator, RefreshControl, Image } from 'react-native';
 import { AppStackParamList } from '.';
 import tw from '~/tailwindcss';
 import { http } from '~/helpers/http';
 import { horizontalScale, verticalScale, moderateScale } from '~/helpers/responsive';
+import { BellIcon, BellRinging } from '~/lib/images';
 
 type Props = NativeStackScreenProps<AppStackParamList, 'AppStack_NotificationScreen'>;
 
@@ -148,17 +149,17 @@ const AppStack_NotificationScreen: React.FC<Props> = ({ navigation }) => {
   const getNotificationIcon = (type: string) => {
     switch (type) {
       case 'moment_request_created':
-        return '📅';
+        return <Text style={{ fontSize: moderateScale(22.5) }}>📅</Text>;
       case 'moment_request_accepted':
-        return '✅';
+        return <Text style={{ fontSize: moderateScale(22.5) }}>✅</Text>;
       case 'moment_request_rejected':
-        return '❌';
+        return <Text style={{ fontSize: moderateScale(22.5) }}>❌</Text>;
       case 'moment_request_canceled':
-        return '🚫';
+        return <Text style={{ fontSize: moderateScale(22.5) }}>🚫</Text>;
       case 'moment_request_rescheduled':
-        return '🔄';
+        return <Text style={{ fontSize: moderateScale(22.5) }}>🔄</Text>;
       default:
-        return '🔔';
+        return <Image source={BellRinging} style={{ width: moderateScale(22.5), height: moderateScale(22.5) }} resizeMode="contain" />;
     }
   };
 
@@ -214,7 +215,7 @@ const AppStack_NotificationScreen: React.FC<Props> = ({ navigation }) => {
         >
           {notifications.length === 0 ? (
             <View style={[tw`flex-1 items-center justify-center`, { paddingVertical: verticalScale(75) }]}>
-              <Text style={{ fontSize: moderateScale(56), marginBottom: verticalScale(15) }}>🔔</Text>
+              <Image source={BellIcon} style={{ width: moderateScale(56), height: moderateScale(56), marginBottom: verticalScale(15) }} resizeMode="contain" />
               <Text style={[tw`text-grey font-dm`, { fontSize: moderateScale(15) }]}>No notifications yet</Text>
             </View>
           ) : (
@@ -228,7 +229,7 @@ const AppStack_NotificationScreen: React.FC<Props> = ({ navigation }) => {
               >
                 {/* Icon */}
                 <View style={[tw`rounded-full bg-gray-200 items-center justify-center`, { width: horizontalScale(45), height: horizontalScale(45), marginRight: horizontalScale(15) }]}>
-                  <Text style={{ fontSize: moderateScale(22.5) }}>{getNotificationIcon(notification.type)}</Text>
+                  {getNotificationIcon(notification.type)}
                 </View>
 
                 {/* Content */}

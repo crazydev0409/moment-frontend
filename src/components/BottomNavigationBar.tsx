@@ -5,7 +5,7 @@ import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { BlurView } from 'expo-blur';
 import tw from '~/tailwindcss';
-import { HomeIcon, CalendarIcon, BusinessIcon, ProfileIcon, AddIcon, Search, Avatar } from '~/lib/images';
+import { HomeIcon, CalendarIcon, BusinessIcon, AddIcon, Search, Avatar, TwoPeople } from '~/lib/images';
 import { AppStackParamList } from '~/navigation/AppStack';
 import { horizontalScale, verticalScale, moderateScale } from '~/helpers/responsive';
 import { http } from '~/helpers/http';
@@ -138,7 +138,7 @@ const BottomNavigationBar: React.FC<BottomNavigationBarProps> = ({
             onPress={handleProfilePress}
             style={[tw`${selectedTab === 'profile' ? 'bg-[#A3CB31]' : 'bg-[#222222]'} rounded-full items-center justify-center`, { padding: horizontalScale(15) }]}
           >
-            <Image source={ProfileIcon} style={{ width: horizontalScale(22.5), height: horizontalScale(22.5) }} resizeMode="contain" />
+            <Image source={TwoPeople} tintColor="#FFFFFF" style={{ width: horizontalScale(22.5), height: horizontalScale(22.5) }} resizeMode="contain" />
           </TouchableOpacity>
         </View>
         <TouchableOpacity
