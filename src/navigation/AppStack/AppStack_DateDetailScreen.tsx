@@ -199,16 +199,15 @@ const AppStack_DateDetailScreen: React.FC<Props> = ({ navigation, route }) => {
   ]);
 
   // Generate all available time slots (30-minute intervals, 24-hour format)
-  const generateTimeSlots = () => {
+  // Memoize to avoid regenerating on every render
+  const allTimeSlots = useMemo(() => {
     const slots = [];
     for (let hour = 0; hour < 24; hour++) {
       slots.push(`${String(hour).padStart(2, '0')}:00`);
       slots.push(`${String(hour).padStart(2, '0')}:30`);
     }
     return slots;
-  };
-
-  const allTimeSlots = generateTimeSlots();
+  }, []);
 
   // Get the week containing the selected date (Monday to Sunday)
   const weekDates = useMemo(() => {
@@ -1006,48 +1005,56 @@ const AppStack_DateDetailScreen: React.FC<Props> = ({ navigation, route }) => {
     });
   };
 
-  // Check if a time slot with given duration would conflict with existing meetings
-  const wouldConflictWithMeetings = (timeString: string, durationStr: string): boolean => {
+  // Pre-calculate busy intervals for the selected date to optimize conflict detection
+  const busyIntervals = useMemo(() => {
+    const intervals: { start: number; end: number }[] = [];
+
+    // Parse selected date once
     const [year, month, day] = selectedDate.split('-').map(Number);
-    const [hour, minute] = timeString.split(':').map(Number);
-    const proposedStart = new Date(year, month - 1, day, hour, minute);
-    const durationMins = durationToMinutes(durationStr);
-    const proposedEnd = new Date(proposedStart.getTime() + durationMins * 60 * 1000);
+    const selectedDateStart = new Date(year, month - 1, day, 0, 0, 0).getTime();
+    const selectedDateEnd = new Date(year, month - 1, day, 23, 59, 59).getTime();
 
-    // Check against user's own meetings
-    const selectedDateStart = new Date(year, month - 1, day, 0, 0, 0);
-    const selectedDateEnd = new Date(year, month - 1, day, 23, 59, 59);
-    const todayMeetings = momentRequests.filter(request => {
-      const requestStart = new Date(request.startTime);
-      return requestStart >= selectedDateStart && requestStart <= selectedDateEnd;
-    });
+    // Helper to add valid intervals
+    const addInterval = (requests: MomentRequest[]) => {
+      requests.forEach(req => {
+        const start = new Date(req.startTime).getTime();
+        const end = new Date(req.endTime).getTime(); // Note: End time is exclusive for conflict check
 
-    const userConflict = todayMeetings.some(meeting => {
-      const meetingStart = new Date(meeting.startTime);
-      const meetingEnd = new Date(meeting.endTime);
-      // Check if proposed meeting overlaps with existing meeting
-      return (proposedStart < meetingEnd && proposedEnd > meetingStart);
-    });
-
-    // Check against contact's meetings
-    let contactConflict = false;
-    if (selectedContact && contactMomentRequests.length > 0) {
-      contactConflict = contactMomentRequests.some(meeting => {
-        const meetingStart = new Date(meeting.startTime);
-        const meetingEnd = new Date(meeting.endTime);
-        const meetingDate = new Date(meetingStart.toDateString());
-        const proposedDate = new Date(proposedStart.toDateString());
-
-        // Only check meetings on the same day
-        if (meetingDate.getTime() !== proposedDate.getTime()) return false;
-
-        // Check if proposed meeting overlaps with contact's existing meeting
-        return (proposedStart < meetingEnd && proposedEnd > meetingStart);
+        // Only consider meetings that overlap with the selected date (even partially)
+        if (end > selectedDateStart && start < selectedDateEnd) {
+          intervals.push({ start, end });
+        }
       });
+    };
+
+    // Add user's meetings
+    addInterval(momentRequests);
+
+    // Add contact's meetings (only same day check needed effectively, but logic same)
+    if (selectedContact && contactMomentRequests.length > 0) {
+      addInterval(contactMomentRequests);
     }
 
-    return userConflict || contactConflict;
-  };
+    return intervals;
+  }, [selectedDate, momentRequests, contactMomentRequests, selectedContact]);
+
+  // Check if a time slot with given duration would conflict with existing meetings
+  // Optimized to use pre-calculated busyIntervals
+  const wouldConflictWithMeetings = useCallback((timeString: string, durationStr: string): boolean => {
+    const [year, month, day] = selectedDate.split('-').map(Number);
+    const [hour, minute] = timeString.split(':').map(Number);
+
+    // Calculate proposed start and end timestamps
+    const proposedStart = new Date(year, month - 1, day, hour, minute).getTime();
+    const durationMins = durationToMinutes(durationStr);
+    const proposedEnd = proposedStart + durationMins * 60 * 1000;
+
+    // Check overlap with any busy interval
+    // Overlap condition: (StartA < EndB) and (EndA > StartB)
+    return busyIntervals.some(interval => {
+      return proposedStart < interval.end && proposedEnd > interval.start;
+    });
+  }, [selectedDate, busyIntervals]);
 
   // Convert duration string to minutes
   const durationToMinutes = (duration: string): number => {
