@@ -312,9 +312,8 @@ const AppStack_DateDetailScreen: React.FC<Props> = ({ navigation, route }) => {
     return Math.max(32, (durationMinutes / 30) * 32);
   };
 
-  // Handle clicking on a moment request block
   // Handle clicking on a meeting block - show details modal
-  const handleRequestBlockPress = (request: MomentRequest) => {
+  const handleRequestBlockPress = useCallback((request: MomentRequest) => {
     setSelectedRequest(request);
     setShowRequestModal(true);
     // Animate modal in
@@ -330,7 +329,7 @@ const AppStack_DateDetailScreen: React.FC<Props> = ({ navigation, route }) => {
         useNativeDriver: true,
       }),
     ]).start();
-  };
+  }, [requestModalSlideAnim, requestModalOpacityAnim]);
 
   // Handle accepting a moment request
   const handleAcceptRequest = async () => {
@@ -850,7 +849,7 @@ const AppStack_DateDetailScreen: React.FC<Props> = ({ navigation, route }) => {
   }, [selectedContact, contactMomentRequests, selectedDate]);
 
   // Handle clicking on a time slot to create meeting
-  const handleTimeSlotClick = (hour: number, minute: number) => {
+  const handleTimeSlotClick = useCallback((hour: number, minute: number) => {
     const timeString = `${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}`;
     setAppointmentTime(timeString);
     setAppointmentDuration('30 min');
@@ -874,7 +873,7 @@ const AppStack_DateDetailScreen: React.FC<Props> = ({ navigation, route }) => {
       // If contact is already selected, show create modal directly
       setShowCreateModal(true);
     }
-  };
+  }, [selectedDate, appointmentTitle, selectedContact]);
 
   // Handle closing create modal without creating
   const handleCloseCreateModal = () => {
@@ -949,6 +948,7 @@ const AppStack_DateDetailScreen: React.FC<Props> = ({ navigation, route }) => {
   }, []);
 
   // Load local contacts to create a mapping from hashed to original phone numbers
+  // Optimized to batch requests and avoid bridge flooding on iOS
   const loadPhoneNumberMapping = async () => {
     try {
       const { status } = await Contacts.getPermissionsAsync();
@@ -958,17 +958,58 @@ const AppStack_DateDetailScreen: React.FC<Props> = ({ navigation, route }) => {
         });
 
         const mapping = new Map<string, string>();
-        await Promise.all(data.map(async (contact) => {
+
+        // Process contacts in batches to avoid flooding the JS-Native bridge
+        const BATCH_SIZE = 20;
+
+        // Flatten the list of phone numbers to process
+        const allPhones: string[] = [];
+        data.forEach(contact => {
           if (contact.phoneNumbers && contact.phoneNumbers.length > 0) {
-            await Promise.all(contact.phoneNumbers.map(async (phone) => {
+            contact.phoneNumbers.forEach(phone => {
               const normalized = phone.number?.replace(/[\s\-\(\)]/g, '') || '';
               if (normalized) {
-                const hashed = await hashPhoneNumber(normalized);
-                mapping.set(hashed, phone.number || normalized);
+                allPhones.push(normalized);
+                // Also store original if needed, but here we just need normalized -> hash
+                // actually we need hash -> original (or normalized)
+                // The mapping requires: hash -> original display number
+                // So we'll need to store pairs
               }
-            }));
+            });
           }
-        }));
+        });
+
+        // We need to re-iterate to keep the original number for display
+        // Let's create a list of items to process: { normalized, original }
+        const itemsToProcess: { normalized: string; original: string }[] = [];
+        data.forEach(contact => {
+          if (contact.phoneNumbers && contact.phoneNumbers.length > 0) {
+            contact.phoneNumbers.forEach(phone => {
+              const normalized = phone.number?.replace(/[\s\-\(\)]/g, '') || '';
+              if (normalized) {
+                itemsToProcess.push({ normalized, original: phone.number || normalized });
+              }
+            });
+          }
+        });
+
+        // Process sequentially in batches
+        for (let i = 0; i < itemsToProcess.length; i += BATCH_SIZE) {
+          const batch = itemsToProcess.slice(i, i + BATCH_SIZE);
+          await Promise.all(batch.map(async (item) => {
+            try {
+              const hashed = await hashPhoneNumber(item.normalized);
+              mapping.set(hashed, item.original);
+            } catch (e) {
+              console.warn('Error hashing phone:', e);
+            }
+          }));
+
+          // Small delay to yield to event loop if needed, though await Promise.all releases checks
+          if (i + BATCH_SIZE < itemsToProcess.length) {
+            await new Promise(resolve => setTimeout(resolve, 10));
+          }
+        }
 
         setPhoneNumberMap(mapping);
       }
@@ -994,7 +1035,7 @@ const AppStack_DateDetailScreen: React.FC<Props> = ({ navigation, route }) => {
   );
 
   // Check if a specific time slot is occupied by a meeting
-  const isTimeSlotOccupied = (hour: number, minute: number, meetings: MomentRequest[]) => {
+  const isTimeSlotOccupied = useCallback((hour: number, minute: number, meetings: MomentRequest[]) => {
     const [year, month, day] = selectedDate.split('-').map(Number);
     const slotTime = new Date(year, month - 1, day, hour, minute);
 
@@ -1003,7 +1044,7 @@ const AppStack_DateDetailScreen: React.FC<Props> = ({ navigation, route }) => {
       const meetingEnd = new Date(meeting.endTime);
       return slotTime >= meetingStart && slotTime < meetingEnd;
     });
-  };
+  }, [selectedDate]);
 
   // Pre-calculate busy intervals for the selected date to optimize conflict detection
   const busyIntervals = useMemo(() => {
@@ -1180,6 +1221,351 @@ const AppStack_DateDetailScreen: React.FC<Props> = ({ navigation, route }) => {
     return blocks;
   };
 
+  const scheduledViewElements = useMemo(() => {
+    if (availabilityView !== 'scheduled') return null;
+
+    const rows = [];
+    const [year, month, day] = selectedDate.split('-').map(Number);
+    const selectedDateStart = new Date(year, month - 1, day, 0, 0, 0);
+    const selectedDateEnd = new Date(year, month - 1, day, 23, 59, 59);
+
+    // Filter requests for today
+    const todayRequests = momentRequests.filter(request => {
+      const requestStart = new Date(request.startTime);
+      return requestStart >= selectedDateStart && requestStart <= selectedDateEnd;
+    });
+
+    // Add pending meeting if it exists and is for today
+    const allRequests = [...todayRequests];
+    if (pendingMeeting) {
+      const pendingStart = new Date(pendingMeeting.startTime);
+      if (pendingStart >= selectedDateStart && pendingStart <= selectedDateEnd) {
+        // Create a temporary request object for the pending meeting
+        const tempRequest: MomentRequest = {
+          id: 'pending',
+          senderId: '',
+          receiverId: '',
+          startTime: pendingMeeting.startTime.toISOString(),
+          endTime: pendingMeeting.endTime.toISOString(),
+          title: pendingMeeting.title,
+          status: 'pending'
+        };
+        allRequests.push(tempRequest);
+      }
+    }
+
+    // Render each hour
+    for (let hour = 0; hour < 24; hour++) {
+      const hourTime = `${String(hour).padStart(2, '0')}:00`;
+
+      // Find meetings that START in this hour
+      const hourMeetings = allRequests.filter(request => {
+        const start = new Date(request.startTime);
+        return start.getHours() === hour;
+      });
+
+      rows.push(
+        <View key={hour} style={[tw`relative`, { height: verticalScale(75) }]}>
+          {/* Base structure (relative positioning) */}
+          <View style={tw`flex-row`}>
+            <Text style={[tw`text-black font-bold font-dm`, { fontSize: moderateScale(15), width: horizontalScale(60), marginTop: -verticalScale(11.25) }]}>
+              {hourTime}
+            </Text>
+            <View style={[tw`flex-1`, { marginLeft: horizontalScale(7.5) }]}>
+              <View style={[tw`bg-gray-300`, { height: verticalScale(1.875) }]} />
+            </View>
+          </View>
+
+          {/* Meeting blocks (absolute positioning, overlay on top) */}
+          {hourMeetings.length > 0 && (
+            <View style={[tw`absolute top-0 right-0 z-2`, { left: horizontalScale(60), height: verticalScale(75) }]}>
+              {hourMeetings.map((request, idx) => {
+                const start = new Date(request.startTime);
+                const end = new Date(request.endTime);
+                const startMin = start.getMinutes();
+
+                // Position from top
+                const top = startMin === 30 ? 40 : 0;
+
+                // Calculate height based on total meeting duration
+                const durationMinutes = (end.getTime() - start.getTime()) / (1000 * 60);
+                const height = (durationMinutes / 30) * 40; // Each 30-min slot = 40px
+
+                let blockColor = 'bg-gray-400';
+                const isPending = request.id === 'pending';
+                if (isPending) blockColor = 'bg-gray-300'; // Light grey for pending placeholder
+                else if (request.status === 'approved') blockColor = 'bg-green-500';
+                else if (request.status === 'rejected') blockColor = 'bg-red-500';
+
+                // Calculate positioning for side-by-side blocks
+                const totalMeetings = hourMeetings.length;
+                const blockWidthPercent = (100 / totalMeetings) - 0.5; // -0.5% for gap
+                const leftPercent = idx * (100 / totalMeetings);
+                return (
+                  <TouchableOpacity
+                    key={request.id}
+                    style={[
+                      tw`${blockColor} rounded-lg absolute`,
+                      {
+                        paddingHorizontal: horizontalScale(7.5),
+                        top: `${(top / 80) * 100}%`, // Convert to percentage relative to container height (80px -> 20vw)
+                        height: `${(height / 80) * 100}%`, // Convert to percentage
+                        left: `${leftPercent}%`,
+                        width: `${blockWidthPercent}%`,
+                        justifyContent: 'center',
+                        opacity: isPending ? 0.6 : 1
+                      }
+                    ]}
+                    activeOpacity={isPending ? 1 : 0.7}
+                    onPress={() => !isPending && handleRequestBlockPress(request)}
+                    disabled={isPending}
+                  >
+                    <Text
+                      style={[tw`${isPending ? 'text-gray-600' : 'text-white'} font-dm font-semibold`, { fontSize: moderateScale(11.25) }]}
+                      numberOfLines={2}
+                    >
+                      {request.title || request.notes || 'Meeting'}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+          )}
+
+          {/* Clickable empty time slots */}
+          {!isTimeSlotOccupied(hour, 0, allRequests) && (
+            <TouchableOpacity
+              style={[tw`absolute`, { top: 0, left: '16%', right: 0, height: '50%', zIndex: 1 }]}
+              activeOpacity={0.3}
+              onPress={() => handleTimeSlotClick(hour, 0)}
+            />
+          )}
+          {!isTimeSlotOccupied(hour, 30, allRequests) && (
+            <TouchableOpacity
+              style={[tw`absolute`, { top: '50%', left: '16%', right: 0, height: '50%', zIndex: 1 }]}
+              activeOpacity={0.3}
+              onPress={() => handleTimeSlotClick(hour, 30)}
+            />
+          )}
+        </View>
+      );
+    }
+    return rows;
+  }, [availabilityView, selectedDate, momentRequests, pendingMeeting, handleTimeSlotClick, handleRequestBlockPress]);
+
+  const fullAvailabilityViewElements = useMemo(() => {
+    if (availabilityView !== 'full') return null;
+
+    if (selectedContact) {
+      // Dual availability: Contact (left) and User (right)
+      const rows = [];
+      const [year, month, day] = selectedDate.split('-').map(Number);
+      const selectedDateStart = new Date(year, month - 1, day, 0, 0, 0);
+      const selectedDateEnd = new Date(year, month - 1, day, 23, 59, 59, 999);
+
+      // Get today's meetings, sorted by start time
+      const todayMeetings = momentRequests
+        .filter(request => {
+          const requestStart = new Date(request.startTime);
+          return requestStart >= selectedDateStart && requestStart <= selectedDateEnd;
+        })
+        .sort((a, b) => new Date(a.startTime).getTime() - new Date(b.startTime).getTime());
+
+      // Calculate USER availability gaps (times NOT occupied by meetings)
+      type AvailabilityGap = { start: Date; end: Date };
+      const userAvailabilityGaps: AvailabilityGap[] = [];
+
+      let userLastEnd = selectedDateStart;
+      todayMeetings.forEach(meeting => {
+        const meetingStart = new Date(meeting.startTime);
+        const meetingEnd = new Date(meeting.endTime);
+        if (meetingStart > userLastEnd) {
+          userAvailabilityGaps.push({ start: userLastEnd, end: meetingStart });
+        }
+        userLastEnd = meetingEnd > userLastEnd ? meetingEnd : userLastEnd;
+      });
+      if (userLastEnd < selectedDateEnd) {
+        userAvailabilityGaps.push({ start: userLastEnd, end: selectedDateEnd });
+      }
+      if (todayMeetings.length === 0) {
+        userAvailabilityGaps.push({ start: selectedDateStart, end: selectedDateEnd });
+      }
+
+      // Calculate CONTACT availability gaps from contactAvailableBlocks
+      const contactAvailabilityGaps: AvailabilityGap[] = contactAvailableBlocks.map(block => {
+        const [startHour, startMin] = block.start.split(':').map(Number);
+        const [endHour, endMin] = block.end.split(':').map(Number);
+        return {
+          start: new Date(year, month - 1, day, startHour, startMin),
+          end: new Date(year, month - 1, day, endHour, endMin)
+        };
+      });
+
+      // Render each hour
+      for (let hour = 0; hour < 24; hour++) {
+        const hourTime = `${String(hour).padStart(2, '0')}:00`;
+
+        // Find availability gaps that START in this hour
+        const userHourGaps = userAvailabilityGaps.filter(gap => gap.start.getHours() === hour);
+        const contactHourGaps = contactAvailabilityGaps.filter(gap => gap.start.getHours() === hour);
+
+        rows.push(
+          <View key={hour} style={[tw`relative`, { height: verticalScale(75) }]}>
+            {/* Base structure */}
+            <View style={tw`flex-row`}>
+              <Text style={[tw`text-black font-bold font-dm`, { fontSize: moderateScale(15), width: horizontalScale(60), marginTop: -verticalScale(11.25) }]}>
+                {hourTime}
+              </Text>
+              <View style={[tw`flex-1`, { marginLeft: horizontalScale(7.5) }]}>
+                <View style={[tw`bg-gray-300`, { height: verticalScale(1.875) }]} />
+              </View>
+            </View>
+
+            {/* Contact availability blocks (left, absolute) */}
+            {contactHourGaps.length > 0 && (
+              <View style={[tw`absolute top-0`, { left: '16%', width: '45%', height: '100%', zIndex: 2 }]}>
+                {contactHourGaps.map((gap, idx) => {
+                  const startMin = gap.start.getMinutes();
+                  const top = startMin === 30 ? 50 : 0; // percentage
+                  const durationMinutes = (gap.end.getTime() - gap.start.getTime()) / (1000 * 60);
+                  const height = (durationMinutes / 30) * 50; // percentage
+
+                  return (
+                    <View
+                      key={idx}
+                      style={[
+                        tw`bg-gray-300 rounded-lg absolute`,
+                        { top: `${top}%`, height: `${height}%`, left: 0, right: 4 }
+                      ]}
+                    />
+                  );
+                })}
+              </View>
+            )}
+
+            {/* User availability blocks (right, absolute) */}
+            {userHourGaps.length > 0 && (
+              <View style={[tw`absolute top-0`, { right: 0, width: '45%', height: '100%', zIndex: 2 }]}>
+                {userHourGaps.map((gap, idx) => {
+                  const startMin = gap.start.getMinutes();
+                  const top = startMin === 30 ? 50 : 0; // percentage
+                  const durationMinutes = (gap.end.getTime() - gap.start.getTime()) / (1000 * 60);
+                  const height = (durationMinutes / 30) * 50; // percentage
+
+                  return (
+                    <TouchableOpacity
+                      key={idx}
+                      style={[
+                        tw`bg-gray-200 rounded-lg absolute`,
+                        { top: `${top}%`, height: `${height}%`, left: 4, right: 0 }
+                      ]}
+                      activeOpacity={0.7}
+                      onPress={() => {
+                        // Set appointment time to gap start
+                        const gapTime = `${String(gap.start.getHours()).padStart(2, '0')}:${String(gap.start.getMinutes()).padStart(2, '0')}`;
+                        setAppointmentTime(gapTime);
+                      }}
+                    />
+                  );
+                })}
+              </View>
+            )}
+          </View>
+        );
+      }
+      return rows;
+    } else {
+      // Single availability view (no contact selected)
+      const rows = [];
+      const [year, month, day] = selectedDate.split('-').map(Number);
+      const selectedDateStart = new Date(year, month - 1, day, 0, 0, 0);
+      const selectedDateEnd = new Date(year, month - 1, day, 23, 59, 59, 999);
+
+      // Get today's meetings, sorted by start time
+      const todayMeetings = momentRequests
+        .filter(request => {
+          const requestStart = new Date(request.startTime);
+          return requestStart >= selectedDateStart && requestStart <= selectedDateEnd;
+        })
+        .sort((a, b) => new Date(a.startTime).getTime() - new Date(b.startTime).getTime());
+
+      // Calculate availability gaps (times NOT occupied by meetings)
+      type AvailabilityGap = { start: Date; end: Date };
+      const availabilityGaps: AvailabilityGap[] = [];
+
+      // Start from beginning of day
+      let lastEnd = selectedDateStart;
+
+      // For each meeting, create a gap from lastEnd to meeting start
+      todayMeetings.forEach(meeting => {
+        const meetingStart = new Date(meeting.startTime);
+        const meetingEnd = new Date(meeting.endTime);
+
+        // Add gap before this meeting (if any)
+        if (meetingStart > lastEnd) {
+          availabilityGaps.push({ start: lastEnd, end: meetingStart });
+        }
+
+        lastEnd = meetingEnd;
+      });
+
+      // Add final gap from last meeting to end of day
+      if (lastEnd < selectedDateEnd) {
+        availabilityGaps.push({ start: lastEnd, end: selectedDateEnd });
+      }
+
+      // If no meetings, entire day is available
+      if (todayMeetings.length === 0) {
+        availabilityGaps.push({ start: selectedDateStart, end: selectedDateEnd });
+      }
+
+      // Render each hour
+      for (let hour = 0; hour < 24; hour++) {
+        const hourTime = `${String(hour).padStart(2, '0')}:00`;
+
+        // Find availability gaps that START in this hour
+        const hourGaps = availabilityGaps.filter(gap => gap.start.getHours() === hour);
+
+        rows.push(
+          <View key={hour} style={[tw`relative`, { height: verticalScale(75) }]}>
+            {/* Base structure */}
+            <View style={tw`flex-row`}>
+              <Text style={[tw`text-black font-bold font-dm`, { fontSize: moderateScale(15), width: horizontalScale(60), marginTop: -verticalScale(11.25) }]}>
+                {hourTime}
+              </Text>
+              <View style={[tw`flex-1`, { marginLeft: horizontalScale(7.5) }]}>
+                <View style={[tw`bg-gray-300`, { height: verticalScale(1.875) }]} />
+              </View>
+            </View>
+
+            {/* Availability blocks (absolute) */}
+            {hourGaps.length > 0 && (
+              <View style={[tw`absolute top-0 right-0`, { left: '16%', height: '100%', zIndex: 2 }]}>
+                {hourGaps.map((gap, idx) => {
+                  const startMin = gap.start.getMinutes();
+                  const top = startMin === 30 ? 50 : 0; // percentage
+                  const durationMinutes = (gap.end.getTime() - gap.start.getTime()) / (1000 * 60);
+                  const height = (durationMinutes / 30) * 50; // percentage
+
+                  return (
+                    <View
+                      key={idx}
+                      style={[
+                        tw`bg-gray-200 rounded-lg absolute`,
+                        { top: `${top}%`, height: `${height}%`, left: 0, right: 0 }
+                      ]}
+                    />
+                  );
+                })}
+              </View>
+            )}
+          </View>
+        );
+      }
+      return rows;
+    }
+  }, [availabilityView, selectedContact, selectedDate, momentRequests, contactAvailableBlocks]);
+
   const availableBlocks = getAvailableBlocks();
 
   return (
@@ -1304,350 +1690,9 @@ const AppStack_DateDetailScreen: React.FC<Props> = ({ navigation, route }) => {
       >
         <View style={{ marginTop: verticalScale(15) }}>
           {availabilityView === 'scheduled' ? (
-            // Show scheduled events - simplified
-            (() => {
-              const rows = [];
-              const [year, month, day] = selectedDate.split('-').map(Number);
-              const selectedDateStart = new Date(year, month - 1, day, 0, 0, 0);
-              const selectedDateEnd = new Date(year, month - 1, day, 23, 59, 59);
-
-              // Filter requests for today
-              const todayRequests = momentRequests.filter(request => {
-                const requestStart = new Date(request.startTime);
-                return requestStart >= selectedDateStart && requestStart <= selectedDateEnd;
-              });
-
-              // Add pending meeting if it exists and is for today
-              const allRequests = [...todayRequests];
-              if (pendingMeeting) {
-                const pendingStart = new Date(pendingMeeting.startTime);
-                if (pendingStart >= selectedDateStart && pendingStart <= selectedDateEnd) {
-                  // Create a temporary request object for the pending meeting
-                  const tempRequest: MomentRequest = {
-                    id: 'pending',
-                    senderId: '',
-                    receiverId: '',
-                    startTime: pendingMeeting.startTime.toISOString(),
-                    endTime: pendingMeeting.endTime.toISOString(),
-                    title: pendingMeeting.title,
-                    status: 'pending'
-                  };
-                  allRequests.push(tempRequest);
-                }
-              }
-
-              // Render each hour
-              for (let hour = 0; hour < 24; hour++) {
-                const hourTime = `${String(hour).padStart(2, '0')}:00`;
-
-                // Find meetings that START in this hour
-                const hourMeetings = allRequests.filter(request => {
-                  const start = new Date(request.startTime);
-                  return start.getHours() === hour;
-                });
-
-                rows.push(
-                  <View key={hour} style={[tw`relative`, { height: verticalScale(75) }]}>
-                    {/* Base structure (relative positioning) */}
-                    <View style={tw`flex-row`}>
-                      <Text style={[tw`text-black font-bold font-dm`, { fontSize: moderateScale(15), width: horizontalScale(60), marginTop: -verticalScale(11.25) }]}>
-                        {hourTime}
-                      </Text>
-                      <View style={[tw`flex-1`, { marginLeft: horizontalScale(7.5) }]}>
-                        <View style={[tw`bg-gray-300`, { height: verticalScale(1.875) }]} />
-                      </View>
-                    </View>
-
-                    {/* Meeting blocks (absolute positioning, overlay on top) */}
-                    {hourMeetings.length > 0 && (
-                      <View style={[tw`absolute top-0 right-0 z-2`, { left: horizontalScale(60), height: verticalScale(75) }]}>
-                        {hourMeetings.map((request, idx) => {
-                          const start = new Date(request.startTime);
-                          const end = new Date(request.endTime);
-                          const startMin = start.getMinutes();
-
-                          // Position from top
-                          const top = startMin === 30 ? 40 : 0; // Keeping as number for now since it's used in calculations, will refactor logic later if needed, but for now just styling
-
-                          // Calculate height based on total meeting duration
-                          const durationMinutes = (end.getTime() - start.getTime()) / (1000 * 60);
-                          const height = (durationMinutes / 30) * 40; // Each 30-min slot = 40px
-
-                          let blockColor = 'bg-gray-400';
-                          const isPending = request.id === 'pending';
-                          if (isPending) blockColor = 'bg-gray-300'; // Light grey for pending placeholder
-                          else if (request.status === 'approved') blockColor = 'bg-green-500';
-                          else if (request.status === 'rejected') blockColor = 'bg-red-500';
-
-                          // Calculate positioning for side-by-side blocks
-                          const totalMeetings = hourMeetings.length;
-                          const blockWidthPercent = (100 / totalMeetings) - 0.5; // -0.5% for gap
-                          const leftPercent = idx * (100 / totalMeetings);
-                          return (
-                            <TouchableOpacity
-                              key={request.id}
-                              style={[
-                                tw`${blockColor} rounded-lg absolute`,
-                                {
-                                  paddingHorizontal: horizontalScale(7.5),
-                                  top: `${(top / 80) * 100}%`, // Convert to percentage relative to container height (80px -> 20vw)
-                                  height: `${(height / 80) * 100}%`, // Convert to percentage
-                                  left: `${leftPercent}%`,
-                                  width: `${blockWidthPercent}%`,
-                                  justifyContent: 'center',
-                                  opacity: isPending ? 0.6 : 1
-                                }
-                              ]}
-                              activeOpacity={isPending ? 1 : 0.7}
-                              onPress={() => !isPending && handleRequestBlockPress(request)}
-                              disabled={isPending}
-                            >
-                              <Text
-                                style={[tw`${isPending ? 'text-gray-600' : 'text-white'} font-dm font-semibold`, { fontSize: moderateScale(11.25) }]}
-                                numberOfLines={2}
-                              >
-                                {request.title || request.notes || 'Meeting'}
-                              </Text>
-                            </TouchableOpacity>
-                          );
-                        })}
-                      </View>
-                    )}
-
-                    {/* Clickable empty time slots */}
-                    {!isTimeSlotOccupied(hour, 0, allRequests) && (
-                      <TouchableOpacity
-                        style={[tw`absolute`, { top: 0, left: '16%', right: 0, height: '50%', zIndex: 1 }]}
-                        activeOpacity={0.3}
-                        onPress={() => handleTimeSlotClick(hour, 0)}
-                      />
-                    )}
-                    {!isTimeSlotOccupied(hour, 30, allRequests) && (
-                      <TouchableOpacity
-                        style={[tw`absolute`, { top: '50%', left: '16%', right: 0, height: '50%', zIndex: 1 }]}
-                        activeOpacity={0.3}
-                        onPress={() => handleTimeSlotClick(hour, 30)}
-                      />
-                    )}
-                  </View>
-                );
-              }
-              return rows;
-            })()
+            scheduledViewElements
           ) : (
-            // Show full availability - dual view if contact selected, single view otherwise
-            selectedContact ? (
-              // Dual availability: Contact (left) and User (right)
-              (() => {
-                const rows = [];
-                const [year, month, day] = selectedDate.split('-').map(Number);
-                const selectedDateStart = new Date(year, month - 1, day, 0, 0, 0);
-                const selectedDateEnd = new Date(year, month - 1, day, 23, 59, 59, 999);
-
-                // Get today's meetings, sorted by start time
-                const todayMeetings = momentRequests
-                  .filter(request => {
-                    const requestStart = new Date(request.startTime);
-                    return requestStart >= selectedDateStart && requestStart <= selectedDateEnd;
-                  })
-                  .sort((a, b) => new Date(a.startTime).getTime() - new Date(b.startTime).getTime());
-
-                // Calculate USER availability gaps (times NOT occupied by meetings)
-                type AvailabilityGap = { start: Date; end: Date };
-                const userAvailabilityGaps: AvailabilityGap[] = [];
-
-                let userLastEnd = selectedDateStart;
-                todayMeetings.forEach(meeting => {
-                  const meetingStart = new Date(meeting.startTime);
-                  const meetingEnd = new Date(meeting.endTime);
-                  if (meetingStart > userLastEnd) {
-                    userAvailabilityGaps.push({ start: userLastEnd, end: meetingStart });
-                  }
-                  userLastEnd = meetingEnd > userLastEnd ? meetingEnd : userLastEnd;
-                });
-                if (userLastEnd < selectedDateEnd) {
-                  userAvailabilityGaps.push({ start: userLastEnd, end: selectedDateEnd });
-                }
-                if (todayMeetings.length === 0) {
-                  userAvailabilityGaps.push({ start: selectedDateStart, end: selectedDateEnd });
-                }
-
-                // Calculate CONTACT availability gaps from contactAvailableBlocks
-                const contactAvailabilityGaps: AvailabilityGap[] = contactAvailableBlocks.map(block => {
-                  const [startHour, startMin] = block.start.split(':').map(Number);
-                  const [endHour, endMin] = block.end.split(':').map(Number);
-                  return {
-                    start: new Date(year, month - 1, day, startHour, startMin),
-                    end: new Date(year, month - 1, day, endHour, endMin)
-                  };
-                });
-
-                // Render each hour
-                for (let hour = 0; hour < 24; hour++) {
-                  const hourTime = `${String(hour).padStart(2, '0')}:00`;
-
-                  // Find availability gaps that START in this hour
-                  const userHourGaps = userAvailabilityGaps.filter(gap => gap.start.getHours() === hour);
-                  const contactHourGaps = contactAvailabilityGaps.filter(gap => gap.start.getHours() === hour);
-
-                  rows.push(
-                    <View key={hour} style={[tw`relative`, { height: verticalScale(75) }]}>
-                      {/* Base structure */}
-                      <View style={tw`flex-row`}>
-                        <Text style={[tw`text-black font-bold font-dm`, { fontSize: moderateScale(15), width: horizontalScale(60), marginTop: -verticalScale(11.25) }]}>
-                          {hourTime}
-                        </Text>
-                        <View style={[tw`flex-1`, { marginLeft: horizontalScale(7.5) }]}>
-                          <View style={[tw`bg-gray-300`, { height: verticalScale(1.875) }]} />
-                        </View>
-                      </View>
-
-                      {/* Contact availability blocks (left, absolute) */}
-                      {contactHourGaps.length > 0 && (
-                        <View style={[tw`absolute top-0`, { left: '16%', width: '45%', height: '100%', zIndex: 2 }]}>
-                          {contactHourGaps.map((gap, idx) => {
-                            const startMin = gap.start.getMinutes();
-                            const top = startMin === 30 ? 50 : 0; // percentage
-                            const durationMinutes = (gap.end.getTime() - gap.start.getTime()) / (1000 * 60);
-                            const height = (durationMinutes / 30) * 50; // percentage
-
-                            return (
-                              <View
-                                key={idx}
-                                style={[
-                                  tw`bg-gray-300 rounded-lg absolute`,
-                                  { top: `${top}%`, height: `${height}%`, left: 0, right: 4 }
-                                ]}
-                              />
-                            );
-                          })}
-                        </View>
-                      )}
-
-                      {/* User availability blocks (right, absolute) */}
-                      {userHourGaps.length > 0 && (
-                        <View style={[tw`absolute top-0`, { right: 0, width: '45%', height: '100%', zIndex: 2 }]}>
-                          {userHourGaps.map((gap, idx) => {
-                            const startMin = gap.start.getMinutes();
-                            const top = startMin === 30 ? 50 : 0; // percentage
-                            const durationMinutes = (gap.end.getTime() - gap.start.getTime()) / (1000 * 60);
-                            const height = (durationMinutes / 30) * 50; // percentage
-
-                            return (
-                              <TouchableOpacity
-                                key={idx}
-                                style={[
-                                  tw`bg-gray-200 rounded-lg absolute`,
-                                  { top: `${top}%`, height: `${height}%`, left: 4, right: 0 }
-                                ]}
-                                activeOpacity={0.7}
-                                onPress={() => {
-                                  // Set appointment time to gap start
-                                  const gapTime = `${String(gap.start.getHours()).padStart(2, '0')}:${String(gap.start.getMinutes()).padStart(2, '0')}`;
-                                  setAppointmentTime(gapTime);
-                                }}
-                              />
-                            );
-                          })}
-                        </View>
-                      )}
-                    </View>
-                  );
-                }
-                return rows;
-              })()
-            ) : (
-              // Single availability view (no contact selected)
-              (() => {
-                const rows = [];
-                const [year, month, day] = selectedDate.split('-').map(Number);
-                const selectedDateStart = new Date(year, month - 1, day, 0, 0, 0);
-                const selectedDateEnd = new Date(year, month - 1, day, 23, 59, 59, 999);
-
-                // Get today's meetings, sorted by start time
-                const todayMeetings = momentRequests
-                  .filter(request => {
-                    const requestStart = new Date(request.startTime);
-                    return requestStart >= selectedDateStart && requestStart <= selectedDateEnd;
-                  })
-                  .sort((a, b) => new Date(a.startTime).getTime() - new Date(b.startTime).getTime());
-
-                // Calculate availability gaps (times NOT occupied by meetings)
-                type AvailabilityGap = { start: Date; end: Date };
-                const availabilityGaps: AvailabilityGap[] = [];
-
-                // Start from beginning of day
-                let lastEnd = selectedDateStart;
-
-                // For each meeting, create a gap from lastEnd to meeting start
-                todayMeetings.forEach(meeting => {
-                  const meetingStart = new Date(meeting.startTime);
-                  const meetingEnd = new Date(meeting.endTime);
-
-                  // Add gap before this meeting (if any)
-                  if (meetingStart > lastEnd) {
-                    availabilityGaps.push({ start: lastEnd, end: meetingStart });
-                  }
-
-                  lastEnd = meetingEnd;
-                });
-
-                // Add final gap from last meeting to end of day
-                if (lastEnd < selectedDateEnd) {
-                  availabilityGaps.push({ start: lastEnd, end: selectedDateEnd });
-                }
-
-                // If no meetings, entire day is available
-                if (todayMeetings.length === 0) {
-                  availabilityGaps.push({ start: selectedDateStart, end: selectedDateEnd });
-                }
-
-                // Render each hour
-                for (let hour = 0; hour < 24; hour++) {
-                  const hourTime = `${String(hour).padStart(2, '0')}:00`;
-
-                  // Find availability gaps that START in this hour
-                  const hourGaps = availabilityGaps.filter(gap => gap.start.getHours() === hour);
-
-                  rows.push(
-                    <View key={hour} style={[tw`relative`, { height: verticalScale(75) }]}>
-                      {/* Base structure */}
-                      <View style={tw`flex-row`}>
-                        <Text style={[tw`text-black font-bold font-dm`, { fontSize: moderateScale(15), width: horizontalScale(60), marginTop: -verticalScale(11.25) }]}>
-                          {hourTime}
-                        </Text>
-                        <View style={[tw`flex-1`, { marginLeft: horizontalScale(7.5) }]}>
-                          <View style={[tw`bg-gray-300`, { height: verticalScale(1.875) }]} />
-                        </View>
-                      </View>
-
-                      {/* Availability blocks (absolute) */}
-                      {hourGaps.length > 0 && (
-                        <View style={[tw`absolute top-0 right-0`, { left: '16%', height: '100%', zIndex: 2 }]}>
-                          {hourGaps.map((gap, idx) => {
-                            const startMin = gap.start.getMinutes();
-                            const top = startMin === 30 ? 50 : 0; // percentage
-                            const durationMinutes = (gap.end.getTime() - gap.start.getTime()) / (1000 * 60);
-                            const height = (durationMinutes / 30) * 50; // percentage
-
-                            return (
-                              <View
-                                key={idx}
-                                style={[
-                                  tw`bg-gray-200 rounded-lg absolute`,
-                                  { top: `${top}%`, height: `${height}%`, left: 0, right: 0 }
-                                ]}
-                              />
-                            );
-                          })}
-                        </View>
-                      )}
-                    </View>
-                  );
-                }
-                return rows;
-              })()
-            )
+            fullAvailabilityViewElements
           )}
         </View>
       </ScrollView>
