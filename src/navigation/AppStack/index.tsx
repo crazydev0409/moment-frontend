@@ -43,116 +43,59 @@ interface Contact {
 type Props = NativeStackScreenProps<RootStackParamList, 'AppStack'>;
 const Stack = createNativeStackNavigator<AppStackParamList>();
 
-// Screens that should NOT show the bottom navigation bar
-const SCREENS_WITHOUT_NAV_BAR = [
-  'AppStack_DateDetailScreen',
-  'AppStack_SearchScreen',
-  'AppStack_NotificationScreen',
-  'AppStack_SettingsScreen',
-  'AppStack_ComingSoonScreen',
-  'AppStack_ProfileScreen',
-];
-
-// Wrapper component that adds bottom navigation to screens
-const ScreenWithNav = ({ component: Component, showNav, selectedTab }: any) => {
-  return (props: any) => {
-    return (
-      <View style={tw`flex-1`}>
-        <Component {...props} />
-        {showNav && (
-          <BottomNavigationBar
-            selectedTab={selectedTab}
-          />
-        )}
-      </View>
-    );
-  };
-};
 
 const AppStackNavigator: React.FC = () => {
   return (
-    <Stack.Navigator initialRouteName="AppStack_HomePageScreen">
-      <Stack.Screen
-        name="AppStack_HomePageScreen"
-        component={ScreenWithNav({
-          component: AppStack_HomePageScreen,
-          showNav: true,
-          selectedTab: 'home'
-        })}
-        options={{ headerShown: false }}
-      />
-      <Stack.Screen
-        name="AppStack_ProfileScreen"
-        component={ScreenWithNav({
-          component: AppStack_ProfileScreen,
-          showNav: false
-        })}
-        options={{ headerShown: false }}
-      />
-      <Stack.Screen
-        name="AppStack_SettingsScreen"
-        component={ScreenWithNav({
-          component: AppStack_SettingsScreen,
-          showNav: false
-        })}
-        options={{ headerShown: false }}
-      />
-      <Stack.Screen
-        name="AppStack_CalendarScreen"
-        component={ScreenWithNav({
-          component: AppStack_CalendarScreen,
-          showNav: true,
-          selectedTab: 'calendar'
-        })}
-        options={{ headerShown: false }}
-      />
-      <Stack.Screen
-        name="AppStack_DateDetailScreen"
-        component={ScreenWithNav({
-          component: AppStack_DateDetailScreen,
-          showNav: false
-        })}
-        options={{ headerShown: false }}
-      />
-      <Stack.Screen
-        name="AppStack_ContactScreen"
-        component={ScreenWithNav({
-          component: AppStack_ContactScreen,
-          showNav: true,
-          selectedTab: 'profile'
-        })}
-        options={{ headerShown: false }}
-      />
-      <Stack.Screen
-        name="AppStack_ComingSoonScreen"
-        component={ScreenWithNav({
-          component: AppStack_ComingSoonScreen,
-          showNav: true,
-          selectedTab: 'business'
-        })}
-        options={{ headerShown: false }}
-      />
-      <Stack.Screen
-        name="AppStack_SearchScreen"
-        component={ScreenWithNav({
-          component: AppStack_SearchScreen,
-          showNav: false
-        })}
-        options={{ headerShown: false }}
-      />
-      <Stack.Screen
-        name="AppStack_NotificationScreen"
-        component={ScreenWithNav({
-          component: AppStack_NotificationScreen,
-          showNav: false
-        })}
-        options={{ headerShown: false }}
-      />
+    <Stack.Navigator
+      initialRouteName="AppStack_HomePageScreen"
+      screenOptions={{ headerShown: false }}
+    >
+      <Stack.Screen name="AppStack_HomePageScreen">
+        {(props: any) => (
+          <View style={tw`flex-1`}>
+            <AppStack_HomePageScreen {...props} />
+            <BottomNavigationBar selectedTab="home" />
+          </View>
+        )}
+      </Stack.Screen>
+
+      <Stack.Screen name="AppStack_CalendarScreen">
+        {(props: any) => (
+          <View style={tw`flex-1`}>
+            <AppStack_CalendarScreen {...props} />
+            <BottomNavigationBar selectedTab="calendar" />
+          </View>
+        )}
+      </Stack.Screen>
+
+      <Stack.Screen name="AppStack_ContactScreen">
+        {(props: any) => (
+          <View style={tw`flex-1`}>
+            <AppStack_ContactScreen {...props} />
+            <BottomNavigationBar selectedTab="profile" />
+          </View>
+        )}
+      </Stack.Screen>
+
+      <Stack.Screen name="AppStack_ComingSoonScreen">
+        {(props: any) => (
+          <View style={tw`flex-1`}>
+            <AppStack_ComingSoonScreen {...props} />
+            <BottomNavigationBar selectedTab="business" />
+          </View>
+        )}
+      </Stack.Screen>
+
+      <Stack.Screen name="AppStack_ProfileScreen" component={AppStack_ProfileScreen} />
+      <Stack.Screen name="AppStack_SettingsScreen" component={AppStack_SettingsScreen} />
+      <Stack.Screen name="AppStack_DateDetailScreen" component={AppStack_DateDetailScreen} />
+      <Stack.Screen name="AppStack_SearchScreen" component={AppStack_SearchScreen} />
+      <Stack.Screen name="AppStack_NotificationScreen" component={AppStack_NotificationScreen} />
     </Stack.Navigator>
   );
 };
 
-const AppStack: React.FC<Props> = ({ navigation, route }) => {
+const AppStack: React.FC<any> = ({ navigation, route }) => {
   return (
     <AppStackNavigator />
   );

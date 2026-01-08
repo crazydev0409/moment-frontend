@@ -3,7 +3,6 @@
     "name": "Catch",
     "slug": "ios-app",
     "version": "1.0.1",
-    "newArchEnabled": false,
     "extra": {
       "eas": {
         "projectId": "53303aed-83d0-469c-ae4f-8d2c27c784cb"
@@ -16,7 +15,6 @@
       "tsconfigPaths": true
     },
     "plugins": [
-      "expo-font",
       [
         "expo-location",
         {
@@ -29,9 +27,14 @@
           "android": {
             "gradleVersion": "8.10.2",
             "targetSdkVersion": 35
+          },
+          "ios": {
+            "deploymentTarget": "15.0"
           }
         }
-      ]
+      ],
+      "expo-asset",
+      "expo-font"
     ],
     "orientation": "portrait",
     "icon": "./assets/images/logo.png",
