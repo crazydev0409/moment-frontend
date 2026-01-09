@@ -1130,23 +1130,6 @@ const AppStack_DateDetailScreen: React.FC<Props> = ({ navigation, route }) => {
     try {
       setIsSubmitting(true);
       // Ensure calendar visibility is granted before creating the request
-      try {
-        await http.post('/users/visibility', {
-          userId: selectedContact.contactUser.id
-        });
-        console.log('Calendar visibility granted');
-      } catch (visibilityError: any) {
-        // If error is about calendar not found, show a helpful message
-        if (visibilityError.response?.data?.error?.includes('calendar not found') ||
-          visibilityError.response?.data?.error?.includes('Default calendar not found')) {
-          showToastMessage('The selected contact does not have a calendar set up yet. Please ask them to complete their profile first.');
-          return;
-        }
-        // Ignore if visibility is already granted
-        if (!visibilityError.response?.data?.error?.includes('already')) {
-          console.warn('Could not grant calendar visibility:', visibilityError.response?.data?.error || visibilityError.message);
-        }
-      }
 
       // Parse selected date and time
       const [year, month, day] = selectedDate.split('-').map(Number);
