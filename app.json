@@ -29,7 +29,7 @@
             "targetSdkVersion": 35
           },
           "ios": {
-            "deploymentTarget": "15.0"
+            "deploymentTarget": "15.1"
           }
         }
       ],
@@ -48,7 +48,6 @@
       "**/*"
     ],
     "ios": {
-      "supportsTablet": false,
       "bundleIdentifier": "com.crazydev0409.catchapp",
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false,
