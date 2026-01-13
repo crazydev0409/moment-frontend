@@ -26,7 +26,8 @@
         {
           "android": {
             "gradleVersion": "8.10.2",
-            "targetSdkVersion": 35
+            "targetSdkVersion": 35,
+            "kotlinVersion": "1.9.25"
           },
           "ios": {
             "deploymentTarget": "15.1"
