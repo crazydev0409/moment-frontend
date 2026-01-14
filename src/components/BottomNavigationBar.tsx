@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { View, TouchableOpacity, Image, Modal, Text, TextInput, ScrollView, Alert } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
@@ -35,6 +35,7 @@ const BottomNavigationBar: React.FC<BottomNavigationBarProps> = ({
   const [showContactModal, setShowContactModal] = useState(false);
   const [contacts, setContacts] = useState<any[]>([]);
   const [contactSearchText, setContactSearchText] = useState('');
+  const [isLoadingContacts, setIsLoadingContacts] = useState(false);
 
   // Handle Tab Navigation
   const handleHomePress = () => {
@@ -76,23 +77,36 @@ const BottomNavigationBar: React.FC<BottomNavigationBarProps> = ({
 
   const handleBookMeeting = () => {
     setShowAddMenu(false);
-    setShowContactModal(true);
+    // Add a small delay to ensure the first modal is fully closed before opening the second
+    // This prevents race conditions in production builds where React batches state updates differently
+    setTimeout(() => {
+      setShowContactModal(true);
+    }, 100);
   };
 
-  const loadContacts = async () => {
+  const loadContacts = useCallback(async () => {
+    setIsLoadingContacts(true);
     try {
       const response = await http.get('/users/contacts');
       setContacts(response.data.contacts || []);
     } catch (error) {
       console.error('Error loading contacts:', error);
+      Alert.alert(
+        'Error',
+        'Failed to load contacts. Please try again.',
+        [{ text: 'OK' }]
+      );
+      setShowContactModal(false);
+    } finally {
+      setIsLoadingContacts(false);
     }
-  };
+  }, []);
 
   useEffect(() => {
     if (showContactModal) {
       loadContacts();
     }
-  }, [showContactModal]);
+  }, [showContactModal, loadContacts]);
 
   const filteredContacts = contacts.filter(contact =>
     contact.displayName.toLowerCase().includes(contactSearchText.toLowerCase())
@@ -100,12 +114,18 @@ const BottomNavigationBar: React.FC<BottomNavigationBarProps> = ({
 
   const handleContactSelect = (contact: any) => {
     setShowContactModal(false);
+    setContactSearchText('');
     // Navigate to DateDetailScreen with selected contact
     const today = new Date().toISOString().split('T')[0];
     navigation.navigate('AppStack_DateDetailScreen', {
       date: today,
       contact: contact
     });
+  };
+
+  const handleCloseContactModal = () => {
+    setShowContactModal(false);
+    setContactSearchText('');
   };
 
   return (
@@ -218,13 +238,13 @@ const BottomNavigationBar: React.FC<BottomNavigationBarProps> = ({
         visible={showContactModal}
         transparent={true}
         animationType="slide"
-        onRequestClose={() => setShowContactModal(false)}
+        onRequestClose={handleCloseContactModal}
       >
         <View style={tw`flex-1`}>
           <TouchableOpacity
             style={tw`flex-1`}
             activeOpacity={1}
-            onPress={() => setShowContactModal(false)}
+            onPress={handleCloseContactModal}
           >
             <BlurView intensity={20} tint="dark" style={tw`absolute inset-0`}>
               <View style={tw`flex-1 bg-black opacity-40`} />
@@ -237,7 +257,7 @@ const BottomNavigationBar: React.FC<BottomNavigationBarProps> = ({
               <View style={[tw`flex-row justify-between items-center`, { marginBottom: verticalScale(15) }]}>
                 <Text style={[tw`text-black font-bold font-dm`, { fontSize: moderateScale(18.75) }]}>Select Contact</Text>
                 <TouchableOpacity
-                  onPress={() => setShowContactModal(false)}
+                  onPress={handleCloseContactModal}
                   activeOpacity={0.7}
                 >
                   <Text style={[tw`text-[#A3CB31] font-dm`, { fontSize: moderateScale(15) }]}>Cancel</Text>
@@ -258,7 +278,11 @@ const BottomNavigationBar: React.FC<BottomNavigationBarProps> = ({
 
               {/* Contacts List */}
               <ScrollView style={{ maxHeight: verticalScale(337.5) }} showsVerticalScrollIndicator={false}>
-                {filteredContacts.length > 0 ? (
+                {isLoadingContacts ? (
+                  <View style={{ paddingVertical: verticalScale(37.5), alignItems: 'center' }}>
+                    <Text style={[tw`text-grey font-dm`, { fontSize: moderateScale(15) }]}>Loading contacts...</Text>
+                  </View>
+                ) : filteredContacts.length > 0 ? (
                   filteredContacts.map((contact) => {
                     const isDisabled = !contact.contactUser?.id;
                     return (
