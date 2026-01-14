@@ -19,6 +19,17 @@
         "simulator": false
       }
     },
+    "preview-simulator": {
+      "node": "20.18.0",
+      "distribution": "internal",
+      "android": {
+        "buildType": "apk"
+      },
+      "ios": {
+        "simulator": true,
+        "buildConfiguration": "Release"
+      }
+    },
     "production": {
       "node": "20.18.0",
       "android": {
