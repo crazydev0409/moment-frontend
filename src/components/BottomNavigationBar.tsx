@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { View, TouchableOpacity, Image, Modal, Text, TextInput, ScrollView, Alert } from 'react-native';
+import { View, TouchableOpacity, Image, Modal, Text, TextInput, ScrollView, Alert, Platform } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -36,6 +36,7 @@ const BottomNavigationBar: React.FC<BottomNavigationBarProps> = ({
   const [contacts, setContacts] = useState<any[]>([]);
   const [contactSearchText, setContactSearchText] = useState('');
   const [isLoadingContacts, setIsLoadingContacts] = useState(false);
+  const [isTransitioning, setIsTransitioning] = useState(false);
 
   // Handle Tab Navigation
   const handleHomePress = () => {
@@ -76,12 +77,18 @@ const BottomNavigationBar: React.FC<BottomNavigationBarProps> = ({
   };
 
   const handleBookMeeting = () => {
+    // Set transitioning flag to prevent double modal rendering
+    setIsTransitioning(true);
     setShowAddMenu(false);
-    // Add a small delay to ensure the first modal is fully closed before opening the second
-    // This prevents race conditions in production builds where React batches state updates differently
-    setTimeout(() => {
-      setShowContactModal(true);
-    }, 100);
+    // iOS production builds require more time for modal animations and BlurView cleanup
+    // Use requestAnimationFrame for smoother transition and platform-specific delay
+    const transitionDelay = Platform.OS === 'ios' ? 500 : 200;
+    requestAnimationFrame(() => {
+      setTimeout(() => {
+        setIsTransitioning(false);
+        setShowContactModal(true);
+      }, transitionDelay);
+    });
   };
 
   const loadContacts = useCallback(async () => {
@@ -170,23 +177,24 @@ const BottomNavigationBar: React.FC<BottomNavigationBarProps> = ({
         </TouchableOpacity>
       </View>
 
-      {/* Add Menu Popup Modal */}
-      <Modal
-        visible={showAddMenu}
-        transparent={true}
-        animationType="fade"
-        onRequestClose={() => setShowAddMenu(false)}
-      >
-        <View style={tw`flex-1`}>
-          <TouchableOpacity
-            style={tw`flex-1`}
-            activeOpacity={1}
-            onPress={() => setShowAddMenu(false)}
-          >
-            <BlurView intensity={20} tint="dark" style={tw`absolute inset-0`}>
-              <View style={tw`flex-1 bg-black opacity-40`} />
-            </BlurView>
-          </TouchableOpacity>
+      {/* Add Menu Popup Modal - Only render when contact modal is not active */}
+      {!showContactModal && !isTransitioning && (
+        <Modal
+          visible={showAddMenu}
+          transparent={true}
+          animationType="fade"
+          onRequestClose={() => setShowAddMenu(false)}
+        >
+          <View style={tw`flex-1`}>
+            <TouchableOpacity
+              style={tw`flex-1`}
+              activeOpacity={1}
+              onPress={() => setShowAddMenu(false)}
+            >
+              <BlurView intensity={20} tint="dark" style={tw`absolute inset-0`}>
+                <View style={tw`flex-1 bg-black opacity-40`} />
+              </BlurView>
+            </TouchableOpacity>
 
           <View style={[tw`absolute bottom-0 left-0 right-0 items-center`, { paddingBottom: verticalScale(90) }]}>
             <View style={[tw`bg-white rounded-3xl w-11/12 overflow-hidden`, { paddingHorizontal: horizontalScale(15) }]}>
@@ -232,14 +240,16 @@ const BottomNavigationBar: React.FC<BottomNavigationBarProps> = ({
           </View>
         </View>
       </Modal>
+      )}
 
-      {/* Contact Selection Modal */}
-      <Modal
-        visible={showContactModal}
-        transparent={true}
-        animationType="slide"
-        onRequestClose={handleCloseContactModal}
-      >
+      {/* Contact Selection Modal - Only render when add menu is not active */}
+      {!showAddMenu && (
+        <Modal
+          visible={showContactModal && !isTransitioning}
+          transparent={true}
+          animationType="slide"
+          onRequestClose={handleCloseContactModal}
+        >
         <View style={tw`flex-1`}>
           <TouchableOpacity
             style={tw`flex-1`}
@@ -335,6 +345,7 @@ const BottomNavigationBar: React.FC<BottomNavigationBarProps> = ({
           </View>
         </View>
       </Modal>
+      )}
     </>
   );
 };
