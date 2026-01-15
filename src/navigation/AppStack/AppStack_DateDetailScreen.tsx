@@ -10,6 +10,7 @@ import {
   Alert,
   ActivityIndicator,
   Animated,
+  Platform,
 } from 'react-native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { useFocusEffect } from '@react-navigation/native';
@@ -109,6 +110,7 @@ const AppStack_DateDetailScreen: React.FC<Props> = ({ navigation, route }) => {
   const [contacts, setContacts] = useState<Contact[]>([]);
   const [contactSearchText, setContactSearchText] = useState('');
   const [phoneNumberMap, setPhoneNumberMap] = useState<Map<string, string>>(new Map());
+  const [isTransitioningModals, setIsTransitioningModals] = useState(false);
 
   // Animation values for smooth modal transitions
   const createModalSlideAnim = useRef(new Animated.Value(0)).current;
@@ -1025,9 +1027,17 @@ const AppStack_DateDetailScreen: React.FC<Props> = ({ navigation, route }) => {
       return;
     }
     setSelectedContact(contact);
+    setIsTransitioningModals(true);
     setShowContactModal(false);
-    // After selecting contact, show create meeting modal
-    setShowCreateModal(true);
+    // iOS production builds require more time for modal animations and BlurView cleanup
+    // Use requestAnimationFrame for smoother transition and platform-specific delay
+    const transitionDelay = Platform.OS === 'ios' ? 500 : 200;
+    requestAnimationFrame(() => {
+      setTimeout(() => {
+        setIsTransitioningModals(false);
+        setShowCreateModal(true);
+      }, transitionDelay);
+    });
   };
 
   const filteredContacts = contacts.filter(contact =>
@@ -1697,12 +1707,13 @@ const AppStack_DateDetailScreen: React.FC<Props> = ({ navigation, route }) => {
         </View>
       </View>
 
-      {/* Create Appointment Modal */}
-      <Modal
-        visible={showCreateModal}
-        transparent
-        animationType="none"
-        onRequestClose={handleCloseCreateModal}
+      {/* Create Appointment Modal - Only render when contact modal is not active */}
+      {!showContactModal && (
+        <Modal
+          visible={showCreateModal && !isTransitioningModals}
+          transparent
+          animationType="none"
+          onRequestClose={handleCloseCreateModal}
         onShow={() => {
           // Animate in when modal becomes visible
           Animated.parallel([
@@ -1906,6 +1917,7 @@ const AppStack_DateDetailScreen: React.FC<Props> = ({ navigation, route }) => {
           </BlurView>
         </Animated.View>
       </Modal>
+      )}
 
       {/* Moment Request Accept/Reject Modal */}
       <Modal
@@ -2161,12 +2173,13 @@ const AppStack_DateDetailScreen: React.FC<Props> = ({ navigation, route }) => {
         </Animated.View>
       </Modal>
 
-      {/* Contact Selection Modal */}
-      <Modal
-        visible={showContactModal}
-        transparent={true}
-        animationType="none"
-        onRequestClose={handleCloseContactModal}
+      {/* Contact Selection Modal - Only render when create modal is not active */}
+      {!showCreateModal && !isTransitioningModals && (
+        <Modal
+          visible={showContactModal}
+          transparent={true}
+          animationType="none"
+          onRequestClose={handleCloseContactModal}
         onShow={() => {
           // Animate in when modal becomes visible
           Animated.parallel([
@@ -2293,6 +2306,7 @@ const AppStack_DateDetailScreen: React.FC<Props> = ({ navigation, route }) => {
           </View>
         </Animated.View>
       </Modal>
+      )}
 
       {/* Toast notification */}
       <Toast
