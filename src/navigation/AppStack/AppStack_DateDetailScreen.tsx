@@ -1166,8 +1166,8 @@ const AppStack_DateDetailScreen: React.FC<Props> = ({ navigation, route }) => {
         receiverId: selectedContact.contactUser.id,
         startTime: startTime.toISOString(),
         endTime: endTime.toISOString(),
-        title: appointmentTitle,
-        description: `Meeting with ${selectedContact.displayName}`,
+        title: `${appointmentTitle}: Meeting with ${selectedContact.displayName}`,
+        description: appointmentTitle,
         meetingType: appointmentType,
       });
 
@@ -1326,7 +1326,24 @@ const AppStack_DateDetailScreen: React.FC<Props> = ({ navigation, route }) => {
                       style={[tw`${isPending ? 'text-gray-600' : 'text-white'} font-dm font-semibold`, { fontSize: moderateScale(11.25) }]}
                       numberOfLines={2}
                     >
-                      {request.title || request.notes || 'Meeting'}
+                      {(() => {
+                        const title = request.title || request.notes || 'Meeting';
+                        const otherPersonName = request.sender?.id === user?.id
+                          ? request.receiver?.name
+                          : request.sender?.name;
+                        
+                        // Replace any contact name in title with the correct one from viewer's perspective
+                        const titlePattern = /(.+):\s*Meeting with\s+(.+)/i;
+                        const match = title.match(titlePattern);
+                        
+                        if (match) {
+                          // Title has format "Duration: Meeting with Name"
+                          const meetingType = match[1];
+                          return `${meetingType}: Meeting with ${otherPersonName}`;
+                        }
+                        
+                        return title;
+                      })()}
                     </Text>
                   </TouchableOpacity>
                 );

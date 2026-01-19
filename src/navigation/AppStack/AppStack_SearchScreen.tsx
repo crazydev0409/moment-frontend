@@ -276,7 +276,24 @@ const AppStack_SearchScreen: React.FC<Props> = ({ navigation, route }) => {
                       <View style={tw`flex-1`}>
                         <View style={[tw`flex-row items-center justify-between`, { marginBottom: verticalScale(3.75) }]}>
                           <Text style={[tw`text-black font-bold font-dm`, { fontSize: moderateScale(15) }]}>
-                            {meeting.title || meeting.notes || 'Untitled Meeting'}
+                            {(() => {
+                              const title = meeting.title || meeting.notes || 'Untitled Meeting';
+                              const otherPersonName = meeting.senderId === userId
+                                ? meeting.receiver?.name
+                                : meeting.sender?.name;
+                              
+                              // Replace any contact name in title with the correct one from viewer's perspective
+                              const titlePattern = /(.+):\s*Meeting with\s+(.+)/i;
+                              const match = title.match(titlePattern);
+                              
+                              if (match) {
+                                // Title has format "Duration: Meeting with Name"
+                                const meetingType = match[1];
+                                return `${meetingType}: Meeting with ${otherPersonName}`;
+                              }
+                              
+                              return title;
+                            })()}
                           </Text>
                           <Text style={[tw`font-dm ${statusColor} capitalize`, { fontSize: moderateScale(11.25) }]}>
                             {meeting.status}

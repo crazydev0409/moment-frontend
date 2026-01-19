@@ -743,8 +743,8 @@ const AppStack_HomePageScreen: React.FC<Props> = ({ navigation, route }) => {
           {/* Information Cards */}
           <View style={{ flexDirection: 'row', gap: horizontalScale(7.5), marginBottom: verticalScale(7.5), height: verticalScale(150) }}>
             {/* Today's Date Card */}
-            <View style={[tw`bg-[#A3CB31] rounded-2xl items-center justify-center`, { padding: moderateScale(7.5), width: horizontalScale(131.25) }]}>
-              <Text style={[tw`text-white font-dm`, { fontSize: moderateScale(13), marginBottom: verticalScale(3.75) }]}>Last</Text>
+            <View style={[tw`bg-[#A3CB31] rounded-2xl items-center justify-center`, { padding: moderateScale(7.5), width: horizontalScale(100) }]}>
+              <Text style={[tw`text-white font-dm`, { fontSize: moderateScale(13), marginBottom: verticalScale(3.75) }]}>Upcoming</Text>
               <Text style={[tw`text-white font-bold font-dm`, { fontSize: moderateScale(37.5), marginBottom: verticalScale(3.75) }]}>
                 {formatDate(new Date(), 'd')}
               </Text>
@@ -753,85 +753,164 @@ const AppStack_HomePageScreen: React.FC<Props> = ({ navigation, route }) => {
               </Text>
             </View>
 
-            {/* Upcoming Meeting Card - flex: 6 */}
-            <View style={[tw`bg-white rounded-2xl shadow-sm`, { flex: 6, overflow: 'hidden' }]}>
+            {/* Upcoming Meeting Card - flex: 1 (auto expand) */}
+            <View style={[tw`bg-white rounded-2xl shadow-sm`, { flex: 1, overflow: 'hidden' }]}>
               {upcomingMeeting ? (
                 <>
                   {/* Meeting Info - 80% */}
-                  <View style={[tw`justify-center`, { height: '80%', paddingHorizontal: moderateScale(9.375), paddingTop: moderateScale(9.375) }]}>
-                    <Text style={[tw`text-black font-bold font-dm`, { fontSize: moderateScale(13), marginBottom: verticalScale(1.875) }]} numberOfLines={1}>
-                      {upcomingMeeting.title || upcomingMeeting.notes || 'Untitled Meeting'}
+                  <View style={[tw`justify-center`, { height: '75%', paddingHorizontal: moderateScale(15), paddingTop: moderateScale(15) }]}>
+                    {/* Line 1: Meeting Title/Type - BIGGER */}
+                    <Text 
+                      style={[tw`text-black font-bold font-dm`, { fontSize: moderateScale(13), marginBottom: verticalScale(1.875) }]} 
+                      numberOfLines={1}
+                      ellipsizeMode="tail"
+                    >
+                      {(() => {
+                        const title = upcomingMeeting.title || upcomingMeeting.notes || 'Untitled Meeting';
+                        
+                        // Extract just the meeting type/duration part
+                        const titlePattern = /(.+):\s*Meeting with\s+(.+)/i;
+                        const match = title.match(titlePattern);
+                        
+                        if (match) {
+                          // Return just the meeting type (e.g., "30 Minute Meeting")
+                          return match[1];
+                        }
+                        
+                        return title;
+                      })()}
                     </Text>
-                    <Text style={[tw`text-grey font-dm`, { fontSize: moderateScale(9.375), marginBottom: verticalScale(1.875) }]} numberOfLines={1}>
+                    
+                    {/* Line 2: Meeting with Contact - BIGGER */}
+                    <Text 
+                      style={[tw`text-black font-bold font-dm`, { fontSize: moderateScale(13), marginBottom: verticalScale(5) }]} 
+                      numberOfLines={1}
+                      ellipsizeMode="tail"
+                    >
                       Meeting with {upcomingMeeting.sender?.id === userId
                         ? upcomingMeeting.receiver?.name
                         : upcomingMeeting.sender?.name}
                     </Text>
-                    <Text style={[tw`text-grey font-dm`, { fontSize: moderateScale(9.375), marginBottom: verticalScale(1.875) }]} numberOfLines={1}>
-                      {formatDate(new Date(upcomingMeeting.startTime), 'MMM do, yyyy')}
+                    
+                    {/* Line 3: Date - SMALLER */}
+                    <Text 
+                      style={[tw`text-grey font-dm`, { fontSize: moderateScale(9.375), marginBottom: verticalScale(1.875) }]} 
+                      numberOfLines={1}
+                      ellipsizeMode="tail"
+                    >
+                      {new Date(upcomingMeeting.startTime).toLocaleDateString('en-US', { 
+                        month: 'short', 
+                        day: 'numeric', 
+                        year: 'numeric' 
+                      })}
                     </Text>
-                    <Text style={[tw`text-grey font-dm`, { fontSize: moderateScale(9.375) }]} numberOfLines={1}>
-                      {formatDate(new Date(upcomingMeeting.startTime), 'h:mm a')} - {formatDate(new Date(upcomingMeeting.endTime), 'h:mm a')}
+                    
+                    {/* Line 4: Time - SMALLER */}
+                    <Text 
+                      style={[tw`text-grey font-dm`, { fontSize: moderateScale(9.375) }]} 
+                      numberOfLines={1}
+                      ellipsizeMode="tail"
+                    >
+                      {new Date(upcomingMeeting.startTime).toLocaleTimeString('en-US', { 
+                        hour: 'numeric', 
+                        minute: '2-digit', 
+                        hour12: true 
+                      })} - {new Date(upcomingMeeting.endTime).toLocaleTimeString('en-US', { 
+                        hour: 'numeric', 
+                        minute: '2-digit', 
+                        hour12: true 
+                      })}
                     </Text>
                   </View>
                   
-                  {/* Progress Indicator - 20% */}
-                  <View style={[tw`border-t border-gray-100`, { height: '20%', paddingHorizontal: moderateScale(9.375), justifyContent: 'center' }]}>
-                    {(() => {
-                      const now = new Date().getTime();
-                      const meetingStart = new Date(upcomingMeeting.startTime).getTime();
-                      const meetingEnd = new Date(upcomingMeeting.endTime).getTime();
-                      const totalDuration = meetingEnd - meetingStart;
-                      const timeUntilMeeting = meetingStart - now;
-                      
-                      // Calculate percentage (0-100)
-                      // If meeting hasn't started yet, show countdown
-                      let progressPercent = 0;
-                      let displayText = '';
-                      
-                      if (timeUntilMeeting > 0) {
-                        // Meeting hasn't started - show time until meeting
-                        const hoursUntil = Math.floor(timeUntilMeeting / (1000 * 60 * 60));
-                        const minutesUntil = Math.floor((timeUntilMeeting % (1000 * 60 * 60)) / (1000 * 60));
+                  {/* Progress Slider - 20% */}
+                  <View style={[tw`border-t border-gray-100`, { height: '10%', paddingHorizontal: moderateScale(15), paddingVertical: verticalScale(6), justifyContent: 'center' }]}>
+                    <View style={tw`flex-row items-center`}>
+                      {/* Progress Bar Container */}
+                      <View style={[tw`relative flex-1 items-center justify-center`, { marginRight: horizontalScale(10) }]}>
+                        {/* Outlined Track */}
+                        <View 
+                          style={[
+                            tw`w-full rounded-full`,
+                            { 
+                              height: verticalScale(3),
+                              borderWidth: 1.5,
+                              borderColor: 'rgba(0, 0, 0, 0.2)',
+                              backgroundColor: 'black'
+                            }
+                          ]} 
+                        />
                         
-                        if (hoursUntil > 24) {
-                          const daysUntil = Math.floor(hoursUntil / 24);
-                          displayText = `In ${daysUntil}d ${hoursUntil % 24}h`;
-                        } else if (hoursUntil > 0) {
-                          displayText = `In ${hoursUntil}h ${minutesUntil}m`;
-                        } else {
-                          displayText = `In ${minutesUntil}m`;
-                        }
-                        progressPercent = 0;
-                      } else if (now >= meetingStart && now <= meetingEnd) {
-                        // Meeting is in progress
-                        const elapsed = now - meetingStart;
-                        progressPercent = Math.min(100, (elapsed / totalDuration) * 100);
-                        displayText = `${Math.round(progressPercent)}% complete`;
-                      } else {
-                        // Meeting has passed
-                        progressPercent = 100;
-                        displayText = 'Completed';
-                      }
-                      
-                      return (
-                        <View style={tw`flex-row items-center`}>
-                          {/* Progress Bar */}
-                          <View style={[tw`flex-1 bg-gray-200 rounded-full`, { height: verticalScale(3.75), marginRight: horizontalScale(7.5) }]}>
-                            <View 
-                              style={[
-                                tw`bg-[#A3CB31] rounded-full h-full`,
-                                { width: `${progressPercent}%` }
-                              ]}
-                            />
-                          </View>
-                          {/* Time Text */}
-                          <Text style={[tw`text-grey font-dm`, { fontSize: moderateScale(9), minWidth: horizontalScale(52.5) }]} numberOfLines={1}>
-                            {displayText}
-                          </Text>
+                        {/* Progress Fill - Fixed at 85% */}
+                        <View 
+                          style={[
+                            tw`absolute flex-row items-center`,
+                            { width: '85%', left: 0 }
+                          ]}
+                        >
+                          {/* Black Fill Bar */}
+                          <View 
+                            style={[
+                              tw`rounded-full flex-1`,
+                              { 
+                                height: verticalScale(3),
+                                backgroundColor: 'rgba(0, 0, 0, 0.85)'
+                              }
+                            ]}
+                          />
+                          
+                          {/* Outlined Circle Knob at end */}
+                          <View 
+                            style={[
+                              tw`absolute rounded-full bg-white`,
+                              { 
+                                width: horizontalScale(16), 
+                                height: horizontalScale(16),
+                                right: -horizontalScale(8),
+                                borderWidth: 2,
+                                borderColor: 'rgba(0, 0, 0, 0.85)',
+                                borderRadius: horizontalScale(8),
+                                shadowColor: '#000',
+                                shadowOffset: {
+                                  width: 0,
+                                  height: 1,
+                                },
+                                shadowOpacity: 0.15,
+                                shadowRadius: 1.5,
+                                elevation: 2
+                              }
+                            ]}
+                          />
                         </View>
-                      );
-                    })()}
+                      </View>
+                      
+                      {/* Percentage in Circle */}
+                      <View 
+                        style={[
+                          tw`items-center justify-center`,
+                          { 
+                            width: horizontalScale(28),
+                            height: horizontalScale(28),
+                            borderRadius: horizontalScale(14),
+                            borderWidth: 1.5,
+                            borderColor: 'rgba(0, 0, 0, 0.85)',
+                            backgroundColor: 'white'
+                          }
+                        ]}
+                      >
+                        <Text 
+                          style={[
+                            tw`font-dm font-bold`,
+                            { 
+                              fontSize: moderateScale(10),
+                              color: 'rgba(0, 0, 0, 0.85)'
+                            }
+                          ]}
+                        >
+                          0.85
+                        </Text>
+                      </View>
+                    </View>
                   </View>
                 </>
               ) : (
@@ -970,7 +1049,24 @@ const AppStack_HomePageScreen: React.FC<Props> = ({ navigation, route }) => {
                     </View>
                     <View style={tw`flex-1`}>
                       <Text style={[tw`text-black font-bold font-dm`, { fontSize: moderateScale(13), marginBottom: verticalScale(3.75) }]}>
-                        {meeting.title || meeting.notes || 'Untitled Meeting'}
+                        {(() => {
+                          const title = meeting.title || meeting.notes || 'Untitled Meeting';
+                          const otherPersonName = meeting.senderId === userId
+                            ? meeting.receiver?.name
+                            : meeting.sender?.name;
+                          
+                          // Replace any contact name in title with the correct one from viewer's perspective
+                          const titlePattern = /(.+):\s*Meeting with\s+(.+)/i;
+                          const match = title.match(titlePattern);
+                          
+                          if (match) {
+                            // Title has format "Duration: Meeting with Name"
+                            const meetingType = match[1];
+                            return `${meetingType}: Meeting with ${otherPersonName}`;
+                          }
+                          
+                          return title;
+                        })()}
                       </Text>
                       <Text style={[tw`text-grey font-dm`, { fontSize: moderateScale(11.25) }]}>
                         {formatMeetingDuration(meeting.startTime, meeting.endTime)} •{' '}
