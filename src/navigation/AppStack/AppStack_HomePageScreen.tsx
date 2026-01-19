@@ -668,7 +668,7 @@ const AppStack_HomePageScreen: React.FC<Props> = ({ navigation, route }) => {
       <View style={tw`absolute w-full h-full bg-black opacity-5`} />
       <ScrollView
         style={tw`flex-1`}
-        contentContainerStyle={{ paddingBottom: verticalScale(75), paddingTop: Math.max(insets.top, 40) }}
+        contentContainerStyle={{ paddingBottom: verticalScale(140), paddingTop: Math.max(insets.top, 40) }}
         showsVerticalScrollIndicator={false}
       >
         <View style={{ flex: 1, paddingHorizontal: '8%' }}>
@@ -754,34 +754,99 @@ const AppStack_HomePageScreen: React.FC<Props> = ({ navigation, route }) => {
             </View>
 
             {/* Upcoming Meeting Card - flex: 6 */}
-            <View style={[tw`bg-white rounded-2xl shadow-sm justify-center`, { flex: 6, padding: moderateScale(9.375) }]}>
+            <View style={[tw`bg-white rounded-2xl shadow-sm`, { flex: 6, overflow: 'hidden' }]}>
               {upcomingMeeting ? (
                 <>
-                  <Text style={[tw`text-black font-bold font-dm`, { fontSize: moderateScale(13), marginBottom: verticalScale(1.875) }]} numberOfLines={1}>
-                    {upcomingMeeting.title || upcomingMeeting.notes || 'Untitled Meeting'}
-                  </Text>
-                  <Text style={[tw`text-grey font-dm`, { fontSize: moderateScale(9.375), marginBottom: verticalScale(1.875) }]} numberOfLines={1}>
-                    {upcomingMeeting.sender?.id === userId
-                      ? upcomingMeeting.receiver?.name
-                      : upcomingMeeting.sender?.name}
-                  </Text>
-                  <Text style={[tw`text-grey font-dm`, { fontSize: moderateScale(13) }]}>
-                    {formatDate(new Date(upcomingMeeting.startTime), 'MMM do')} from{' '}
-                    {formatDate(new Date(upcomingMeeting.startTime), 'h:mm')} -{' '}
-                    {formatDate(new Date(upcomingMeeting.endTime), 'h:mm a')}
-                  </Text>
+                  {/* Meeting Info - 80% */}
+                  <View style={[tw`justify-center`, { height: '80%', paddingHorizontal: moderateScale(9.375), paddingTop: moderateScale(9.375) }]}>
+                    <Text style={[tw`text-black font-bold font-dm`, { fontSize: moderateScale(13), marginBottom: verticalScale(1.875) }]} numberOfLines={1}>
+                      {upcomingMeeting.title || upcomingMeeting.notes || 'Untitled Meeting'}
+                    </Text>
+                    <Text style={[tw`text-grey font-dm`, { fontSize: moderateScale(9.375), marginBottom: verticalScale(1.875) }]} numberOfLines={1}>
+                      Meeting with {upcomingMeeting.sender?.id === userId
+                        ? upcomingMeeting.receiver?.name
+                        : upcomingMeeting.sender?.name}
+                    </Text>
+                    <Text style={[tw`text-grey font-dm`, { fontSize: moderateScale(9.375), marginBottom: verticalScale(1.875) }]} numberOfLines={1}>
+                      {formatDate(new Date(upcomingMeeting.startTime), 'MMM do, yyyy')}
+                    </Text>
+                    <Text style={[tw`text-grey font-dm`, { fontSize: moderateScale(9.375) }]} numberOfLines={1}>
+                      {formatDate(new Date(upcomingMeeting.startTime), 'h:mm a')} - {formatDate(new Date(upcomingMeeting.endTime), 'h:mm a')}
+                    </Text>
+                  </View>
+                  
+                  {/* Progress Indicator - 20% */}
+                  <View style={[tw`border-t border-gray-100`, { height: '20%', paddingHorizontal: moderateScale(9.375), justifyContent: 'center' }]}>
+                    {(() => {
+                      const now = new Date().getTime();
+                      const meetingStart = new Date(upcomingMeeting.startTime).getTime();
+                      const meetingEnd = new Date(upcomingMeeting.endTime).getTime();
+                      const totalDuration = meetingEnd - meetingStart;
+                      const timeUntilMeeting = meetingStart - now;
+                      
+                      // Calculate percentage (0-100)
+                      // If meeting hasn't started yet, show countdown
+                      let progressPercent = 0;
+                      let displayText = '';
+                      
+                      if (timeUntilMeeting > 0) {
+                        // Meeting hasn't started - show time until meeting
+                        const hoursUntil = Math.floor(timeUntilMeeting / (1000 * 60 * 60));
+                        const minutesUntil = Math.floor((timeUntilMeeting % (1000 * 60 * 60)) / (1000 * 60));
+                        
+                        if (hoursUntil > 24) {
+                          const daysUntil = Math.floor(hoursUntil / 24);
+                          displayText = `In ${daysUntil}d ${hoursUntil % 24}h`;
+                        } else if (hoursUntil > 0) {
+                          displayText = `In ${hoursUntil}h ${minutesUntil}m`;
+                        } else {
+                          displayText = `In ${minutesUntil}m`;
+                        }
+                        progressPercent = 0;
+                      } else if (now >= meetingStart && now <= meetingEnd) {
+                        // Meeting is in progress
+                        const elapsed = now - meetingStart;
+                        progressPercent = Math.min(100, (elapsed / totalDuration) * 100);
+                        displayText = `${Math.round(progressPercent)}% complete`;
+                      } else {
+                        // Meeting has passed
+                        progressPercent = 100;
+                        displayText = 'Completed';
+                      }
+                      
+                      return (
+                        <View style={tw`flex-row items-center`}>
+                          {/* Progress Bar */}
+                          <View style={[tw`flex-1 bg-gray-200 rounded-full`, { height: verticalScale(3.75), marginRight: horizontalScale(7.5) }]}>
+                            <View 
+                              style={[
+                                tw`bg-[#A3CB31] rounded-full h-full`,
+                                { width: `${progressPercent}%` }
+                              ]}
+                            />
+                          </View>
+                          {/* Time Text */}
+                          <Text style={[tw`text-grey font-dm`, { fontSize: moderateScale(9), minWidth: horizontalScale(52.5) }]} numberOfLines={1}>
+                            {displayText}
+                          </Text>
+                        </View>
+                      );
+                    })()}
+                  </View>
                 </>
               ) : (
-                <Text style={[tw`text-grey font-dm text-center`, { fontSize: moderateScale(13) }]}>
-                  No Upcoming Appointment
-                </Text>
+                <View style={[tw`justify-center items-center`, { height: '100%', padding: moderateScale(9.375) }]}>
+                  <Text style={[tw`text-grey font-dm text-center`, { fontSize: moderateScale(13) }]}>
+                    No Upcoming Appointment
+                  </Text>
+                </View>
               )}
             </View>
           </View>
 
           {/* Heavy Traffic Card - flex: 3 */}
           <View style={{ marginBottom: verticalScale(7.5), height: verticalScale(90) }}>
-            <View style={[tw`bg-black rounded-2xl flex-row items-center justify-between`, { padding: moderateScale(9.375), flex: 1 }]}>
+            <View style={[tw`bg-black rounded-2xl flex-row items-center justify-between`, { paddingHorizontal: moderateScale(18), paddingVertical: moderateScale(9.375), flex: 1 }]}>
               <View style={tw`flex-1`}>
                 <Text style={[tw`text-white font-dm`, { fontSize: moderateScale(11.25), marginBottom: verticalScale(1.875) }]}>Heavy traffic</Text>
                 <Text style={[tw`text-white font-bold font-dm`, { fontSize: moderateScale(22.5), marginBottom: verticalScale(1.875) }]}>1.2 km away</Text>

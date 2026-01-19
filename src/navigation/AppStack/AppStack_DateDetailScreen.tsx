@@ -343,6 +343,15 @@ const AppStack_DateDetailScreen: React.FC<Props> = ({ navigation, route }) => {
         approved: true,
       });
 
+      // Schedule a reminder notification 30 minutes before the meeting
+      try {
+        const { scheduleMeetingReminder } = await import('~/services/notificationService');
+        await scheduleMeetingReminder(selectedRequest, user.id);
+      } catch (reminderError) {
+        console.error('Error scheduling meeting reminder:', reminderError);
+        // Don't block the acceptance if reminder scheduling fails
+      }
+
       // Refresh moment requests
       await fetchMomentRequests();
 
@@ -1260,7 +1269,7 @@ const AppStack_DateDetailScreen: React.FC<Props> = ({ navigation, route }) => {
       rows.push(
         <View key={hour} style={[tw`relative`, { height: verticalScale(75) }]}>
           {/* Base structure (relative positioning) */}
-          <View style={tw`flex-row`}>
+          <View style={[tw`flex-row`, { zIndex: 1 }]}>
             <Text style={[tw`text-black font-bold font-dm`, { fontSize: moderateScale(15), width: horizontalScale(60), marginTop: -verticalScale(11.25) }]}>
               {hourTime}
             </Text>
@@ -1271,7 +1280,7 @@ const AppStack_DateDetailScreen: React.FC<Props> = ({ navigation, route }) => {
 
           {/* Meeting blocks (absolute positioning, overlay on top) */}
           {hourMeetings.length > 0 && (
-            <View style={[tw`absolute top-0 right-0 z-2`, { left: horizontalScale(60), height: verticalScale(75) }]}>
+            <View style={[tw`absolute top-0 right-0`, { left: horizontalScale(60), height: verticalScale(75), zIndex: 10 }]}>
               {hourMeetings.map((request, idx) => {
                 const start = new Date(request.startTime);
                 const end = new Date(request.endTime);

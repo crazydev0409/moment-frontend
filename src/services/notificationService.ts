@@ -186,6 +186,12 @@ export function setupNotificationResponseHandler(
       navigateToMeetingDate(data);
       // Trigger refresh - app will refresh when navigated
     }
+    // Handle meeting reminder notifications
+    else if (eventType === 'meeting.reminder') {
+      console.log('⏰ Meeting reminder notification tapped:', data.momentRequestId);
+      navigateToMeetingDate(data);
+      // Trigger refresh - app will refresh when navigated
+    }
   });
 }
 
@@ -273,6 +279,135 @@ export function setupNotificationReceivedHandler(
     });
     onNotificationReceived(notification);
   });
+}
+
+// Schedule a reminder notification 30 minutes before a confirmed meeting
+export async function scheduleMeetingReminder(meeting: {
+  id: string;
+  title?: string;
+  notes?: string;
+  startTime: string;
+  endTime: string;
+  sender?: { id: string; name?: string; phoneNumber?: string };
+  receiver?: { id: string; name?: string; phoneNumber?: string };
+  senderId: string;
+  receiverId: string;
+}, currentUserId: string) {
+  try {
+    // Check if permission is granted
+    const { status } = await Notifications.getPermissionsAsync();
+    if (status !== 'granted') {
+      console.log('Cannot schedule reminder: permission not granted');
+      return;
+    }
+
+    const startTime = new Date(meeting.startTime);
+    const now = new Date();
+    
+    // Calculate time 30 minutes before meeting
+    const reminderTime = new Date(startTime.getTime() - 30 * 60 * 1000);
+    
+    // Only schedule if reminder time is in the future
+    if (reminderTime <= now) {
+      console.log('Meeting is too soon, not scheduling reminder');
+      return;
+    }
+
+    // Determine the other person's name
+    const isCurrentUserSender = meeting.senderId === currentUserId;
+    const otherPerson = isCurrentUserSender 
+      ? (meeting.receiver?.name || meeting.receiver?.phoneNumber || 'Someone')
+      : (meeting.sender?.name || meeting.sender?.phoneNumber || 'Someone');
+
+    const meetingTitle = meeting.title || meeting.notes || 'Meeting';
+
+    // Format time
+    const timeString = startTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+
+    // Calculate seconds until reminder
+    const secondsUntilReminder = Math.floor((reminderTime.getTime() - now.getTime()) / 1000);
+
+    // Schedule the reminder
+    await Notifications.scheduleNotificationAsync({
+      content: {
+        title: '⏰ Meeting Reminder',
+        body: `Your meeting "${meetingTitle}" with ${otherPerson} starts at ${timeString}`,
+        data: {
+          eventType: 'meeting.reminder',
+          momentRequestId: meeting.id,
+          startTime: meeting.startTime,
+          endTime: meeting.endTime,
+        },
+        sound: true,
+      },
+      trigger: {
+        type: Notifications.SchedulableTriggerInputTypes.TIME_INTERVAL,
+        seconds: secondsUntilReminder,
+        repeats: false,
+      },
+      identifier: `meeting-reminder-${meeting.id}`,
+    });
+
+    console.log(`✅ Scheduled reminder for meeting ${meeting.id} at ${reminderTime.toLocaleString()}`);
+  } catch (error: any) {
+    console.error('Failed to schedule meeting reminder:', error.message);
+  }
+}
+
+// Cancel a scheduled meeting reminder
+export async function cancelMeetingReminder(meetingId: string) {
+  try {
+    await Notifications.cancelScheduledNotificationAsync(`meeting-reminder-${meetingId}`);
+    console.log(`🚫 Canceled reminder for meeting ${meetingId}`);
+  } catch (error: any) {
+    console.error('Failed to cancel meeting reminder:', error.message);
+  }
+}
+
+// Schedule reminders for all upcoming confirmed meetings
+export async function scheduleAllMeetingReminders(currentUserId: string) {
+  try {
+    // Check if permission is granted
+    const { status } = await Notifications.getPermissionsAsync();
+    if (status !== 'granted') {
+      console.log('Cannot schedule reminders: permission not granted');
+      return;
+    }
+
+    // Fetch all confirmed meetings (both sent and received)
+    const [receivedRes, sentRes] = await Promise.all([
+      http.get('/users/moment-requests/received'),
+      http.get('/users/moment-requests/sent'),
+    ]);
+
+    const allMeetings = [
+      ...(receivedRes.data.requests || []),
+      ...(sentRes.data.requests || []),
+    ];
+
+    // Filter for approved meetings in the future
+    const now = new Date();
+    const upcomingConfirmedMeetings = allMeetings.filter((meeting: any) => {
+      const meetingStart = new Date(meeting.startTime);
+      return meeting.status === 'approved' && meetingStart > now;
+    });
+
+    if (upcomingConfirmedMeetings.length === 0) {
+      console.log('No upcoming confirmed meetings to schedule reminders for');
+      return;
+    }
+
+    console.log(`📅 Scheduling reminders for ${upcomingConfirmedMeetings.length} upcoming meeting(s)...`);
+
+    // Schedule reminder for each meeting
+    for (const meeting of upcomingConfirmedMeetings) {
+      await scheduleMeetingReminder(meeting, currentUserId);
+    }
+
+    console.log(`✅ Scheduled ${upcomingConfirmedMeetings.length} meeting reminder(s)`);
+  } catch (error: any) {
+    console.error('Failed to schedule meeting reminders:', error.message);
+  }
 }
 
 // Fetch and display pending moment requests as notifications

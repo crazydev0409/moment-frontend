@@ -55,6 +55,9 @@ export default function App() {
 
           // Show pending moment requests as notifications
           await showPendingRequests();
+
+          // Schedule reminders for upcoming confirmed meetings
+          await scheduleUpcomingMeetingReminders();
         } else {
           // No device registration, check for existing access token
           const accessToken = await AsyncStorage.getItem('accessToken');
@@ -73,6 +76,9 @@ export default function App() {
 
             // Show pending moment requests as notifications
             await showPendingRequests();
+
+            // Schedule reminders for upcoming confirmed meetings
+            await scheduleUpcomingMeetingReminders();
           } else {
             // Disconnect Socket.IO if user is not authenticated
             disconnectSocket();
@@ -225,6 +231,18 @@ export default function App() {
         await showPendingMomentRequestNotifications();
       } catch (error) {
         console.error('Error showing pending moment requests:', error);
+        // Don't block app initialization if this fails
+      }
+    };
+
+    // Schedule reminders for all upcoming confirmed meetings
+    const scheduleUpcomingMeetingReminders = async () => {
+      try {
+        if (!__) return; // No user logged in
+        const { scheduleAllMeetingReminders } = await import('./src/services/notificationService');
+        await scheduleAllMeetingReminders(__.id);
+      } catch (error) {
+        console.error('Error scheduling meeting reminders:', error);
         // Don't block app initialization if this fails
       }
     };

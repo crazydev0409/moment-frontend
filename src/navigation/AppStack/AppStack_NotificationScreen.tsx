@@ -109,8 +109,8 @@ const AppStack_NotificationScreen: React.FC<Props> = ({ navigation }) => {
           momentRequestId: data.momentRequestId
         });
         console.log('📬 Navigating to DateDetailScreen with momentRequestId:', data.momentRequestId);
-      } else if (data.momentRequestId) {
-        // For other moment request events, also navigate but modal may not open
+      } else if (data.momentRequestId || data.startTime) {
+        // For other moment request events (including reminders), also navigate to correct date
         let dateParam: string;
         if (data.startTime) {
           const meetingDate = new Date(data.startTime);
@@ -126,6 +126,7 @@ const AppStack_NotificationScreen: React.FC<Props> = ({ navigation }) => {
           date: dateParam,
           momentRequestId: data.momentRequestId
         });
+        console.log('📬 Navigating to DateDetailScreen:', { date: dateParam, momentRequestId: data.momentRequestId });
       }
     }
   };
@@ -158,6 +159,8 @@ const AppStack_NotificationScreen: React.FC<Props> = ({ navigation }) => {
         return <Text style={{ fontSize: moderateScale(22.5) }}>🚫</Text>;
       case 'moment_request_rescheduled':
         return <Text style={{ fontSize: moderateScale(22.5) }}>🔄</Text>;
+      case 'meeting_reminder':
+        return <Text style={{ fontSize: moderateScale(22.5) }}>⏰</Text>;
       default:
         return <Image source={BellRinging} style={{ width: moderateScale(22.5), height: moderateScale(22.5) }} resizeMode="contain" />;
     }
