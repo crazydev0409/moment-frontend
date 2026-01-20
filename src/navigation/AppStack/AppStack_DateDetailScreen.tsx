@@ -2034,7 +2034,26 @@ const AppStack_DateDetailScreen: React.FC<Props> = ({ navigation, route }) => {
                         <View style={[tw`flex-row justify-between items-center`, { marginBottom: verticalScale(22.5) }]}>
                           <View style={tw`flex-1`}>
                             <Text style={[tw`font-bold font-dm text-black`, { fontSize: moderateScale(22.5), marginBottom: verticalScale(7.5) }]}>
-                              {selectedRequest.title || selectedRequest.notes || 'Meeting'}
+                              {(() => {
+                                const title = selectedRequest.title || selectedRequest.notes || 'Meeting';
+                                const otherPersonName = selectedRequest.senderId === user.id
+                                  ? selectedRequest.receiver?.name
+                                  : selectedRequest.sender?.name;
+                                
+                                // Replace any contact name in title with the correct one from viewer's perspective
+                                // Match both old "Meeting with" and new "# catch" formats
+                                const titlePattern = /(.+):\s*(?:#\s*catch|Meeting\s+with)\s+(.+)/i;
+                                const match = title.match(titlePattern);
+                                
+                                if (match && otherPersonName) {
+                                  // Title has format "Duration: Meeting with/# catch Name"
+                                  // Always display as "# catch {correct contact name}"
+                                  const meetingType = match[1];
+                                  return `${meetingType}: # catch ${otherPersonName}`;
+                                }
+                                
+                                return title;
+                              })()}
                             </Text>
                             <View style={tw`flex-row items-center`}>
                               {selectedRequest.status === 'pending' && (
@@ -2134,7 +2153,23 @@ const AppStack_DateDetailScreen: React.FC<Props> = ({ navigation, route }) => {
                           <View style={{ marginBottom: verticalScale(22.5) }}>
                             <Text style={[tw`font-dm text-grey`, { fontSize: moderateScale(13.125), marginBottom: verticalScale(7.5) }]}>Description</Text>
                             <Text style={[tw`font-dm text-black leading-5`, { fontSize: moderateScale(15) }]}>
-                              {selectedRequest.notes}
+                              {(() => {
+                                const notes = selectedRequest.notes || '';
+                                const otherPersonName = selectedRequest.senderId === user.id
+                                  ? selectedRequest.receiver?.name
+                                  : selectedRequest.sender?.name;
+                                
+                                // Replace any contact name in description with the correct one from viewer's perspective
+                                // Match both old "Meeting with" and new "# catch" formats
+                                const descPattern = /(?:Meeting\s+with|#\s*catch)\s+(.+)/i;
+                                
+                                if (otherPersonName && descPattern.test(notes)) {
+                                  // Replace with "# catch {correct contact name}"
+                                  return notes.replace(descPattern, `# catch ${otherPersonName}`);
+                                }
+                                
+                                return notes;
+                              })()}
                             </Text>
                           </View>
                         )}
