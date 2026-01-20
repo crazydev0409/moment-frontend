@@ -88,46 +88,68 @@ const AppStack_NotificationScreen: React.FC<Props> = ({ navigation }) => {
     if (notification.data) {
       const data = typeof notification.data === 'string' ? JSON.parse(notification.data) : notification.data;
       const eventType = data.eventType || notification.type;
+      
+      console.log('📬 Notification pressed:', { eventType, data });
 
-      // For moment request created, navigate to DateDetailScreen with momentRequestId
-      if (eventType === 'moment.request.created' && data.momentRequestId) {
-        // Extract date from startTime if available
-        let dateParam: string;
-        if (data.startTime) {
-          const meetingDate = new Date(data.startTime);
-          const year = meetingDate.getFullYear();
-          const month = String(meetingDate.getMonth() + 1).padStart(2, '0');
-          const day = String(meetingDate.getDate()).padStart(2, '0');
-          dateParam = `${year}-${month}-${day}`;
-        } else {
+      let dateParam: string;
+      
+      // If notification has startTime in data, use it directly
+      if (data.startTime) {
+        const meetingDate = new Date(data.startTime);
+        const year = meetingDate.getFullYear();
+        const month = String(meetingDate.getMonth() + 1).padStart(2, '0');
+        const day = String(meetingDate.getDate()).padStart(2, '0');
+        dateParam = `${year}-${month}-${day}`;
+        console.log('📅 Extracted date from startTime:', { startTime: data.startTime, dateParam });
+      } 
+      // If no startTime but we have momentRequestId, fetch the meeting to get the date
+      else if (data.momentRequestId) {
+        console.log('📅 No startTime in notification, fetching meeting details for:', data.momentRequestId);
+        
+        try {
+          // Fetch both received and sent requests to find the meeting
+          const [receivedRes, sentRes] = await Promise.all([
+            http.get('/users/moment-requests/received'),
+            http.get('/users/moment-requests/sent'),
+          ]);
+
+          const allRequests = [
+            ...(receivedRes.data.requests || []),
+            ...(sentRes.data.requests || []),
+          ];
+
+          // Find the specific meeting
+          const meeting = allRequests.find((req: any) => req.id === data.momentRequestId);
+          
+          if (meeting && meeting.startTime) {
+            const meetingDate = new Date(meeting.startTime);
+            const year = meetingDate.getFullYear();
+            const month = String(meetingDate.getMonth() + 1).padStart(2, '0');
+            const day = String(meetingDate.getDate()).padStart(2, '0');
+            dateParam = `${year}-${month}-${day}`;
+            console.log('📅 Fetched meeting date:', { startTime: meeting.startTime, dateParam });
+          } else {
+            console.warn('📅 Meeting not found or has no startTime, using today');
+            dateParam = new Date().toISOString().split('T')[0];
+          }
+        } catch (error) {
+          console.error('📅 Error fetching meeting details:', error);
           dateParam = new Date().toISOString().split('T')[0];
         }
-
-        // Navigate to date detail screen with momentRequestId to auto-open modal
-        navigation.navigate('AppStack_DateDetailScreen', {
-          date: dateParam,
-          momentRequestId: data.momentRequestId
-        });
-        console.log('📬 Navigating to DateDetailScreen with momentRequestId:', data.momentRequestId);
-      } else if (data.momentRequestId || data.startTime) {
-        // For other moment request events (including reminders), also navigate to correct date
-        let dateParam: string;
-        if (data.startTime) {
-          const meetingDate = new Date(data.startTime);
-          const year = meetingDate.getFullYear();
-          const month = String(meetingDate.getMonth() + 1).padStart(2, '0');
-          const day = String(meetingDate.getDate()).padStart(2, '0');
-          dateParam = `${year}-${month}-${day}`;
-        } else {
-          dateParam = new Date().toISOString().split('T')[0];
-        }
-
-        navigation.navigate('AppStack_DateDetailScreen', {
-          date: dateParam,
-          momentRequestId: data.momentRequestId
-        });
-        console.log('📬 Navigating to DateDetailScreen:', { date: dateParam, momentRequestId: data.momentRequestId });
+      } 
+      // Fallback to today if no date info available
+      else {
+        dateParam = new Date().toISOString().split('T')[0];
+        console.log('📅 No date info available, using today:', dateParam);
       }
+
+      // Navigate to DateDetailScreen with the date and momentRequestId
+      console.log('🚀 Navigating to DateDetailScreen with:', { date: dateParam, momentRequestId: data.momentRequestId });
+      
+      navigation.navigate('AppStack_DateDetailScreen', {
+        date: dateParam,
+        momentRequestId: data.momentRequestId
+      });
     }
   };
 

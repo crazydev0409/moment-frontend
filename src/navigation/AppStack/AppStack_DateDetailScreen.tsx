@@ -87,14 +87,36 @@ const AppStack_DateDetailScreen: React.FC<Props> = ({ navigation, route }) => {
   const [user, setUser] = useAtom(userAtom);
 
   // Get the selected date and contact from route params
-  const selectedDateParam = route.params?.date || new Date().toISOString().split('T')[0];
   const routeContact = route.params?.contact;
   const routeMomentRequestId = route.params?.momentRequestId;
-  const [selectedDate, setSelectedDate] = useState(selectedDateParam);
+  const [selectedDate, setSelectedDate] = useState(route.params?.date || new Date().toISOString().split('T')[0]);
   const [availabilityView, setAvailabilityView] = useState<'scheduled' | 'full'>('scheduled');
 
   // Selected contact from route or state
   const [selectedContact, setSelectedContact] = useState<Contact | null>(routeContact || null);
+
+  // Update selectedDate when route params change (e.g., from notification navigation)
+  // This handles both initial load and subsequent navigation with different dates
+  useEffect(() => {
+    const paramDate = route.params?.date;
+    console.log('📅 [UseEffect] Route params changed:', { paramDate, currentSelectedDate: selectedDate });
+    
+    if (paramDate && paramDate !== selectedDate) {
+      console.log('📅 [UseEffect] Updating selectedDate from', selectedDate, 'to', paramDate);
+      setSelectedDate(paramDate);
+    }
+  }, [route.params?.date, route.params?.momentRequestId, selectedDate]); // Also watch momentRequestId to ensure update on notification click
+  
+  // Additional listener for navigation focus events to ensure date updates even when screen is already mounted
+  useFocusEffect(
+    useCallback(() => {
+      const paramDate = route.params?.date;
+      if (paramDate) {
+        console.log('📅 [Focus Effect] Setting selectedDate from route params:', paramDate);
+        setSelectedDate(paramDate);
+      }
+    }, [route.params?.date])
+  );
   const [appointmentTitle, setAppointmentTitle] = useState('30 Minute Meeting');
   const [appointmentTime, setAppointmentTime] = useState('');
   const [appointmentDuration, setAppointmentDuration] = useState('30 min');
@@ -725,11 +747,11 @@ const AppStack_DateDetailScreen: React.FC<Props> = ({ navigation, route }) => {
   useEffect(() => {
     if (routeMomentRequestId && momentRequests.length > 0) {
       const request = momentRequests.find(r => r.id === routeMomentRequestId);
-      if (request && request.status === 'pending' && request.receiverId === user?.id) {
-        // Only auto-open if user is the receiver and request is pending
+      if (request) {
+        // Auto-open modal for any meeting (pending, approved, etc.) when coming from notification
         setSelectedRequest(request);
         setShowRequestModal(true);
-        console.log('📬 Auto-opening moment request modal for:', routeMomentRequestId);
+        console.log('📬 Auto-opening moment request modal for:', routeMomentRequestId, 'Status:', request.status);
         // Animate modal in
         Animated.parallel([
           Animated.timing(requestModalSlideAnim, {
@@ -1328,10 +1350,10 @@ const AppStack_DateDetailScreen: React.FC<Props> = ({ navigation, route }) => {
                     >
                       {(() => {
                         const title = request.title || request.notes || 'Meeting';
-                        const otherPersonName = request.sender?.id === user?.id
+                        const otherPersonName = request.senderId === user?.id
                           ? request.receiver?.name
                           : request.sender?.name;
-                        
+                     
                         // Replace any contact name in title with the correct one from viewer's perspective
                         // Match both old "Meeting with" and new "# catch" formats
                         const titlePattern = /(.+):\s*(?:#\s*catch|Meeting\s+with)\s+(.+)/i;
