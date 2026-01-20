@@ -97,6 +97,7 @@ const AppStack_DateDetailScreen: React.FC<Props> = ({ navigation, route }) => {
 
   // Update selectedDate when route params change (e.g., from notification navigation)
   // This handles both initial load and subsequent navigation with different dates
+  // We only update when route.params.date actually changes, not on every focus
   useEffect(() => {
     const paramDate = route.params?.date;
     console.log('📅 [UseEffect] Route params changed:', { paramDate, currentSelectedDate: selectedDate });
@@ -105,18 +106,7 @@ const AppStack_DateDetailScreen: React.FC<Props> = ({ navigation, route }) => {
       console.log('📅 [UseEffect] Updating selectedDate from', selectedDate, 'to', paramDate);
       setSelectedDate(paramDate);
     }
-  }, [route.params?.date, route.params?.momentRequestId, selectedDate]); // Also watch momentRequestId to ensure update on notification click
-  
-  // Additional listener for navigation focus events to ensure date updates even when screen is already mounted
-  useFocusEffect(
-    useCallback(() => {
-      const paramDate = route.params?.date;
-      if (paramDate) {
-        console.log('📅 [Focus Effect] Setting selectedDate from route params:', paramDate);
-        setSelectedDate(paramDate);
-      }
-    }, [route.params?.date])
-  );
+  }, [route.params?.date, route.params?.momentRequestId]); // Only watch route params, not selectedDate to avoid loops
   const [appointmentTitle, setAppointmentTitle] = useState('30 Minute Meeting');
   const [appointmentTime, setAppointmentTime] = useState('');
   const [appointmentDuration, setAppointmentDuration] = useState('30 min');

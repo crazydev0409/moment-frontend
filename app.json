@@ -42,7 +42,7 @@
     "splash": {
       "image": "./assets/splash.png",
       "resizeMode": "contain",
-      "backgroundColor": "#ffffff"
+      "backgroundColor": "#A3CB31"
     },
     "assetBundlePatterns": [
       "**/*"
@@ -60,7 +60,7 @@
     "android": {
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/logo.png",
-        "backgroundColor": "#ffffff"
+        "backgroundColor": "#A3CB31"
       },
       "permissions": [
         "ACCESS_COARSE_LOCATION",
