@@ -283,13 +283,15 @@ const AppStack_SearchScreen: React.FC<Props> = ({ navigation, route }) => {
                                 : meeting.sender?.name;
                               
                               // Replace any contact name in title with the correct one from viewer's perspective
-                              const titlePattern = /(.+):\s*Meeting with\s+(.+)/i;
+                              // Match both old "Meeting with" and new "# catch" formats
+                              const titlePattern = /(.+):\s*(?:#\s*catch|Meeting\s+with)\s+(.+)/i;
                               const match = title.match(titlePattern);
                               
                               if (match) {
-                                // Title has format "Duration: Meeting with Name"
+                                // Title has format "Duration: Meeting with/# catch Name"
+                                // Always display as "# catch {correct contact name}"
                                 const meetingType = match[1];
-                                return `${meetingType}: Meeting with ${otherPersonName}`;
+                                return `${meetingType}: # catch ${otherPersonName}`;
                               }
                               
                               return title;

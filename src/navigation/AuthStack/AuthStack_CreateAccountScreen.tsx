@@ -47,7 +47,7 @@ const AuthStack_CreateAccountScreen: React.FC<Props> = ({ navigation, route }) =
         <View style={tw`flex-row justify-around`}>
           {/* Privacy Policy */}
           <TouchableOpacity
-            onPress={() => Linking.openURL("https://your-privacy-policy-url.com")}
+            onPress={() => Linking.openURL("https://github.com/crazydev0409/catch-policy")}
             style={{ marginRight: horizontalScale(37.5) }}
           >
             <Text style={[tw`underline text-black font-semibold`, { fontSize: moderateScale(13) }]}>
@@ -57,7 +57,7 @@ const AuthStack_CreateAccountScreen: React.FC<Props> = ({ navigation, route }) =
 
           {/* Terms & Conditions */}
           <TouchableOpacity
-            onPress={() => Linking.openURL("https://your-terms-url.com")}
+            onPress={() => Linking.openURL("https://github.com/crazydev0409/catch-policy")}
           >
             <Text style={[tw`underline text-black font-semibold`, { fontSize: moderateScale(13) }]}>
               Terms & Conditions

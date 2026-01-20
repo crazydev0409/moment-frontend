@@ -769,7 +769,8 @@ const AppStack_HomePageScreen: React.FC<Props> = ({ navigation, route }) => {
                         const title = upcomingMeeting.title || upcomingMeeting.notes || 'Untitled Meeting';
                         
                         // Extract just the meeting type/duration part
-                        const titlePattern = /(.+):\s*Meeting with\s+(.+)/i;
+                        // Match both old "Meeting with" and new "# catch" formats
+                        const titlePattern = /(.+):\s*(?:#\s*catch|Meeting\s+with)\s+(.+)/i;
                         const match = title.match(titlePattern);
                         
                         if (match) {
@@ -781,13 +782,13 @@ const AppStack_HomePageScreen: React.FC<Props> = ({ navigation, route }) => {
                       })()}
                     </Text>
                     
-                    {/* Line 2: Meeting with Contact - BIGGER */}
+                    {/* Line 2: # catch Contact - BIGGER */}
                     <Text 
                       style={[tw`text-black font-bold font-dm`, { fontSize: moderateScale(13), marginBottom: verticalScale(5) }]} 
                       numberOfLines={1}
                       ellipsizeMode="tail"
                     >
-                      Meeting with {upcomingMeeting.sender?.id === userId
+                      # catch {upcomingMeeting.sender?.id === userId
                         ? upcomingMeeting.receiver?.name
                         : upcomingMeeting.sender?.name}
                     </Text>
@@ -1056,13 +1057,15 @@ const AppStack_HomePageScreen: React.FC<Props> = ({ navigation, route }) => {
                             : meeting.sender?.name;
                           
                           // Replace any contact name in title with the correct one from viewer's perspective
-                          const titlePattern = /(.+):\s*Meeting with\s+(.+)/i;
+                          // Match both old "Meeting with" and new "# catch" formats
+                          const titlePattern = /(.+):\s*(?:#\s*catch|Meeting\s+with)\s+(.+)/i;
                           const match = title.match(titlePattern);
                           
                           if (match) {
-                            // Title has format "Duration: Meeting with Name"
+                            // Title has format "Duration: Meeting with/# catch Name"
+                            // Always display as "# catch {correct contact name}"
                             const meetingType = match[1];
-                            return `${meetingType}: Meeting with ${otherPersonName}`;
+                            return `${meetingType}: # catch ${otherPersonName}`;
                           }
                           
                           return title;
