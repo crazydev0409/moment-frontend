@@ -1280,8 +1280,16 @@ const AppStack_DateDetailScreen: React.FC<Props> = ({ navigation, route }) => {
 
       rows.push(
         <View key={hour} style={[tw`relative`, { height: verticalScale(75) }]}>
-          {/* Base structure (relative positioning) - MUST be below meeting blocks */}
-          <View style={[tw`flex-row`, { zIndex: 0 }]}>
+          {/* Hour label and bar - Using absolute positioning to avoid z-index issues */}
+          <View 
+            style={[
+              tw`absolute top-0 left-0 right-0 flex-row`,
+              { 
+                zIndex: 1,
+                pointerEvents: 'none' // Don't block touches to meeting blocks
+              }
+            ]}
+          >
             <Text style={[tw`text-black font-bold font-dm`, { fontSize: moderateScale(15), width: horizontalScale(60), marginTop: -verticalScale(11.25) }]}>
               {hourTime}
             </Text>
@@ -1290,13 +1298,13 @@ const AppStack_DateDetailScreen: React.FC<Props> = ({ navigation, route }) => {
             </View>
           </View>
 
-          {/* Meeting blocks (absolute positioning, overlay on top) - MUST be above hour bars */}
+          {/* Meeting blocks - Rendered AFTER hour bars to ensure they're on top */}
           {hourMeetings.length > 0 && (
             <View style={[tw`absolute top-0 right-0`, { 
               left: horizontalScale(60), 
               height: verticalScale(75), 
-              zIndex: 100,
-              elevation: 100 // Android elevation
+              zIndex: 999,
+              elevation: 999
             }]}>
               {hourMeetings.map((request, idx) => {
                 const start = new Date(request.startTime);
@@ -1327,14 +1335,14 @@ const AppStack_DateDetailScreen: React.FC<Props> = ({ navigation, route }) => {
                       tw`${blockColor} rounded-lg absolute`,
                       {
                         paddingHorizontal: horizontalScale(7.5),
-                        top: `${(top / 80) * 100}%`, // Convert to percentage relative to container height (80px -> 20vw)
-                        height: `${(height / 80) * 100}%`, // Convert to percentage
+                        top: `${(top / 80) * 100}%`,
+                        height: `${(height / 80) * 100}%`,
                         left: `${leftPercent}%`,
                         width: `${blockWidthPercent}%`,
                         justifyContent: 'center',
                         opacity: isPending ? 0.6 : 1,
-                        zIndex: 100, // Ensure meeting blocks are always on top
-                        elevation: 100 // Android elevation
+                        zIndex: 1000,
+                        elevation: 1000
                       }
                     ]}
                     activeOpacity={isPending ? 1 : 0.7}
@@ -1372,17 +1380,17 @@ const AppStack_DateDetailScreen: React.FC<Props> = ({ navigation, route }) => {
             </View>
           )}
 
-          {/* Clickable empty time slots - MUST be below meeting blocks */}
+          {/* Clickable empty time slots - Behind meeting blocks */}
           {!isTimeSlotOccupied(hour, 0, allRequests) && (
             <TouchableOpacity
-              style={[tw`absolute`, { top: 0, left: '16%', right: 0, height: '50%', zIndex: 5 }]}
+              style={[tw`absolute`, { top: 0, left: '16%', right: 0, height: '50%', zIndex: 50 }]}
               activeOpacity={0.3}
               onPress={() => handleTimeSlotClick(hour, 0)}
             />
           )}
           {!isTimeSlotOccupied(hour, 30, allRequests) && (
             <TouchableOpacity
-              style={[tw`absolute`, { top: '50%', left: '16%', right: 0, height: '50%', zIndex: 5 }]}
+              style={[tw`absolute`, { top: '50%', left: '16%', right: 0, height: '50%', zIndex: 50 }]}
               activeOpacity={0.3}
               onPress={() => handleTimeSlotClick(hour, 30)}
             />
@@ -1451,8 +1459,16 @@ const AppStack_DateDetailScreen: React.FC<Props> = ({ navigation, route }) => {
 
         rows.push(
           <View key={hour} style={[tw`relative`, { height: verticalScale(75) }]}>
-            {/* Base structure - MUST be below availability blocks */}
-            <View style={[tw`flex-row`, { zIndex: 0 }]}>
+            {/* Hour label and bar - Using absolute positioning with pointerEvents none */}
+            <View 
+              style={[
+                tw`absolute top-0 left-0 right-0 flex-row`,
+                { 
+                  zIndex: 1,
+                  pointerEvents: 'none'
+                }
+              ]}
+            >
               <Text style={[tw`text-black font-bold font-dm`, { fontSize: moderateScale(15), width: horizontalScale(60), marginTop: -verticalScale(11.25) }]}>
                 {hourTime}
               </Text>
@@ -1461,9 +1477,9 @@ const AppStack_DateDetailScreen: React.FC<Props> = ({ navigation, route }) => {
               </View>
             </View>
 
-            {/* Contact availability blocks (left, absolute) - MUST be above hour bars */}
+            {/* Contact availability blocks - Rendered AFTER hour bars */}
             {contactHourGaps.length > 0 && (
-              <View style={[tw`absolute top-0`, { left: '16%', width: '45%', height: '100%', zIndex: 100, elevation: 100 }]}>
+              <View style={[tw`absolute top-0`, { left: '16%', width: '45%', height: '100%', zIndex: 999, elevation: 999 }]}>
                 {contactHourGaps.map((gap, idx) => {
                   const startMin = gap.start.getMinutes();
                   const top = startMin === 30 ? 50 : 0; // percentage
@@ -1483,9 +1499,9 @@ const AppStack_DateDetailScreen: React.FC<Props> = ({ navigation, route }) => {
               </View>
             )}
 
-            {/* User availability blocks (right, absolute) - MUST be above hour bars */}
+            {/* User availability blocks - Rendered AFTER hour bars */}
             {userHourGaps.length > 0 && (
-              <View style={[tw`absolute top-0`, { right: 0, width: '45%', height: '100%', zIndex: 100, elevation: 100 }]}>
+              <View style={[tw`absolute top-0`, { right: 0, width: '45%', height: '100%', zIndex: 999, elevation: 999 }]}>
                 {userHourGaps.map((gap, idx) => {
                   const startMin = gap.start.getMinutes();
                   const top = startMin === 30 ? 50 : 0; // percentage
@@ -1568,8 +1584,16 @@ const AppStack_DateDetailScreen: React.FC<Props> = ({ navigation, route }) => {
 
         rows.push(
           <View key={hour} style={[tw`relative`, { height: verticalScale(75) }]}>
-            {/* Base structure - MUST be below availability blocks */}
-            <View style={[tw`flex-row`, { zIndex: 0 }]}>
+            {/* Hour label and bar - Using absolute positioning with pointerEvents none */}
+            <View 
+              style={[
+                tw`absolute top-0 left-0 right-0 flex-row`,
+                { 
+                  zIndex: 1,
+                  pointerEvents: 'none'
+                }
+              ]}
+            >
               <Text style={[tw`text-black font-bold font-dm`, { fontSize: moderateScale(15), width: horizontalScale(60), marginTop: -verticalScale(11.25) }]}>
                 {hourTime}
               </Text>
@@ -1578,9 +1602,9 @@ const AppStack_DateDetailScreen: React.FC<Props> = ({ navigation, route }) => {
               </View>
             </View>
 
-            {/* Availability blocks (absolute) - MUST be above hour bars */}
+            {/* Availability blocks - Rendered AFTER hour bars */}
             {hourGaps.length > 0 && (
-              <View style={[tw`absolute top-0 right-0`, { left: '16%', height: '100%', zIndex: 100, elevation: 100 }]}>
+              <View style={[tw`absolute top-0 right-0`, { left: '16%', height: '100%', zIndex: 999, elevation: 999 }]}>
                 {hourGaps.map((gap, idx) => {
                   const startMin = gap.start.getMinutes();
                   const top = startMin === 30 ? 50 : 0; // percentage
