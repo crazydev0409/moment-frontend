@@ -7,7 +7,10 @@
     "development": {
       "node": "20.18.0",
       "developmentClient": true,
-      "distribution": "internal"
+      "distribution": "internal",
+      "ios": {
+        "image": "latest"
+      }
     },
     "preview": {
       "node": "20.18.0",
@@ -16,7 +19,8 @@
         "buildType": "apk"
       },
       "ios": {
-        "simulator": false
+        "simulator": false,
+        "image": "latest"
       }
     },
     "preview-simulator": {
@@ -38,7 +42,8 @@
       },
       "ios": {
         "simulator": false,
-        "autoIncrement": true
+        "autoIncrement": true,
+        "image": "latest"
       }
     }
   },
