@@ -788,7 +788,7 @@ const AppStack_HomePageScreen: React.FC<Props> = ({ navigation, route }) => {
                       numberOfLines={1}
                       ellipsizeMode="tail"
                     >
-                      # catch {upcomingMeeting.sender?.id === userId
+                      # catch {upcomingMeeting.senderId === userId
                         ? upcomingMeeting.receiver?.name
                         : upcomingMeeting.sender?.name}
                     </Text>
