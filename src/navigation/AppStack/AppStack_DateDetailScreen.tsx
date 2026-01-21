@@ -1238,7 +1238,6 @@ const AppStack_DateDetailScreen: React.FC<Props> = ({ navigation, route }) => {
   const scheduledViewElements = useMemo(() => {
     if (availabilityView !== 'scheduled') return null;
 
-    const rows = [];
     const [year, month, day] = selectedDate.split('-').map(Number);
     const selectedDateStart = new Date(year, month - 1, day, 0, 0, 0);
     const selectedDateEnd = new Date(year, month - 1, day, 23, 59, 59);
@@ -1254,7 +1253,6 @@ const AppStack_DateDetailScreen: React.FC<Props> = ({ navigation, route }) => {
     if (pendingMeeting) {
       const pendingStart = new Date(pendingMeeting.startTime);
       if (pendingStart >= selectedDateStart && pendingStart <= selectedDateEnd) {
-        // Create a temporary request object for the pending meeting
         const tempRequest: MomentRequest = {
           id: 'pending',
           senderId: '',
@@ -1268,138 +1266,159 @@ const AppStack_DateDetailScreen: React.FC<Props> = ({ navigation, route }) => {
       }
     }
 
-    // Render each hour
+    // LAYER 1: Hour bars and labels (bottom layer)
+    const hourBars = [];
     for (let hour = 0; hour < 24; hour++) {
       const hourTime = `${String(hour).padStart(2, '0')}:00`;
-
-      // Find meetings that START in this hour
-      const hourMeetings = allRequests.filter(request => {
-        const start = new Date(request.startTime);
-        return start.getHours() === hour;
-      });
-
-      rows.push(
-        <View key={hour} style={[tw`relative`, { height: verticalScale(75) }]}>
-          {/* Hour label and bar - Using absolute positioning to avoid z-index issues */}
-          <View 
-            style={[
-              tw`absolute top-0 left-0 right-0 flex-row`,
-              { 
-                zIndex: 1,
-                pointerEvents: 'none' // Don't block touches to meeting blocks
-              }
-            ]}
-          >
-            <Text style={[tw`text-black font-bold font-dm`, { fontSize: moderateScale(15), width: horizontalScale(60), marginTop: -verticalScale(11.25) }]}>
-              {hourTime}
-            </Text>
-            <View style={[tw`flex-1`, { marginLeft: horizontalScale(7.5) }]}>
-              <View style={[tw`bg-gray-300`, { height: verticalScale(1.875) }]} />
-            </View>
+      hourBars.push(
+        <View key={`hour-${hour}`} style={[tw`flex-row`, { height: verticalScale(75) }]}>
+          <Text style={[tw`text-black font-bold font-dm`, { fontSize: moderateScale(15), width: horizontalScale(60), marginTop: -verticalScale(11.25) }]}>
+            {hourTime}
+          </Text>
+          <View style={[tw`flex-1`, { marginLeft: horizontalScale(7.5) }]}>
+            <View style={[tw`bg-gray-300`, { height: verticalScale(1.875) }]} />
           </View>
-
-          {/* Meeting blocks - Rendered AFTER hour bars to ensure they're on top */}
-          {hourMeetings.length > 0 && (
-            <View style={[tw`absolute top-0 right-0`, { 
-              left: horizontalScale(60), 
-              height: verticalScale(75), 
-              zIndex: 999,
-              elevation: 999
-            }]}>
-              {hourMeetings.map((request, idx) => {
-                const start = new Date(request.startTime);
-                const end = new Date(request.endTime);
-                const startMin = start.getMinutes();
-
-                // Position from top
-                const top = startMin === 30 ? 40 : 0;
-
-                // Calculate height based on total meeting duration
-                const durationMinutes = (end.getTime() - start.getTime()) / (1000 * 60);
-                const height = (durationMinutes / 30) * 40; // Each 30-min slot = 40px
-
-                let blockColor = 'bg-gray-400';
-                const isPending = request.id === 'pending';
-                if (isPending) blockColor = 'bg-gray-300'; // Light grey for pending placeholder
-                else if (request.status === 'approved') blockColor = 'bg-green-500';
-                else if (request.status === 'rejected') blockColor = 'bg-red-500';
-
-                // Calculate positioning for side-by-side blocks
-                const totalMeetings = hourMeetings.length;
-                const blockWidthPercent = (100 / totalMeetings) - 0.5; // -0.5% for gap
-                const leftPercent = idx * (100 / totalMeetings);
-                return (
-                  <TouchableOpacity
-                    key={request.id}
-                    style={[
-                      tw`${blockColor} rounded-lg absolute`,
-                      {
-                        paddingHorizontal: horizontalScale(7.5),
-                        top: `${(top / 80) * 100}%`,
-                        height: `${(height / 80) * 100}%`,
-                        left: `${leftPercent}%`,
-                        width: `${blockWidthPercent}%`,
-                        justifyContent: 'center',
-                        opacity: isPending ? 0.6 : 1,
-                        zIndex: 1000,
-                        elevation: 1000
-                      }
-                    ]}
-                    activeOpacity={isPending ? 1 : 0.7}
-                    onPress={() => !isPending && handleRequestBlockPress(request)}
-                    disabled={isPending}
-                  >
-                    <Text
-                      style={[tw`${isPending ? 'text-gray-600' : 'text-white'} font-dm font-semibold`, { fontSize: moderateScale(11.25) }]}
-                      numberOfLines={2}
-                    >
-                      {(() => {
-                        const title = request.title || request.notes || 'Meeting';
-                        const otherPersonName = request.senderId === user?.id
-                          ? request.receiver?.name
-                          : request.sender?.name;
-                     
-                        // Replace any contact name in title with the correct one from viewer's perspective
-                        // Match both old "Meeting with" and new "# catch" formats
-                        const titlePattern = /(.+):\s*(?:#\s*catch|Meeting\s+with)\s+(.+)/i;
-                        const match = title.match(titlePattern);
-                        
-                        if (match) {
-                          // Title has format "Duration: Meeting with/# catch Name"
-                          // Always display as "# catch {correct contact name}"
-                          const meetingType = match[1];
-                          return `${meetingType}: # catch ${otherPersonName}`;
-                        }
-                        
-                        return title;
-                      })()}
-                    </Text>
-                  </TouchableOpacity>
-                );
-              })}
-            </View>
-          )}
-
-          {/* Clickable empty time slots - Behind meeting blocks */}
-          {!isTimeSlotOccupied(hour, 0, allRequests) && (
-            <TouchableOpacity
-              style={[tw`absolute`, { top: 0, left: '16%', right: 0, height: '50%', zIndex: 50 }]}
-              activeOpacity={0.3}
-              onPress={() => handleTimeSlotClick(hour, 0)}
-            />
-          )}
-          {!isTimeSlotOccupied(hour, 30, allRequests) && (
-            <TouchableOpacity
-              style={[tw`absolute`, { top: '50%', left: '16%', right: 0, height: '50%', zIndex: 50 }]}
-              activeOpacity={0.3}
-              onPress={() => handleTimeSlotClick(hour, 30)}
-            />
-          )}
         </View>
       );
     }
-    return rows;
-  }, [availabilityView, selectedDate, momentRequests, pendingMeeting, handleTimeSlotClick, handleRequestBlockPress]);
+
+    // LAYER 2: Meeting blocks (top layer) - separate absolute container
+    const meetingBlocks: JSX.Element[] = [];
+    allRequests.forEach((request) => {
+      const start = new Date(request.startTime);
+      const end = new Date(request.endTime);
+      const hour = start.getHours();
+      const startMin = start.getMinutes();
+
+      // Calculate vertical position
+      const topPosition = hour * verticalScale(75) + (startMin === 30 ? verticalScale(40) : 0);
+
+      // Calculate height
+      const durationMinutes = (end.getTime() - start.getTime()) / (1000 * 60);
+      const blockHeight = (durationMinutes / 30) * verticalScale(40);
+
+      // Find all meetings that start at the same time for side-by-side positioning
+      const simultaneousMeetings = allRequests.filter(r => {
+        const rStart = new Date(r.startTime);
+        return rStart.getHours() === hour && rStart.getMinutes() === startMin;
+      });
+      const meetingIndex = simultaneousMeetings.findIndex(r => r.id === request.id);
+      const totalSimultaneous = simultaneousMeetings.length;
+      const blockWidthPercent = (100 / totalSimultaneous) - 0.5;
+      const leftPercent = meetingIndex * (100 / totalSimultaneous);
+
+      let blockColor = 'bg-gray-400';
+      const isPending = request.id === 'pending';
+      if (isPending) blockColor = 'bg-gray-300';
+      else if (request.status === 'approved') blockColor = 'bg-green-500';
+      else if (request.status === 'rejected') blockColor = 'bg-red-500';
+
+      meetingBlocks.push(
+        <View
+          key={`container-${request.id}`}
+          style={[
+            tw`absolute`,
+            {
+              top: topPosition,
+              left: horizontalScale(60),
+              right: 0,
+              height: blockHeight,
+            }
+          ]}
+          pointerEvents="box-none"
+        >
+          <TouchableOpacity
+            style={[
+              tw`${blockColor} rounded-lg absolute`,
+              {
+                left: `${leftPercent}%`,
+                width: `${blockWidthPercent}%`,
+                height: '100%',
+                paddingHorizontal: horizontalScale(7.5),
+                justifyContent: 'center',
+                opacity: isPending ? 0.6 : 1,
+              }
+            ]}
+            activeOpacity={isPending ? 1 : 0.7}
+            onPress={() => !isPending && handleRequestBlockPress(request)}
+            disabled={isPending}
+          >
+            <Text
+              style={[tw`${isPending ? 'text-gray-600' : 'text-white'} font-dm font-semibold`, { fontSize: moderateScale(11.25) }]}
+              numberOfLines={2}
+            >
+              {(() => {
+                const title = request.title || request.notes || 'Meeting';
+                const otherPersonName = request.senderId === user?.id
+                  ? request.receiver?.name
+                  : request.sender?.name;
+                const titlePattern = /(.+):\s*(?:#\s*catch|Meeting\s+with)\s+(.+)/i;
+                const match = title.match(titlePattern);
+                if (match) {
+                  const meetingType = match[1];
+                  return `${meetingType}: # catch ${otherPersonName}`;
+                }
+                return title;
+              })()}
+            </Text>
+          </TouchableOpacity>
+        </View>
+      );
+    });
+
+    // LAYER 3: Clickable time slots
+    const timeSlots = [];
+    for (let hour = 0; hour < 24; hour++) {
+      if (!isTimeSlotOccupied(hour, 0, allRequests)) {
+        timeSlots.push(
+          <TouchableOpacity
+            key={`slot-${hour}-0`}
+            style={[tw`absolute`, {
+              top: hour * verticalScale(75),
+              left: horizontalScale(60),
+              right: 0,
+              height: verticalScale(37.5)
+            }]}
+            activeOpacity={0.3}
+            onPress={() => handleTimeSlotClick(hour, 0)}
+          />
+        );
+      }
+      if (!isTimeSlotOccupied(hour, 30, allRequests)) {
+        timeSlots.push(
+          <TouchableOpacity
+            key={`slot-${hour}-30`}
+            style={[tw`absolute`, {
+              top: hour * verticalScale(75) + verticalScale(37.5),
+              left: horizontalScale(60),
+              right: 0,
+              height: verticalScale(37.5)
+            }]}
+            activeOpacity={0.3}
+            onPress={() => handleTimeSlotClick(hour, 30)}
+          />
+        );
+      }
+    }
+
+    // Return THREE separate layers in correct order
+    return (
+      <View style={tw`relative`} collapsable={false}>
+        {/* Layer 1: Hour bars (bottom) */}
+        <View collapsable={false}>{hourBars}</View>
+        
+        {/* Layer 2: Time slots (middle) */}
+        <View style={tw`absolute top-0 left-0 right-0`} collapsable={false} pointerEvents="box-none">
+          {timeSlots}
+        </View>
+        
+        {/* Layer 3: Meeting blocks (top) */}
+        <View style={[tw`absolute top-0`, { left: 0, right: 0 }]} collapsable={false} pointerEvents="box-none">
+          {meetingBlocks}
+        </View>
+      </View>
+    );
+  }, [availabilityView, selectedDate, momentRequests, pendingMeeting, handleTimeSlotClick, handleRequestBlockPress, user]);
 
   const fullAvailabilityViewElements = useMemo(() => {
     if (availabilityView !== 'full') return null;
