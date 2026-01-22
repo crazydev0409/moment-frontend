@@ -742,15 +742,23 @@ const AppStack_HomePageScreen: React.FC<Props> = ({ navigation, route }) => {
 
           {/* Information Cards */}
           <View style={{ flexDirection: 'row', gap: horizontalScale(7.5), marginBottom: verticalScale(7.5), height: verticalScale(150) }}>
-            {/* Today's Date Card */}
+            {/* Upcoming Meeting Date Card */}
             <View style={[tw`bg-[#A3CB31] rounded-2xl items-center justify-center`, { padding: moderateScale(7.5), width: horizontalScale(100) }]}>
               <Text style={[tw`text-white font-dm`, { fontSize: moderateScale(13), marginBottom: verticalScale(3.75) }]}>Upcoming</Text>
-              <Text style={[tw`text-white font-bold font-dm`, { fontSize: moderateScale(37.5), marginBottom: verticalScale(3.75) }]}>
-                {formatDate(new Date(), 'd')}
-              </Text>
-              <Text style={[tw`text-white font-dm`, { fontSize: moderateScale(13) }]}>
-                {formatDate(new Date(), 'MMMM')}
-              </Text>
+              {upcomingMeeting ? (
+                <>
+                  <Text style={[tw`text-white font-bold font-dm`, { fontSize: moderateScale(37.5), marginBottom: verticalScale(3.75) }]}>
+                    {formatDate(new Date(upcomingMeeting.startTime), 'd')}
+                  </Text>
+                  <Text style={[tw`text-white font-dm`, { fontSize: moderateScale(13) }]}>
+                    {formatDate(new Date(upcomingMeeting.startTime), 'MMMM')}
+                  </Text>
+                </>
+              ) : (
+                <Text style={[tw`text-white font-bold font-dm`, { fontSize: moderateScale(37.5) }]}>
+                  -
+                </Text>
+              )}
             </View>
 
             {/* Upcoming Meeting Card - flex: 1 (auto expand) */}
