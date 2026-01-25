@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { AuthStackParamList } from '.';
-import { View, Text, Image, TextInput, TouchableOpacity, ActivityIndicator } from 'react-native';
+import { View, Text, Image, TextInput, TouchableOpacity, ActivityIndicator, KeyboardAvoidingView, ScrollView, Platform } from 'react-native';
 import tw from '~/tailwindcss';
 import { http } from '../../helpers/http';
 import { useAtom } from 'jotai';
@@ -108,62 +108,74 @@ const AuthStack_OTPScreen: React.FC<Props> = ({ navigation, route }) => {
     <View style={tw`flex-1 relative bg-white`}>
       <Image source={Background} style={tw`absolute w-full h-full`} />
       <View style={tw`absolute w-full h-full bg-black opacity-5`} />
-      <View style={[{ marginTop: verticalScale(37.5), marginBottom: verticalScale(37.5) }, { paddingHorizontal: '8%' }]}>
-        <TouchableOpacity onPress={() => navigation.goBack()} activeOpacity={0.5} style={{ marginBottom: verticalScale(18.75) }}>
-          <Image source={BackArrow} style={{ width: horizontalScale(24), height: horizontalScale(24) }} resizeMode="contain" />
-        </TouchableOpacity>
-        <Image source={SMSVerification} style={[tw`self-center`, { marginBottom: verticalScale(37.5) }]} />
-        <Text style={[tw`font-bold font-dm w-2/3`, { fontSize: moderateScale(20.625), lineHeight: moderateScale(30) }]}>Enter Verification Code:</Text>
-        <View style={[tw`flex-row w-full justify-center`, { marginBottom: verticalScale(18.75) }]}>
-          <View
-            style={[tw`flex-row items-center w-full bg-white rounded-full`, { height: verticalScale(56.25), marginTop: verticalScale(37.5) }]}>
-            <TextInput
-              style={[tw`bg-white rounded-lg flex-1 font-dm font-bold`, { fontSize: moderateScale(16.875) }]}
-              value={code}
-              placeholder="Code"
-              onChangeText={setCode}
-              textAlign='center'
-              textAlignVertical='center'
-            />
-          </View>
-        </View>
-        {otpSent ? (
-          <Text style={tw`text-black font-semibold`}>
-            The code sent successfully!
-          </Text>
-        ) : (
-          <TouchableOpacity
-            onPress={onResendCode}
-            disabled={isResending}
-          >
-            {isResending ? (
-              <ActivityIndicator size="small" color="#A3CB31" />
-            ) : (
-              <Text style={tw`underline text-black font-semibold`}>
-                Didn't Get A Code?
-              </Text>
-            )}
-          </TouchableOpacity>
-        )}
-      </View>
-      <View style={tw`absolute bottom-0 w-full flex-col items-center`}>
-        <TouchableOpacity
-          onPress={onPressConfirmCode}
-          activeOpacity={0.7}
-          disabled={loading}
+      <KeyboardAvoidingView 
+        style={tw`flex-1`}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 0}
+      >
+        <ScrollView 
+          contentContainerStyle={{ flexGrow: 1 }}
+          keyboardShouldPersistTaps="handled"
+          showsVerticalScrollIndicator={false}
         >
-          <View
-            style={[tw`bg-[#A3CB31] rounded-full justify-center items-center shadow-lg ${loading ? 'opacity-50' : ''}`, { height: verticalScale(56.25), width: horizontalScale(225), marginBottom: verticalScale(37.5) }]}>
-            {loading ? (
-              <ActivityIndicator size="small" color="#FFFFFF" />
-            ) : (
-              <Text style={[tw`text-white font-bold font-dm`, { fontSize: moderateScale(15) }]}>
-                Send
+          <View style={[{ marginTop: verticalScale(37.5), paddingBottom: verticalScale(120) }, { paddingHorizontal: '8%' }]}>
+            <TouchableOpacity onPress={() => navigation.goBack()} activeOpacity={0.5} style={{ marginBottom: verticalScale(18.75) }}>
+              <Image source={BackArrow} style={{ width: horizontalScale(24), height: horizontalScale(24) }} resizeMode="contain" />
+            </TouchableOpacity>
+            <Image source={SMSVerification} style={[tw`self-center`, { marginBottom: verticalScale(37.5) }]} />
+            <Text style={[tw`font-bold font-dm w-2/3`, { fontSize: moderateScale(20.625), lineHeight: moderateScale(30) }]}>Enter Verification Code:</Text>
+            <View style={[tw`flex-row w-full justify-center`, { marginBottom: verticalScale(18.75) }]}>
+              <View
+                style={[tw`flex-row items-center w-full bg-white rounded-full`, { height: verticalScale(56.25), marginTop: verticalScale(37.5) }]}>
+                <TextInput
+                  style={[tw`bg-white rounded-lg flex-1 font-dm font-bold`, { fontSize: moderateScale(16.875) }]}
+                  value={code}
+                  placeholder="Code"
+                  onChangeText={setCode}
+                  textAlign='center'
+                  textAlignVertical='center'
+                />
+              </View>
+            </View>
+            {otpSent ? (
+              <Text style={tw`text-black font-semibold`}>
+                The code sent successfully!
               </Text>
+            ) : (
+              <TouchableOpacity
+                onPress={onResendCode}
+                disabled={isResending}
+              >
+                {isResending ? (
+                  <ActivityIndicator size="small" color="#A3CB31" />
+                ) : (
+                  <Text style={tw`underline text-black font-semibold`}>
+                    Didn't Get A Code?
+                  </Text>
+                )}
+              </TouchableOpacity>
             )}
           </View>
-        </TouchableOpacity>
-      </View>
+        </ScrollView>
+        <View style={tw`absolute bottom-0 w-full flex-col items-center`}>
+          <TouchableOpacity
+            onPress={onPressConfirmCode}
+            activeOpacity={0.7}
+            disabled={loading}
+          >
+            <View
+              style={[tw`bg-[#A3CB31] rounded-full justify-center items-center shadow-lg ${loading ? 'opacity-50' : ''}`, { height: verticalScale(56.25), width: horizontalScale(225), marginBottom: verticalScale(37.5) }]}>
+              {loading ? (
+                <ActivityIndicator size="small" color="#FFFFFF" />
+              ) : (
+                <Text style={[tw`text-white font-bold font-dm`, { fontSize: moderateScale(15) }]}>
+                  Send
+                </Text>
+              )}
+            </View>
+          </TouchableOpacity>
+        </View>
+      </KeyboardAvoidingView>
 
     </View>
   );

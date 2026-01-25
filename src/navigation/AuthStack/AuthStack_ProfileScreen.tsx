@@ -6,6 +6,9 @@ import {
   TextInput,
   TouchableOpacity,
   Image,
+  KeyboardAvoidingView,
+  ScrollView,
+  Platform,
 } from 'react-native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import tw from '~/tailwindcss';
@@ -116,11 +119,21 @@ const AuthStack_ProfileScreen: React.FC<Props> = ({ navigation, route }) => {
     <View style={tw`flex-1 relative bg-white`}>
       <Image source={Background} style={tw`absolute w-full h-full`} />
       <View style={tw`absolute w-full h-full bg-black opacity-5`} />
-      <View style={[{ marginTop: verticalScale(37.5), marginBottom: verticalScale(37.5) }, { paddingHorizontal: '8%' }]}>
-        <TouchableOpacity onPress={navigateToMainPage} activeOpacity={0.5} style={{ marginBottom: verticalScale(18.75) }}>
-          <Image source={BackArrow} style={{ width: horizontalScale(24), height: horizontalScale(24) }} resizeMode="contain" />
-        </TouchableOpacity>
-        <Text style={[tw`font-bold font-dm w-2/3`, { fontSize: moderateScale(20.625), lineHeight: moderateScale(30), marginBottom: verticalScale(26.25) }]}>Fill in your profile details</Text>
+      <KeyboardAvoidingView 
+        style={tw`flex-1`}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 0}
+      >
+        <ScrollView 
+          contentContainerStyle={{ flexGrow: 1 }}
+          keyboardShouldPersistTaps="handled"
+          showsVerticalScrollIndicator={false}
+        >
+          <View style={[{ marginTop: verticalScale(37.5), paddingBottom: verticalScale(120) }, { paddingHorizontal: '8%' }]}>
+            <TouchableOpacity onPress={navigateToMainPage} activeOpacity={0.5} style={{ marginBottom: verticalScale(18.75) }}>
+              <Image source={BackArrow} style={{ width: horizontalScale(24), height: horizontalScale(24) }} resizeMode="contain" />
+            </TouchableOpacity>
+            <Text style={[tw`font-bold font-dm w-2/3`, { fontSize: moderateScale(20.625), lineHeight: moderateScale(30), marginBottom: verticalScale(26.25) }]}>Fill in your profile details</Text>
         <View style={tw``}>
           <Text style={[tw`text-grey font-dm`, { fontSize: moderateScale(11.25), lineHeight: moderateScale(19.6875), marginBottom: verticalScale(7.5) }]}>Name</Text>
           <TextInput
@@ -209,25 +222,27 @@ const AuthStack_ProfileScreen: React.FC<Props> = ({ navigation, route }) => {
             <Text style={[tw`text-red-500`, { fontSize: moderateScale(11.25), marginBottom: verticalScale(11.25), marginTop: verticalScale(11.25) }]}>{confirmEmailError}</Text>
           ) : <View style={{ marginBottom: verticalScale(11.25), marginTop: verticalScale(11.25) }} />}
         </View>
-      </View>
-      <View style={tw`absolute bottom-0 w-full flex-col items-center`}>
-        <TouchableOpacity
-          onPress={navigateToPlanPage}
-          activeOpacity={0.7}
-          disabled={isSaving}
-        >
-          <View
-            style={[tw`bg-[#A3CB31] rounded-full justify-center items-center shadow-lg ${isSaving ? 'opacity-50' : ''}`, { height: verticalScale(56.25), width: horizontalScale(225), marginBottom: verticalScale(37.5) }]}>
-            {isSaving ? (
-              <ActivityIndicator size="small" color="#FFFFFF" />
-            ) : (
-              <Text style={[tw`text-white font-bold font-dm`, { fontSize: moderateScale(15) }]}>
-                Next
-              </Text>
-            )}
           </View>
-        </TouchableOpacity>
-      </View>
+        </ScrollView>
+        <View style={tw`absolute bottom-0 w-full flex-col items-center`}>
+          <TouchableOpacity
+            onPress={navigateToPlanPage}
+            activeOpacity={0.7}
+            disabled={isSaving}
+          >
+            <View
+              style={[tw`bg-[#A3CB31] rounded-full justify-center items-center shadow-lg ${isSaving ? 'opacity-50' : ''}`, { height: verticalScale(56.25), width: horizontalScale(225), marginBottom: verticalScale(37.5) }]}>
+              {isSaving ? (
+                <ActivityIndicator size="small" color="#FFFFFF" />
+              ) : (
+                <Text style={[tw`text-white font-bold font-dm`, { fontSize: moderateScale(15) }]}>
+                  Next
+                </Text>
+              )}
+            </View>
+          </TouchableOpacity>
+        </View>
+      </KeyboardAvoidingView>
 
     </View>
   );

@@ -8,6 +8,8 @@ import {
     TextInput,
     Modal,
     Alert,
+    KeyboardAvoidingView,
+    Platform,
 } from 'react-native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { BlurView } from 'expo-blur';
@@ -191,11 +193,17 @@ const AppStack_ContactScreen: React.FC<Props> = ({ navigation, route }) => {
             <Image source={Background} style={tw`absolute w-full h-full`} />
             <View style={tw`absolute w-full h-full bg-black opacity-5`} />
 
-            <ScrollView
+            <KeyboardAvoidingView 
                 style={tw`flex-1`}
-                contentContainerStyle={{ paddingBottom: verticalScale(90) }}
-                showsVerticalScrollIndicator={false}
+                behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+                keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 0}
             >
+                <ScrollView
+                    style={tw`flex-1`}
+                    contentContainerStyle={{ paddingBottom: verticalScale(90) }}
+                    showsVerticalScrollIndicator={false}
+                    keyboardShouldPersistTaps="handled"
+                >
                 <View style={[{ marginTop: verticalScale(60) }, { paddingHorizontal: '8%' }]}>
                     {/* Header */}
                     <View style={[tw`flex-row justify-between items-center`, { marginBottom: verticalScale(22.5) }]}>
@@ -276,7 +284,8 @@ const AppStack_ContactScreen: React.FC<Props> = ({ navigation, route }) => {
                         )}
                     </View>
                 </View>
-            </ScrollView>
+                </ScrollView>
+            </KeyboardAvoidingView>
 
             {/* Add Menu Popup Modal */}
 

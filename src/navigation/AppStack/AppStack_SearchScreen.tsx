@@ -1,6 +1,6 @@
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import React, { useEffect, useState } from 'react';
-import { Text, Image, View, TouchableOpacity, ScrollView, TextInput, ActivityIndicator } from 'react-native';
+import { Text, Image, View, TouchableOpacity, ScrollView, TextInput, ActivityIndicator, KeyboardAvoidingView, Platform } from 'react-native';
 import * as Contacts from 'expo-contacts';
 import { AppStackParamList } from '.';
 import tw from '~/tailwindcss';
@@ -193,42 +193,48 @@ const AppStack_SearchScreen: React.FC<Props> = ({ navigation, route }) => {
       <Image source={Background} style={tw`absolute w-full h-full`} />
       <View style={tw`absolute w-full h-full bg-black opacity-5`} />
 
-      <View style={[tw`flex-1`, { marginTop: verticalScale(60), paddingHorizontal: '4%' }]}>
-        {/* Header */}
-        <View style={[tw`flex-row items-center`, { marginBottom: verticalScale(22.5) }]}>
-          <TouchableOpacity
-            onPress={() => navigation.goBack()}
-            activeOpacity={0.7}
-            style={{ marginRight: horizontalScale(15) }}
+      <KeyboardAvoidingView 
+        style={tw`flex-1`}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 0}
+      >
+        <View style={[tw`flex-1`, { marginTop: verticalScale(60), paddingHorizontal: '4%' }]}>
+          {/* Header */}
+          <View style={[tw`flex-row items-center`, { marginBottom: verticalScale(22.5) }]}>
+            <TouchableOpacity
+              onPress={() => navigation.goBack()}
+              activeOpacity={0.7}
+              style={{ marginRight: horizontalScale(15) }}
+            >
+              <Image source={BackArrow} style={{ width: horizontalScale(24), height: horizontalScale(24) }} resizeMode="contain" />
+            </TouchableOpacity>
+            <View style={tw`flex-1`}>
+              <Text style={[tw`text-black font-bold font-dm`, { fontSize: moderateScale(22.5) }]}>Search Meetings</Text>
+            </View>
+          </View>
+
+          {/* Search Bar */}
+          <View style={{ marginBottom: verticalScale(22.5) }}>
+            <View style={[tw`flex-row items-center bg-white rounded-full shadow-sm`, { paddingHorizontal: horizontalScale(15), paddingVertical: verticalScale(11.25) }]}>
+              <TextInput
+                style={[tw`flex-1 font-dm text-black`, { fontSize: moderateScale(13.125) }]}
+                placeholder="Search your meetings"
+                placeholderTextColor="#9CA3AF"
+                value={searchText}
+                onChangeText={setSearchText}
+                autoFocus={true}
+              />
+              <Image source={Search} style={{ width: horizontalScale(18.75), height: horizontalScale(18.75) }} />
+            </View>
+          </View>
+
+          {/* Results */}
+          <ScrollView
+            style={tw`flex-1`}
+            contentContainerStyle={{ paddingBottom: verticalScale(22.5) }}
+            showsVerticalScrollIndicator={false}
+            keyboardShouldPersistTaps="handled"
           >
-            <Image source={BackArrow} style={{ width: horizontalScale(24), height: horizontalScale(24) }} resizeMode="contain" />
-          </TouchableOpacity>
-          <View style={tw`flex-1`}>
-            <Text style={[tw`text-black font-bold font-dm`, { fontSize: moderateScale(22.5) }]}>Search Meetings</Text>
-          </View>
-        </View>
-
-        {/* Search Bar */}
-        <View style={{ marginBottom: verticalScale(22.5) }}>
-          <View style={[tw`flex-row items-center bg-white rounded-full shadow-sm`, { paddingHorizontal: horizontalScale(15), paddingVertical: verticalScale(11.25) }]}>
-            <TextInput
-              style={[tw`flex-1 font-dm text-black`, { fontSize: moderateScale(13.125) }]}
-              placeholder="Search your meetings"
-              placeholderTextColor="#9CA3AF"
-              value={searchText}
-              onChangeText={setSearchText}
-              autoFocus={true}
-            />
-            <Image source={Search} style={{ width: horizontalScale(18.75), height: horizontalScale(18.75) }} />
-          </View>
-        </View>
-
-        {/* Results */}
-        <ScrollView
-          style={tw`flex-1`}
-          contentContainerStyle={{ paddingBottom: verticalScale(22.5) }}
-          showsVerticalScrollIndicator={false}
-        >
           {loading ? (
             <View style={{ paddingVertical: verticalScale(37.5), alignItems: 'center' }}>
               <ActivityIndicator size="large" color="#A3CB31" />
@@ -326,7 +332,8 @@ const AppStack_SearchScreen: React.FC<Props> = ({ navigation, route }) => {
             </View>
           )}
         </ScrollView>
-      </View>
+        </View>
+      </KeyboardAvoidingView>
     </View>
   );
 };

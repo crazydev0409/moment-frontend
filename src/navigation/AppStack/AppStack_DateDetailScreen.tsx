@@ -11,6 +11,7 @@ import {
   ActivityIndicator,
   Animated,
   Platform,
+  KeyboardAvoidingView,
 } from 'react-native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { useFocusEffect } from '@react-navigation/native';
@@ -1832,7 +1833,11 @@ const AppStack_DateDetailScreen: React.FC<Props> = ({ navigation, route }) => {
               activeOpacity={1}
               onPress={handleCloseCreateModal}
             >
-              <View style={tw`flex-1 justify-end`}>
+              <KeyboardAvoidingView 
+                style={tw`flex-1 justify-end`}
+                behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+                keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 0}
+              >
                 <TouchableOpacity activeOpacity={1} onPress={(e) => e.stopPropagation()}>
                   <Animated.View
                     style={[
@@ -2002,7 +2007,7 @@ const AppStack_DateDetailScreen: React.FC<Props> = ({ navigation, route }) => {
                     </TouchableOpacity>
                   </Animated.View>
                 </TouchableOpacity>
-              </View>
+              </KeyboardAvoidingView>
             </TouchableOpacity>
           </BlurView>
         </Animated.View>
@@ -2327,7 +2332,11 @@ const AppStack_DateDetailScreen: React.FC<Props> = ({ navigation, route }) => {
             { opacity: contactModalOpacityAnim }
           ]}
         >
-          <View style={tw`flex-1`}>
+          <KeyboardAvoidingView 
+            style={tw`flex-1`}
+            behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+            keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 0}
+          >
             <TouchableOpacity
               style={tw`flex-1`}
               activeOpacity={1}
@@ -2428,7 +2437,7 @@ const AppStack_DateDetailScreen: React.FC<Props> = ({ navigation, route }) => {
                 </ScrollView>
               </View>
             </Animated.View>
-          </View>
+          </KeyboardAvoidingView>
         </Animated.View>
       </Modal>
       )}
