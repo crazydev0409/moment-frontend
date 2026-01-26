@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { View, TouchableOpacity, Image, Modal, Text, TextInput, ScrollView, Alert, Platform } from 'react-native';
+import { View, TouchableOpacity, Image, Modal, Text, TextInput, ScrollView, Alert, Platform, KeyboardAvoidingView } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -251,40 +251,44 @@ const BottomNavigationBar: React.FC<BottomNavigationBarProps> = ({
           onRequestClose={handleCloseContactModal}
         >
         <View style={tw`flex-1`}>
-          <TouchableOpacity
+          <BlurView intensity={20} tint="dark" style={tw`absolute inset-0`}>
+            <View style={tw`flex-1 bg-black opacity-40`} />
+          </BlurView>
+          <KeyboardAvoidingView 
             style={tw`flex-1`}
-            activeOpacity={1}
-            onPress={handleCloseContactModal}
+            behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+            keyboardVerticalOffset={0}
           >
-            <BlurView intensity={20} tint="dark" style={tw`absolute inset-0`}>
-              <View style={tw`flex-1 bg-black opacity-40`} />
-            </BlurView>
-          </TouchableOpacity>
+            <TouchableOpacity
+              style={tw`flex-1`}
+              activeOpacity={1}
+              onPress={handleCloseContactModal}
+            >
+              <View style={tw`flex-1 justify-end`}>
+                <TouchableOpacity activeOpacity={1} onPress={(e) => e.stopPropagation()}>
+                  <View style={[tw`bg-white rounded-t-3xl`]}>
+                    {/* Header - Fixed */}
+                    <View style={[tw`flex-row justify-between items-center`, { paddingTop: verticalScale(22.5), paddingHorizontal: horizontalScale(15), paddingBottom: verticalScale(15) }]}>
+                      <Text style={[tw`text-black font-bold font-dm`, { fontSize: moderateScale(18.75) }]}>Select Contact</Text>
+                      <TouchableOpacity
+                        onPress={handleCloseContactModal}
+                        activeOpacity={0.7}
+                      >
+                        <Text style={[tw`text-[#A3CB31] font-dm`, { fontSize: moderateScale(15) }]}>Cancel</Text>
+                      </TouchableOpacity>
+                    </View>
 
-          <View style={tw`absolute bottom-0 left-0 right-0 bg-white rounded-t-3xl`}>
-            <View style={[{ paddingTop: verticalScale(22.5), paddingBottom: verticalScale(30) }, { paddingHorizontal: '4%' }]}>
-              {/* Header */}
-              <View style={[tw`flex-row justify-between items-center`, { marginBottom: verticalScale(15) }]}>
-                <Text style={[tw`text-black font-bold font-dm`, { fontSize: moderateScale(18.75) }]}>Select Contact</Text>
-                <TouchableOpacity
-                  onPress={handleCloseContactModal}
-                  activeOpacity={0.7}
-                >
-                  <Text style={[tw`text-[#A3CB31] font-dm`, { fontSize: moderateScale(15) }]}>Cancel</Text>
-                </TouchableOpacity>
-              </View>
-
-              {/* Search Bar */}
-              <View style={[tw`bg-gray-100 rounded-2xl flex-row items-center`, { paddingHorizontal: horizontalScale(15), paddingVertical: verticalScale(11.25), marginBottom: verticalScale(15) }]}>
-                <Image source={Search} style={{ width: horizontalScale(18.75), height: horizontalScale(18.75), marginRight: horizontalScale(7.5) }} />
-                <TextInput
-                  style={[tw`flex-1 text-black font-dm`, { fontSize: moderateScale(13.125) }]}
-                  placeholder="Search contacts"
-                  placeholderTextColor="#999"
-                  value={contactSearchText}
-                  onChangeText={setContactSearchText}
-                />
-              </View>
+                    {/* Search Bar - Fixed */}
+                    <View style={[tw`bg-gray-100 rounded-2xl flex-row items-center`, { paddingHorizontal: horizontalScale(15), paddingVertical: verticalScale(11.25), marginBottom: verticalScale(15), marginHorizontal: horizontalScale(15) }]}>
+                      <Image source={Search} style={{ width: horizontalScale(18.75), height: horizontalScale(18.75), marginRight: horizontalScale(7.5) }} />
+                      <TextInput
+                        style={[tw`flex-1 text-black font-dm`, { fontSize: moderateScale(13.125) }]}
+                        placeholder="Search contacts"
+                        placeholderTextColor="#999"
+                        value={contactSearchText}
+                        onChangeText={setContactSearchText}
+                      />
+                    </View>
 
               {/* Contacts List */}
               <ScrollView style={{ maxHeight: verticalScale(337.5) }} showsVerticalScrollIndicator={false}>
@@ -340,9 +344,12 @@ const BottomNavigationBar: React.FC<BottomNavigationBarProps> = ({
                     <Text style={[tw`text-grey font-dm`, { fontSize: moderateScale(15) }]}>No contacts found</Text>
                   </View>
                 )}
-              </ScrollView>
-            </View>
-          </View>
+                    </ScrollView>
+                  </View>
+                </TouchableOpacity>
+              </View>
+            </TouchableOpacity>
+          </KeyboardAvoidingView>
         </View>
       </Modal>
       )}

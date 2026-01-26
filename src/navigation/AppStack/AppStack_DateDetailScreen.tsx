@@ -1828,44 +1828,53 @@ const AppStack_DateDetailScreen: React.FC<Props> = ({ navigation, route }) => {
           ]}
         >
           <BlurView intensity={20} style={tw`flex-1`}>
-            <TouchableOpacity
+            <KeyboardAvoidingView 
               style={tw`flex-1`}
-              activeOpacity={1}
-              onPress={handleCloseCreateModal}
+              behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+              keyboardVerticalOffset={0}
             >
-              <KeyboardAvoidingView 
-                style={tw`flex-1 justify-end`}
-                behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-                keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 0}
+              <TouchableOpacity
+                style={tw`flex-1`}
+                activeOpacity={1}
+                onPress={handleCloseCreateModal}
               >
-                <TouchableOpacity activeOpacity={1} onPress={(e) => e.stopPropagation()}>
-                  <Animated.View
-                    style={[
-                      tw`bg-white rounded-t-3xl p-5`,
-                      {
-                        transform: [{
-                          translateY: createModalSlideAnim.interpolate({
-                            inputRange: [0, 1],
-                            outputRange: [300, 0],
-                          }),
-                        }],
-                      }
-                    ]}
-                  >
-                    {/* Modal Header */}
-                    <View style={[tw`flex-row justify-between items-center`, { marginBottom: verticalScale(22.5) }]}>
-                      <Text style={[tw`font-bold font-dm text-black`, { fontSize: moderateScale(18.75) }]}>
-                        Create Meeting
-                      </Text>
-                      <TouchableOpacity
-                        onPress={handleCloseCreateModal}
-                        activeOpacity={0.7}
-                      >
-                        <Text style={[tw`text-grey`, { fontSize: moderateScale(16.875) }]}>✕</Text>
-                      </TouchableOpacity>
-                    </View>
+                <View style={tw`flex-1 justify-end`}>
+                  <TouchableOpacity activeOpacity={1} onPress={(e) => e.stopPropagation()}>
+                    <Animated.View
+                      style={[
+                        tw`bg-white rounded-t-3xl`,
+                        {
+                          transform: [{
+                            translateY: createModalSlideAnim.interpolate({
+                              inputRange: [0, 1],
+                              outputRange: [300, 0],
+                            }),
+                          }],
+                          // maxHeight: '70%',
+                        }
+                      ]}
+                    >
+                      {/* Modal Header - Fixed at top */}
+                      <View style={[tw`flex-row justify-between items-center`, { padding: moderateScale(20), paddingBottom: verticalScale(15) }]}>
+                        <Text style={[tw`font-bold font-dm text-black`, { fontSize: moderateScale(18.75) }]}>
+                          Create Meeting
+                        </Text>
+                        <TouchableOpacity
+                          onPress={handleCloseCreateModal}
+                          activeOpacity={0.7}
+                        >
+                          <Text style={[tw`text-grey`, { fontSize: moderateScale(16.875) }]}>✕</Text>
+                        </TouchableOpacity>
+                      </View>
 
-                    {/* Event Name */}
+                      {/* Scrollable Content */}
+                      <ScrollView
+                        contentContainerStyle={{ paddingHorizontal: moderateScale(20), paddingBottom: moderateScale(20) }}
+                        showsVerticalScrollIndicator={false}
+                        keyboardShouldPersistTaps="handled"
+                        nestedScrollEnabled={true}
+                      >
+                      {/* Event Name */}
                     <View style={{ marginBottom: verticalScale(15) }}>
                       <Text style={[tw`font-dm text-grey`, { fontSize: moderateScale(13.125), marginBottom: verticalScale(7.5) }]}>Event Name</Text>
                       <TextInput
@@ -1990,25 +1999,27 @@ const AppStack_DateDetailScreen: React.FC<Props> = ({ navigation, route }) => {
                       </View>
                     </View>
 
-                    {/* Submit Button */}
-                    <TouchableOpacity
-                      onPress={handleSubmitAppointment}
-                      activeOpacity={0.7}
-                      disabled={isSubmitting}
-                      style={[tw`bg-[#A3CB31] rounded-2xl items-center ${isSubmitting ? 'opacity-50' : ''}`, { paddingVertical: verticalScale(11.25) }]}
-                    >
-                      {isSubmitting ? (
-                        <ActivityIndicator size="small" color="#FFFFFF" />
-                      ) : (
-                        <Text style={[tw`text-white font-bold font-dm`, { fontSize: moderateScale(15) }]}>
-                          Create Meeting
-                        </Text>
-                      )}
-                    </TouchableOpacity>
-                  </Animated.View>
-                </TouchableOpacity>
-              </KeyboardAvoidingView>
-            </TouchableOpacity>
+                      {/* Submit Button */}
+                      <TouchableOpacity
+                        onPress={handleSubmitAppointment}
+                        activeOpacity={0.7}
+                        disabled={isSubmitting}
+                        style={[tw`bg-[#A3CB31] rounded-2xl items-center ${isSubmitting ? 'opacity-50' : ''}`, { paddingVertical: verticalScale(11.25), marginTop: verticalScale(7.5) }]}
+                      >
+                        {isSubmitting ? (
+                          <ActivityIndicator size="small" color="#FFFFFF" />
+                        ) : (
+                          <Text style={[tw`text-white font-bold font-dm`, { fontSize: moderateScale(15) }]}>
+                            Create Meeting
+                          </Text>
+                        )}
+                      </TouchableOpacity>
+                    </ScrollView>
+                    </Animated.View>
+                  </TouchableOpacity>
+                </View>
+              </TouchableOpacity>
+            </KeyboardAvoidingView>
           </BlurView>
         </Animated.View>
       </Modal>
@@ -2332,60 +2343,64 @@ const AppStack_DateDetailScreen: React.FC<Props> = ({ navigation, route }) => {
             { opacity: contactModalOpacityAnim }
           ]}
         >
+          <BlurView intensity={20} tint="dark" style={tw`absolute inset-0`}>
+            <View style={tw`flex-1 bg-black opacity-40`} />
+          </BlurView>
           <KeyboardAvoidingView 
             style={tw`flex-1`}
-            behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-            keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 0}
+            behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+            keyboardVerticalOffset={0}
           >
             <TouchableOpacity
               style={tw`flex-1`}
               activeOpacity={1}
               onPress={handleCloseContactModal}
             >
-              <BlurView intensity={20} tint="dark" style={tw`absolute inset-0`}>
-                <View style={tw`flex-1 bg-black opacity-40`} />
-              </BlurView>
-            </TouchableOpacity>
-
-            <Animated.View
-              style={[
-                tw`absolute bottom-0 left-0 right-0 bg-white rounded-t-3xl`,
-                {
-                  transform: [{
-                    translateY: contactModalSlideAnim.interpolate({
-                      inputRange: [0, 1],
-                      outputRange: [300, 0],
-                    }),
-                  }],
-                }
-              ]}
-            >
-              <View style={[{ paddingTop: verticalScale(22.5), paddingBottom: verticalScale(30) }, { paddingHorizontal: '4%' }]}>
-                {/* Header */}
-                <View style={[tw`flex-row justify-between items-center`, { marginBottom: verticalScale(15) }]}>
-                  <Text style={[tw`text-black font-bold font-dm`, { fontSize: moderateScale(18.75) }]}>Select Contact</Text>
-                  <TouchableOpacity
-                    onPress={handleCloseContactModal}
-                    activeOpacity={0.7}
+              <View style={tw`flex-1 justify-end`}>
+                <TouchableOpacity activeOpacity={1} onPress={(e) => e.stopPropagation()}>
+                  <Animated.View
+                    style={[
+                      tw`bg-white rounded-t-3xl`,
+                      {
+                        transform: [{
+                          translateY: contactModalSlideAnim.interpolate({
+                            inputRange: [0, 1],
+                            outputRange: [300, 0],
+                          }),
+                        }],
+                        maxHeight: '70%',
+                      }
+                    ]}
                   >
-                    <Text style={[tw`text-[#A3CB31] font-dm`, { fontSize: moderateScale(15) }]}>Cancel</Text>
-                  </TouchableOpacity>
-                </View>
+                    {/* Header - Fixed */}
+                    <View style={[tw`flex-row justify-between items-center`, { paddingTop: verticalScale(22.5), paddingHorizontal: horizontalScale(15), paddingBottom: verticalScale(15) }]}>
+                      <Text style={[tw`text-black font-bold font-dm`, { fontSize: moderateScale(18.75) }]}>Select Contact</Text>
+                      <TouchableOpacity
+                        onPress={handleCloseContactModal}
+                        activeOpacity={0.7}
+                      >
+                        <Text style={[tw`text-[#A3CB31] font-dm`, { fontSize: moderateScale(15) }]}>Cancel</Text>
+                      </TouchableOpacity>
+                    </View>
 
-                {/* Search Bar */}
-                <View style={[tw`bg-gray-100 rounded-2xl flex-row items-center`, { paddingHorizontal: horizontalScale(15), paddingVertical: verticalScale(11.25), marginBottom: verticalScale(15) }]}>
-                  <Image source={Search} style={{ width: horizontalScale(18.75), height: horizontalScale(18.75), marginRight: horizontalScale(7.5) }} />
-                  <TextInput
-                    style={tw`flex-1 text-black font-dm`}
-                    placeholder="Search contacts"
-                    placeholderTextColor="#999"
-                    value={contactSearchText}
-                    onChangeText={setContactSearchText}
-                  />
-                </View>
+                    {/* Search Bar - Fixed */}
+                    <View style={[tw`bg-gray-100 rounded-2xl flex-row items-center`, { paddingHorizontal: horizontalScale(15), paddingVertical: verticalScale(11.25), marginBottom: verticalScale(15), marginHorizontal: horizontalScale(15) }]}>
+                      <Image source={Search} style={{ width: horizontalScale(18.75), height: horizontalScale(18.75), marginRight: horizontalScale(7.5) }} />
+                      <TextInput
+                        style={tw`flex-1 text-black font-dm`}
+                        placeholder="Search contacts"
+                        placeholderTextColor="#999"
+                        value={contactSearchText}
+                        onChangeText={setContactSearchText}
+                      />
+                    </View>
 
-                {/* Contacts List */}
-                <ScrollView style={{ maxHeight: verticalScale(300) }} showsVerticalScrollIndicator={false}>
+                    {/* Contacts List - Scrollable */}
+                    <ScrollView 
+                      contentContainerStyle={{ paddingHorizontal: horizontalScale(15), paddingBottom: verticalScale(30) }}
+                      showsVerticalScrollIndicator={false}
+                      keyboardShouldPersistTaps="handled"
+                    >
                   {filteredContacts.length > 0 ? (
                     filteredContacts.map((contact) => {
                       const isDisabled = !contact.contactUser?.id;
@@ -2435,8 +2450,10 @@ const AppStack_DateDetailScreen: React.FC<Props> = ({ navigation, route }) => {
                     </View>
                   )}
                 </ScrollView>
+                  </Animated.View>
+                </TouchableOpacity>
               </View>
-            </Animated.View>
+            </TouchableOpacity>
           </KeyboardAvoidingView>
         </Animated.View>
       </Modal>

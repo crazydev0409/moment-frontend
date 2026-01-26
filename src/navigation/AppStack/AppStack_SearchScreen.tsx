@@ -195,8 +195,8 @@ const AppStack_SearchScreen: React.FC<Props> = ({ navigation, route }) => {
 
       <KeyboardAvoidingView 
         style={tw`flex-1`}
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 0}
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        keyboardVerticalOffset={0}
       >
         <View style={[tw`flex-1`, { marginTop: verticalScale(60), paddingHorizontal: '4%' }]}>
           {/* Header */}

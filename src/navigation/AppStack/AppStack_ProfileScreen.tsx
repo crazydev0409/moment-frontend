@@ -168,8 +168,8 @@ const AppStack_ProfileScreen: React.FC<Props> = ({ navigation, route }) => {
 
       <KeyboardAvoidingView 
         style={tw`flex-1`}
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 0}
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        keyboardVerticalOffset={0}
       >
         <ScrollView 
           contentContainerStyle={{ flexGrow: 1 }}
