@@ -137,7 +137,7 @@ const BottomNavigationBar: React.FC<BottomNavigationBarProps> = ({
 
   return (
     <>
-      <View style={[tw`absolute left-0 right-0 justify-center flex-row`, { gap: horizontalScale(7.5), bottom: Math.max(insets.bottom, 20) }]}>
+      <View style={[tw`absolute left-0 right-0 justify-center flex-row`, { gap: horizontalScale(7.5), bottom: Math.max(insets.bottom, 30) }]}>
         <View style={[tw`flex-row items-center rounded-full bg-black overflow-hidden`, { gap: horizontalScale(7.5), padding: verticalScale(9.375) }]}>
           <TouchableOpacity
             activeOpacity={0.7}
@@ -196,50 +196,50 @@ const BottomNavigationBar: React.FC<BottomNavigationBarProps> = ({
               </BlurView>
             </TouchableOpacity>
 
-          <View style={[tw`absolute bottom-0 left-0 right-0 items-center`, { paddingBottom: verticalScale(90) }]}>
-            <View style={[tw`bg-white rounded-3xl w-11/12 overflow-hidden`, { paddingHorizontal: horizontalScale(15) }]}>
-              <TouchableOpacity
-                style={[tw`flex-row items-center`, { paddingHorizontal: horizontalScale(22.5), paddingVertical: verticalScale(15) }]}
-                activeOpacity={0.7}
-                onPress={handleBookMeeting}
-              >
-                <View style={[tw`rounded-full bg-gray-200 items-center justify-center`, { width: horizontalScale(37.5), height: horizontalScale(37.5), marginRight: horizontalScale(15) }]}>
-                  <Text style={[tw`text-black font-bold`, { fontSize: moderateScale(18.75) }]}>+</Text>
-                </View>
-                <Text style={[tw`text-black font-dm flex-1`, { fontSize: moderateScale(15) }]}>Book a meeting</Text>
-              </TouchableOpacity>
-              <View style={[tw`bg-gray-200`, { height: verticalScale(1.125), marginHorizontal: horizontalScale(22.5) }]} />
-              <TouchableOpacity
-                style={[
-                  tw`flex-row items-center opacity-50`,
-                  { paddingHorizontal: horizontalScale(22.5), paddingVertical: verticalScale(15) }
-                ]}
-                activeOpacity={1}
-                disabled={true}
-              >
-                <View style={[tw`rounded-full bg-gray-200 items-center justify-center`, { width: horizontalScale(37.5), height: horizontalScale(37.5), marginRight: horizontalScale(15) }]}>
-                  <Text style={[tw`text-black font-bold`, { fontSize: moderateScale(18.75) }]}>+</Text>
-                </View>
-                <Text style={[tw`text-black font-dm flex-1`, { fontSize: moderateScale(15) }]}>Create meeting type</Text>
-              </TouchableOpacity>
-              <View style={[tw`bg-gray-200`, { height: verticalScale(1.125), marginHorizontal: horizontalScale(22.5) }]} />
-              <TouchableOpacity
-                style={[
-                  tw`flex-row items-center opacity-50`,
-                  { paddingHorizontal: horizontalScale(22.5), paddingVertical: verticalScale(15) }
-                ]}
-                activeOpacity={1}
-                disabled={true}
-              >
-                <View style={[tw`rounded-full bg-gray-200 items-center justify-center`, { width: horizontalScale(37.5), height: horizontalScale(37.5), marginRight: horizontalScale(15) }]}>
-                  <Text style={[tw`text-black font-bold`, { fontSize: moderateScale(18.75) }]}>+</Text>
-                </View>
-                <Text style={[tw`text-black font-dm flex-1`, { fontSize: moderateScale(15) }]}>Manage availability</Text>
-              </TouchableOpacity>
+            <View style={[tw`absolute bottom-0 left-0 right-0 items-center`, { paddingBottom: verticalScale(90) }]}>
+              <View style={[tw`bg-white rounded-3xl w-11/12 overflow-hidden`, { paddingHorizontal: horizontalScale(15) }]}>
+                <TouchableOpacity
+                  style={[tw`flex-row items-center`, { paddingHorizontal: horizontalScale(22.5), paddingVertical: verticalScale(15) }]}
+                  activeOpacity={0.7}
+                  onPress={handleBookMeeting}
+                >
+                  <View style={[tw`rounded-full bg-gray-200 items-center justify-center`, { width: horizontalScale(37.5), height: horizontalScale(37.5), marginRight: horizontalScale(15) }]}>
+                    <Text style={[tw`text-black font-bold`, { fontSize: moderateScale(18.75) }]}>+</Text>
+                  </View>
+                  <Text style={[tw`text-black font-dm flex-1`, { fontSize: moderateScale(15) }]}>Book a meeting</Text>
+                </TouchableOpacity>
+                <View style={[tw`bg-gray-200`, { height: verticalScale(1.125), marginHorizontal: horizontalScale(22.5) }]} />
+                <TouchableOpacity
+                  style={[
+                    tw`flex-row items-center opacity-50`,
+                    { paddingHorizontal: horizontalScale(22.5), paddingVertical: verticalScale(15) }
+                  ]}
+                  activeOpacity={1}
+                  disabled={true}
+                >
+                  <View style={[tw`rounded-full bg-gray-200 items-center justify-center`, { width: horizontalScale(37.5), height: horizontalScale(37.5), marginRight: horizontalScale(15) }]}>
+                    <Text style={[tw`text-black font-bold`, { fontSize: moderateScale(18.75) }]}>+</Text>
+                  </View>
+                  <Text style={[tw`text-black font-dm flex-1`, { fontSize: moderateScale(15) }]}>Create meeting type</Text>
+                </TouchableOpacity>
+                <View style={[tw`bg-gray-200`, { height: verticalScale(1.125), marginHorizontal: horizontalScale(22.5) }]} />
+                <TouchableOpacity
+                  style={[
+                    tw`flex-row items-center opacity-50`,
+                    { paddingHorizontal: horizontalScale(22.5), paddingVertical: verticalScale(15) }
+                  ]}
+                  activeOpacity={1}
+                  disabled={true}
+                >
+                  <View style={[tw`rounded-full bg-gray-200 items-center justify-center`, { width: horizontalScale(37.5), height: horizontalScale(37.5), marginRight: horizontalScale(15) }]}>
+                    <Text style={[tw`text-black font-bold`, { fontSize: moderateScale(18.75) }]}>+</Text>
+                  </View>
+                  <Text style={[tw`text-black font-dm flex-1`, { fontSize: moderateScale(15) }]}>Manage availability</Text>
+                </TouchableOpacity>
+              </View>
             </View>
           </View>
-        </View>
-      </Modal>
+        </Modal>
       )}
 
       {/* Contact Selection Modal - Only render when add menu is not active */}
@@ -250,108 +250,108 @@ const BottomNavigationBar: React.FC<BottomNavigationBarProps> = ({
           animationType="slide"
           onRequestClose={handleCloseContactModal}
         >
-        <View style={tw`flex-1`}>
-          <BlurView intensity={20} tint="dark" style={tw`absolute inset-0`}>
-            <View style={tw`flex-1 bg-black opacity-40`} />
-          </BlurView>
-          <KeyboardAvoidingView 
-            style={tw`flex-1`}
-            behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-            keyboardVerticalOffset={0}
-          >
-            <TouchableOpacity
+          <View style={tw`flex-1`}>
+            <BlurView intensity={20} tint="dark" style={tw`absolute inset-0`}>
+              <View style={tw`flex-1 bg-black opacity-40`} />
+            </BlurView>
+            <KeyboardAvoidingView
               style={tw`flex-1`}
-              activeOpacity={1}
-              onPress={handleCloseContactModal}
+              behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+              keyboardVerticalOffset={0}
             >
-              <View style={tw`flex-1 justify-end`}>
-                <TouchableOpacity activeOpacity={1} onPress={(e) => e.stopPropagation()}>
-                  <View style={[tw`bg-white rounded-t-3xl`]}>
-                    {/* Header - Fixed */}
-                    <View style={[tw`flex-row justify-between items-center`, { paddingTop: verticalScale(22.5), paddingHorizontal: horizontalScale(15), paddingBottom: verticalScale(15) }]}>
-                      <Text style={[tw`text-black font-bold font-dm`, { fontSize: moderateScale(18.75) }]}>Select Contact</Text>
-                      <TouchableOpacity
-                        onPress={handleCloseContactModal}
-                        activeOpacity={0.7}
-                      >
-                        <Text style={[tw`text-[#A3CB31] font-dm`, { fontSize: moderateScale(15) }]}>Cancel</Text>
-                      </TouchableOpacity>
-                    </View>
+              <TouchableOpacity
+                style={tw`flex-1`}
+                activeOpacity={1}
+                onPress={handleCloseContactModal}
+              >
+                <View style={tw`flex-1 justify-end`}>
+                  <TouchableOpacity activeOpacity={1} onPress={(e) => e.stopPropagation()}>
+                    <View style={[tw`bg-white rounded-t-3xl`]}>
+                      {/* Header - Fixed */}
+                      <View style={[tw`flex-row justify-between items-center`, { paddingTop: verticalScale(22.5), paddingHorizontal: horizontalScale(15), paddingBottom: verticalScale(15) }]}>
+                        <Text style={[tw`text-black font-bold font-dm`, { fontSize: moderateScale(18.75) }]}>Select Contact</Text>
+                        <TouchableOpacity
+                          onPress={handleCloseContactModal}
+                          activeOpacity={0.7}
+                        >
+                          <Text style={[tw`text-[#A3CB31] font-dm`, { fontSize: moderateScale(15) }]}>Cancel</Text>
+                        </TouchableOpacity>
+                      </View>
 
-                    {/* Search Bar - Fixed */}
-                    <View style={[tw`bg-gray-100 rounded-2xl flex-row items-center`, { paddingHorizontal: horizontalScale(15), paddingVertical: verticalScale(11.25), marginBottom: verticalScale(15), marginHorizontal: horizontalScale(15) }]}>
-                      <Image source={Search} style={{ width: horizontalScale(18.75), height: horizontalScale(18.75), marginRight: horizontalScale(7.5) }} />
-                      <TextInput
-                        style={[tw`flex-1 text-black font-dm`, { fontSize: moderateScale(13.125) }]}
-                        placeholder="Search contacts"
-                        placeholderTextColor="#999"
-                        value={contactSearchText}
-                        onChangeText={setContactSearchText}
-                      />
-                    </View>
+                      {/* Search Bar - Fixed */}
+                      <View style={[tw`bg-gray-100 rounded-2xl flex-row items-center`, { paddingHorizontal: horizontalScale(15), paddingVertical: verticalScale(11.25), marginBottom: verticalScale(15), marginHorizontal: horizontalScale(15) }]}>
+                        <Image source={Search} style={{ width: horizontalScale(18.75), height: horizontalScale(18.75), marginRight: horizontalScale(7.5) }} />
+                        <TextInput
+                          style={[tw`flex-1 text-black font-dm`, { fontSize: moderateScale(13.125) }]}
+                          placeholder="Search contacts"
+                          placeholderTextColor="#999"
+                          value={contactSearchText}
+                          onChangeText={setContactSearchText}
+                        />
+                      </View>
 
-              {/* Contacts List */}
-              <ScrollView style={{ maxHeight: verticalScale(337.5) }} showsVerticalScrollIndicator={false}>
-                {isLoadingContacts ? (
-                  <View style={{ paddingVertical: verticalScale(37.5), alignItems: 'center' }}>
-                    <Text style={[tw`text-grey font-dm`, { fontSize: moderateScale(15) }]}>Loading contacts...</Text>
-                  </View>
-                ) : filteredContacts.length > 0 ? (
-                  filteredContacts.map((contact) => {
-                    const isDisabled = !contact.contactUser?.id;
-                    return (
-                      <TouchableOpacity
-                        key={contact.id}
-                        style={[
-                          tw`flex-row items-center border-b border-gray-100`,
-                          { paddingVertical: verticalScale(15) },
-                          isDisabled && tw`opacity-50`
-                        ]}
-                        activeOpacity={isDisabled ? 1 : 0.7}
-                        onPress={() => !isDisabled && handleContactSelect(contact)}
-                        disabled={isDisabled}
-                      >
-                        <View style={[tw`rounded-full bg-gray-200 items-center justify-center overflow-hidden`, { width: horizontalScale(45), height: horizontalScale(45), marginRight: horizontalScale(15) }]}>
-                          {contact.contactUser?.avatar ? (
-                            <Image
-                              source={{ uri: contact.contactUser.avatar }}
-                              style={{ width: horizontalScale(45), height: horizontalScale(45), borderRadius: 9999 }}
-                            />
-                          ) : (
-                            <Image source={Avatar} style={{ width: horizontalScale(30), height: horizontalScale(30) }} />
-                          )}
-                        </View>
-                        <View style={tw`flex-1`}>
-                          <Text style={[tw`text-black font-bold font-dm`, { fontSize: moderateScale(15) }]}>
-                            {contact.displayName}
-                          </Text>
-                          {contact.contactPhone && (
-                            <Text style={[tw`text-grey font-dm`, { fontSize: moderateScale(13.125) }]}>
-                              {contact.contactPhone}
-                            </Text>
-                          )}
-                          {isDisabled && (
-                            <Text style={[tw`text-grey font-dm`, { fontSize: moderateScale(11.25), marginTop: 1 }]}>
-                              Not registered
-                            </Text>
-                          )}
-                        </View>
-                      </TouchableOpacity>
-                    );
-                  })
-                ) : (
-                  <View style={{ paddingVertical: verticalScale(37.5), alignItems: 'center' }}>
-                    <Text style={[tw`text-grey font-dm`, { fontSize: moderateScale(15) }]}>No contacts found</Text>
-                  </View>
-                )}
-                    </ScrollView>
-                  </View>
-                </TouchableOpacity>
-              </View>
-            </TouchableOpacity>
-          </KeyboardAvoidingView>
-        </View>
-      </Modal>
+                      {/* Contacts List */}
+                      <ScrollView style={{ maxHeight: verticalScale(337.5) }} showsVerticalScrollIndicator={false}>
+                        {isLoadingContacts ? (
+                          <View style={{ paddingVertical: verticalScale(37.5), alignItems: 'center' }}>
+                            <Text style={[tw`text-grey font-dm`, { fontSize: moderateScale(15) }]}>Loading contacts...</Text>
+                          </View>
+                        ) : filteredContacts.length > 0 ? (
+                          filteredContacts.map((contact) => {
+                            const isDisabled = !contact.contactUser?.id;
+                            return (
+                              <TouchableOpacity
+                                key={contact.id}
+                                style={[
+                                  tw`flex-row items-center border-b border-gray-100`,
+                                  { paddingVertical: verticalScale(15) },
+                                  isDisabled && tw`opacity-50`
+                                ]}
+                                activeOpacity={isDisabled ? 1 : 0.7}
+                                onPress={() => !isDisabled && handleContactSelect(contact)}
+                                disabled={isDisabled}
+                              >
+                                <View style={[tw`rounded-full bg-gray-200 items-center justify-center overflow-hidden`, { width: horizontalScale(45), height: horizontalScale(45), marginRight: horizontalScale(15) }]}>
+                                  {contact.contactUser?.avatar ? (
+                                    <Image
+                                      source={{ uri: contact.contactUser.avatar }}
+                                      style={{ width: horizontalScale(45), height: horizontalScale(45), borderRadius: 9999 }}
+                                    />
+                                  ) : (
+                                    <Image source={Avatar} style={{ width: horizontalScale(30), height: horizontalScale(30) }} />
+                                  )}
+                                </View>
+                                <View style={tw`flex-1`}>
+                                  <Text style={[tw`text-black font-bold font-dm`, { fontSize: moderateScale(15) }]}>
+                                    {contact.displayName}
+                                  </Text>
+                                  {contact.contactPhone && (
+                                    <Text style={[tw`text-grey font-dm`, { fontSize: moderateScale(13.125) }]}>
+                                      {contact.contactPhone}
+                                    </Text>
+                                  )}
+                                  {isDisabled && (
+                                    <Text style={[tw`text-grey font-dm`, { fontSize: moderateScale(11.25), marginTop: 1 }]}>
+                                      Not registered
+                                    </Text>
+                                  )}
+                                </View>
+                              </TouchableOpacity>
+                            );
+                          })
+                        ) : (
+                          <View style={{ paddingVertical: verticalScale(37.5), alignItems: 'center' }}>
+                            <Text style={[tw`text-grey font-dm`, { fontSize: moderateScale(15) }]}>No contacts found</Text>
+                          </View>
+                        )}
+                      </ScrollView>
+                    </View>
+                  </TouchableOpacity>
+                </View>
+              </TouchableOpacity>
+            </KeyboardAvoidingView>
+          </View>
+        </Modal>
       )}
     </>
   );

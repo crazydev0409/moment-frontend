@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState, useCallback, useRef } from 'react';
 import { Alert, ActivityIndicator } from 'react-native';
 import Toast from '~/components/Toast';
 import {
@@ -10,6 +10,8 @@ import {
   KeyboardAvoidingView,
   ScrollView,
   Platform,
+  Keyboard,
+  Animated,
 } from 'react-native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { useFocusEffect } from '@react-navigation/native';
@@ -41,6 +43,33 @@ const AppStack_ProfileScreen: React.FC<Props> = ({ navigation, route }) => {
   const [showToast, setShowToast] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [user, setUser] = useAtom(userAtom);
+  const translateY = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    const keyboardShowEvent = Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow';
+    const keyboardHideEvent = Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide';
+
+    const showSubscription = Keyboard.addListener(keyboardShowEvent, () => {
+      Animated.timing(translateY, {
+        toValue: -20,
+        duration: 250,
+        useNativeDriver: true,
+      }).start();
+    });
+
+    const hideSubscription = Keyboard.addListener(keyboardHideEvent, () => {
+      Animated.timing(translateY, {
+        toValue: 0,
+        duration: 250,
+        useNativeDriver: true,
+      }).start();
+    });
+
+    return () => {
+      showSubscription.remove();
+      hideSubscription.remove();
+    };
+  }, [translateY]);
 
   // Fetch and update user profile
   const fetchUserProfile = useCallback(async () => {
@@ -162,21 +191,23 @@ const AppStack_ProfileScreen: React.FC<Props> = ({ navigation, route }) => {
   };
 
   return (
-    <View style={tw`flex-1 relative bg-white`}>
-      <Image source={Background} style={tw`absolute w-full h-full`} />
+    <View style={[tw`flex-1 relative`, { backgroundColor: '#F5F5F0' }]}>
+      <Image source={Background} style={tw`absolute w-full h-full`} resizeMode="cover" />
       <View style={tw`absolute w-full h-full bg-black opacity-5`} />
 
       <KeyboardAvoidingView 
         style={tw`flex-1`}
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-        keyboardVerticalOffset={0}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        keyboardVerticalOffset={Platform.OS === 'ios' ? 60 : 0}
       >
         <ScrollView 
           contentContainerStyle={{ flexGrow: 1 }}
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
+          bounces={false}
+          overScrollMode="never"
         >
-          <View style={[tw``, { marginTop: verticalScale(60), paddingBottom: verticalScale(120), paddingHorizontal: '8%' }]}>
+          <Animated.View style={[tw``, { marginTop: verticalScale(60), paddingBottom: verticalScale(150), paddingHorizontal: '8%', transform: [{ translateY }] }]}>
             {/* Header with back arrow and settings */}
             <View style={[tw`flex-row justify-between items-center`, { marginBottom: -verticalScale(7.5) }]}>
               <TouchableOpacity onPress={navigateToMainPage} activeOpacity={0.5}>
@@ -303,7 +334,7 @@ const AppStack_ProfileScreen: React.FC<Props> = ({ navigation, route }) => {
             <Text style={[tw`text-red-500`, { fontSize: moderateScale(11), marginBottom: verticalScale(11), marginTop: verticalScale(11) }]}>{confirmEmailError}</Text>
           ) : <View style={{ marginBottom: verticalScale(11), marginTop: verticalScale(11) }} />}
         </View>
-          </View>
+          </Animated.View>
         </ScrollView>
         <View style={tw`absolute bottom-0 w-full flex-col items-center`}>
           <TouchableOpacity

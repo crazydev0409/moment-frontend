@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import {
   View,
@@ -12,6 +12,8 @@ import {
   KeyboardAvoidingView,
   ScrollView,
   Platform,
+  Keyboard,
+  Animated,
 } from 'react-native';
 import tw from '~/tailwindcss';
 import { AuthStackParamList } from '.';
@@ -35,6 +37,33 @@ const AuthStack_SignupScreen: React.FC<Props> = ({ navigation, route }) => {
   const [isSending, setIsSending] = useState(false);
   const [rememberMe, setRememberMe] = useState(false);
   const [pickerVisible, setPickerVisible] = useState(false);
+  const translateY = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    const keyboardShowEvent = Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow';
+    const keyboardHideEvent = Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide';
+
+    const showSubscription = Keyboard.addListener(keyboardShowEvent, () => {
+      Animated.timing(translateY, {
+        toValue: -80,
+        duration: 250,
+        useNativeDriver: true,
+      }).start();
+    });
+
+    const hideSubscription = Keyboard.addListener(keyboardHideEvent, () => {
+      Animated.timing(translateY, {
+        toValue: 0,
+        duration: 250,
+        useNativeDriver: true,
+      }).start();
+    });
+
+    return () => {
+      showSubscription.remove();
+      hideSubscription.remove();
+    };
+  }, [translateY]);
 
   const onSendCode = () => {
     const phoneNumber = `+${callingCode}${phone}`;
@@ -76,14 +105,14 @@ const AuthStack_SignupScreen: React.FC<Props> = ({ navigation, route }) => {
       <KeyboardAvoidingView 
         style={tw`flex-1`}
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-        keyboardVerticalOffset={0}
+        keyboardVerticalOffset={Platform.OS === 'ios' ? 60 : 60}
       >
         <ScrollView 
           contentContainerStyle={{ flexGrow: 1 }}
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
         >
-          <View style={[{ marginTop: verticalScale(37.5), paddingBottom: verticalScale(120) }, { paddingHorizontal: '8%' }]}>
+          <Animated.View style={[{ marginTop: verticalScale(37.5), paddingBottom: verticalScale(120), transform: [{ translateY }] }, { paddingHorizontal: '8%' }]}>
             <TouchableOpacity onPress={() => navigation.goBack()} activeOpacity={0.5} style={{ marginBottom: verticalScale(18.75) }}>
               <Image source={BackArrow} style={{ width: horizontalScale(24), height: horizontalScale(24) }} resizeMode="contain" />
             </TouchableOpacity>
@@ -185,9 +214,9 @@ const AuthStack_SignupScreen: React.FC<Props> = ({ navigation, route }) => {
                 Remember me on this device
               </Text>
             </TouchableOpacity>
-          </View>
+          </Animated.View>
         </ScrollView>
-        <View style={tw`absolute bottom-0 w-full flex-col items-center`}>
+        <View style={tw`absolute bottom-5 w-full flex-col items-center`}>
           <TouchableOpacity
             onPress={onSendCode}
             activeOpacity={0.7}
