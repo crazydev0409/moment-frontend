@@ -155,7 +155,7 @@ const AuthStack_MeetingTypesScreen: React.FC<Props> = ({ navigation, route }) =>
       </ScrollView>
 
       {/* Save Button */}
-      <View style={[tw`absolute bottom-0 w-full flex-col items-center`, { paddingBottom: verticalScale(37.5) }]}>
+      <View style={[tw`absolute bottom-5 w-full flex-col items-center`, { paddingBottom: verticalScale(37.5) }]}>
         <TouchableOpacity
           onPress={handleSave}
           activeOpacity={0.7}

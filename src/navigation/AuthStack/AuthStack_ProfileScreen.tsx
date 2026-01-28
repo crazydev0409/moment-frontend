@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useRef } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Alert, ActivityIndicator } from 'react-native';
 import {
   View,
@@ -6,11 +6,6 @@ import {
   TextInput,
   TouchableOpacity,
   Image,
-  KeyboardAvoidingView,
-  ScrollView,
-  Platform,
-  Keyboard,
-  Animated,
 } from 'react-native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import tw from '~/tailwindcss';
@@ -39,39 +34,10 @@ const AuthStack_ProfileScreen: React.FC<Props> = ({ navigation, route }) => {
   const [confirmEmailError, setConfirmEmailError] = useState('');
   const [isSaving, setIsSaving] = useState(false);
   const [user] = useAtom(userAtom);
-  const translateY = useRef(new Animated.Value(0)).current;
-  const scrollViewRef = useRef<ScrollView>(null);
-
   useEffect(() => {
     if (user.name) setName(user.name);
     if (user.email) setEmail(user.email);
   }, [user]);
-
-  useEffect(() => {
-    const keyboardShowEvent = Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow';
-    const keyboardHideEvent = Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide';
-
-    const showSubscription = Keyboard.addListener(keyboardShowEvent, () => {
-      Animated.timing(translateY, {
-        toValue: -20,
-        duration: 250,
-        useNativeDriver: true,
-      }).start();
-    });
-
-    const hideSubscription = Keyboard.addListener(keyboardHideEvent, () => {
-      Animated.timing(translateY, {
-        toValue: 0,
-        duration: 250,
-        useNativeDriver: true,
-      }).start();
-    });
-
-    return () => {
-      showSubscription.remove();
-      hideSubscription.remove();
-    };
-  }, [translateY]);
   const navigateToMainPage = () => {
     navigation.navigate('AppStack');
   };
@@ -147,27 +113,14 @@ const AuthStack_ProfileScreen: React.FC<Props> = ({ navigation, route }) => {
   };
 
   return (
-    <View style={[tw`flex-1 relative`, { backgroundColor: '#F5F5F0' }]}>
-      <Image source={Background} style={tw`absolute w-full h-full`} resizeMode="cover" />
+    <View style={tw`flex-1 relative bg-white`}>
+      <Image source={Background} style={tw`absolute w-full h-full`} />
       <View style={tw`absolute w-full h-full bg-black opacity-5`} />
-      <KeyboardAvoidingView 
-        style={tw`flex-1`}
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        keyboardVerticalOffset={Platform.OS === 'ios' ? 60 : 0}
-      >
-        <ScrollView 
-          ref={scrollViewRef}
-          contentContainerStyle={{ flexGrow: 1 }}
-          keyboardShouldPersistTaps="handled"
-          showsVerticalScrollIndicator={false}
-          bounces={false}
-          overScrollMode="never"
-        >
-          <Animated.View style={[{ marginTop: verticalScale(37.5), paddingBottom: verticalScale(150), transform: [{ translateY }] }, { paddingHorizontal: '8%' }]}>
-            <TouchableOpacity onPress={navigateToMainPage} activeOpacity={0.5} style={{ marginBottom: verticalScale(18.75) }}>
-              <Image source={BackArrow} style={{ width: horizontalScale(24), height: horizontalScale(24) }} resizeMode="contain" />
-            </TouchableOpacity>
-            <Text style={[tw`font-bold font-dm w-2/3`, { fontSize: moderateScale(20.625), lineHeight: moderateScale(30), marginBottom: verticalScale(26.25) }]}>Fill in your profile details</Text>
+      <View style={[{ marginTop: verticalScale(37.5), marginBottom: verticalScale(37.5) }, { paddingHorizontal: '8%' }]}>
+        <TouchableOpacity onPress={navigateToMainPage} activeOpacity={0.5} style={{ marginBottom: verticalScale(18.75) }}>
+          <Image source={BackArrow} style={{ width: horizontalScale(24), height: horizontalScale(24) }} resizeMode="contain" />
+        </TouchableOpacity>
+        <Text style={[tw`font-bold font-dm w-2/3`, { fontSize: moderateScale(20.625), lineHeight: moderateScale(30), marginBottom: verticalScale(26.25) }]}>Fill in your profile details</Text>
         <View style={tw``}>
           <Text style={[tw`text-grey font-dm`, { fontSize: moderateScale(11.25), lineHeight: moderateScale(19.6875), marginBottom: verticalScale(7.5) }]}>Name</Text>
           <TextInput
@@ -256,27 +209,25 @@ const AuthStack_ProfileScreen: React.FC<Props> = ({ navigation, route }) => {
             <Text style={[tw`text-red-500`, { fontSize: moderateScale(11.25), marginBottom: verticalScale(11.25), marginTop: verticalScale(11.25) }]}>{confirmEmailError}</Text>
           ) : <View style={{ marginBottom: verticalScale(11.25), marginTop: verticalScale(11.25) }} />}
         </View>
-          </Animated.View>
-        </ScrollView>
-        <View style={tw`absolute bottom-0 w-full flex-col items-center`}>
-          <TouchableOpacity
-            onPress={navigateToPlanPage}
-            activeOpacity={0.7}
-            disabled={isSaving}
-          >
-            <View
-              style={[tw`bg-[#A3CB31] rounded-full justify-center items-center shadow-lg ${isSaving ? 'opacity-50' : ''}`, { height: verticalScale(56.25), width: horizontalScale(225), marginBottom: verticalScale(37.5) }]}>
-              {isSaving ? (
-                <ActivityIndicator size="small" color="#FFFFFF" />
-              ) : (
-                <Text style={[tw`text-white font-bold font-dm`, { fontSize: moderateScale(15) }]}>
-                  Next
-                </Text>
-              )}
-            </View>
-          </TouchableOpacity>
-        </View>
-      </KeyboardAvoidingView>
+      </View>
+      <View style={tw`absolute bottom-5 w-full flex-col items-center`}>
+        <TouchableOpacity
+          onPress={navigateToPlanPage}
+          activeOpacity={0.7}
+          disabled={isSaving}
+        >
+          <View
+            style={[tw`bg-[#A3CB31] rounded-full justify-center items-center shadow-lg ${isSaving ? 'opacity-50' : ''}`, { height: verticalScale(56.25), width: horizontalScale(225), marginBottom: verticalScale(37.5) }]}>
+            {isSaving ? (
+              <ActivityIndicator size="small" color="#FFFFFF" />
+            ) : (
+              <Text style={[tw`text-white font-bold font-dm`, { fontSize: moderateScale(15) }]}>
+                Next
+              </Text>
+            )}
+          </View>
+        </TouchableOpacity>
+      </View>
 
     </View>
   );

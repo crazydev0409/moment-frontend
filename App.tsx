@@ -5,7 +5,6 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import * as SplashScreen from 'expo-splash-screen';
 import * as Contacts from 'expo-contacts';
 import * as Location from 'expo-location';
-import CustomSplashScreen from '~/components/SplashScreen';
 import RootNavigator from './src';
 import { useAtom } from 'jotai';
 import { userAtom } from '~/store';
@@ -22,12 +21,11 @@ import {
 import { initializeSocket, disconnectSocket } from '~/services/socketService';
 import { checkDeviceRegistration } from '~/services/deviceService';
 
-SplashScreen.preventAutoHideAsync(); // don't let Expo hide it automatically
+SplashScreen.preventAutoHideAsync(); // Keep native splash visible until app is ready
 
 export default function App() {
   useDeviceContext(tw);
   const [appIsReady, setAppIsReady] = useState(false);
-  const [showCustomSplash, setShowCustomSplash] = useState(true);
   const [__, setUser] = useAtom(userAtom);
   console.log({ __ });
   useEffect(() => {
@@ -277,28 +275,21 @@ export default function App() {
 
   const onLayoutRootView = useCallback(async () => {
     if (appIsReady) {
-      // 👇 hide the native (white) Expo splash
+      // Hide the native splash screen once app is ready
       await SplashScreen.hideAsync();
-
-      // optional: keep your custom splash for a bit
-      setTimeout(() => setShowCustomSplash(false), 1000);
     }
   }, [appIsReady]);
 
   if (!appIsReady) {
-    // native splash is still showing here
+    // Native splash is still showing while app initializes
     return null;
   }
 
-  // Here JS is ready, we control what to show
+  // App is ready - show the main navigator
   return (
     <SafeAreaProvider>
       <View style={{ flex: 1 }} onLayout={onLayoutRootView}>
-        {showCustomSplash ? (
-          <CustomSplashScreen />
-        ) : (
-          <RootNavigator />
-        )}
+        <RootNavigator />
       </View>
     </SafeAreaProvider>
   );
