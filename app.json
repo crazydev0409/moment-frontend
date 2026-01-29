@@ -70,7 +70,10 @@
         "android.permission.ACCESS_FINE_LOCATION"
       ],
       "package": "com.crazydev0409.catchapp",
-      "softwareKeyboardLayoutMode": "pan"
+      "softwareKeyboardLayoutMode": "resize",
+      "statusBar": {
+        "translucent": false
+      }
     },
     "notification": {
       "icon": "./assets/images/logo.png",

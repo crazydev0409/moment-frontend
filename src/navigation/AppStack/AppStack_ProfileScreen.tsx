@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState, useCallback, useRef } from 'react';
 import { Alert, ActivityIndicator } from 'react-native';
 import Toast from '~/components/Toast';
 import {
@@ -7,6 +7,11 @@ import {
   TextInput,
   TouchableOpacity,
   Image,
+  KeyboardAvoidingView,
+  ScrollView,
+  Platform,
+  Keyboard,
+  Animated,
 } from 'react-native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { useFocusEffect } from '@react-navigation/native';
@@ -38,6 +43,33 @@ const AppStack_ProfileScreen: React.FC<Props> = ({ navigation, route }) => {
   const [showToast, setShowToast] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [user, setUser] = useAtom(userAtom);
+  const translateY = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    const keyboardShowEvent = Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow';
+    const keyboardHideEvent = Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide';
+
+    const showSubscription = Keyboard.addListener(keyboardShowEvent, () => {
+      Animated.timing(translateY, {
+        toValue: -80,
+        duration: 250,
+        useNativeDriver: true,
+      }).start();
+    });
+
+    const hideSubscription = Keyboard.addListener(keyboardHideEvent, () => {
+      Animated.timing(translateY, {
+        toValue: 0,
+        duration: 250,
+        useNativeDriver: true,
+      }).start();
+    });
+
+    return () => {
+      showSubscription.remove();
+      hideSubscription.remove();
+    };
+  }, [translateY]);
 
   // Fetch and update user profile
   const fetchUserProfile = useCallback(async () => {
@@ -163,26 +195,36 @@ const AppStack_ProfileScreen: React.FC<Props> = ({ navigation, route }) => {
       <Image source={Background} style={tw`absolute w-full h-full`} />
       <View style={tw`absolute w-full h-full bg-black opacity-5`} />
 
-      <View style={[tw``, { marginTop: verticalScale(60), marginBottom: verticalScale(37.5), paddingHorizontal: '8%' }]}>
-        {/* Header with back arrow and settings */}
-        <View style={[tw`flex-row justify-between items-center`, { marginBottom: -verticalScale(7.5) }]}>
-          <TouchableOpacity onPress={navigateToMainPage} activeOpacity={0.5}>
-            <Image source={BackArrow} style={[tw``, { width: horizontalScale(24), height: horizontalScale(24) }]} resizeMode="contain" />
-          </TouchableOpacity>
-          <TouchableOpacity
-            activeOpacity={0.5}
-            onPress={() => navigation.navigate('AppStack_SettingsScreen')}
-          >
-            <Image source={Settings} style={[tw``, { width: horizontalScale(30), height: horizontalScale(30) }]} resizeMode="contain" />
-          </TouchableOpacity>
-        </View>
+      <KeyboardAvoidingView 
+        style={tw`flex-1`}
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        keyboardVerticalOffset={Platform.OS === 'ios' ? 60 : 60}
+      >
+        <ScrollView 
+          contentContainerStyle={{ flexGrow: 1 }}
+          keyboardShouldPersistTaps="handled"
+          showsVerticalScrollIndicator={false}
+        >
+          <Animated.View style={[{ marginTop: verticalScale(37.5), paddingBottom: verticalScale(120), transform: [{ translateY }] }, { paddingHorizontal: '8%' }]}>
+            {/* Header with back arrow and settings */}
+            <View style={[tw`flex-row justify-between items-center`, { marginBottom: -verticalScale(7.5) }]}>
+              <TouchableOpacity onPress={navigateToMainPage} activeOpacity={0.5}>
+                <Image source={BackArrow} style={[tw``, { width: horizontalScale(24), height: horizontalScale(24) }]} resizeMode="contain" />
+              </TouchableOpacity>
+              <TouchableOpacity
+                activeOpacity={0.5}
+                onPress={() => navigation.navigate('AppStack_SettingsScreen')}
+              >
+                <Image source={Settings} style={[tw``, { width: horizontalScale(30), height: horizontalScale(30) }]} resizeMode="contain" />
+              </TouchableOpacity>
+            </View>
 
-        {/* Profile Picture */}
-        <View style={[tw`items-center`, { marginBottom: verticalScale(30) }]}>
-          <View style={[tw`rounded-full bg-white items-center justify-center shadow-sm`, { width: horizontalScale(82.5), height: horizontalScale(82.5) }]}>
-            <Image source={Avatar} style={[tw``, { width: horizontalScale(75), height: horizontalScale(75) }]} resizeMode="contain" />
-          </View>
-        </View>
+            {/* Profile Picture */}
+            <View style={[tw`items-center`, { marginBottom: verticalScale(30) }]}>
+              <View style={[tw`rounded-full bg-white items-center justify-center shadow-sm`, { width: horizontalScale(82.5), height: horizontalScale(82.5) }]}>
+                <Image source={Avatar} style={[tw``, { width: horizontalScale(75), height: horizontalScale(75) }]} resizeMode="contain" />
+              </View>
+            </View>
         <View style={tw``}>
           <Text style={[tw`text-grey`, { fontSize: moderateScale(12), lineHeight: verticalScale(19), marginBottom: verticalScale(7.5) }]}>Name</Text>
           <TextInput
@@ -286,33 +328,35 @@ const AppStack_ProfileScreen: React.FC<Props> = ({ navigation, route }) => {
             placeholder="Confirm Email"
           />
 
-          {confirmEmailError ? (
-            <Text style={[tw`text-red-500`, { fontSize: moderateScale(11), marginBottom: verticalScale(11), marginTop: verticalScale(11) }]}>{confirmEmailError}</Text>
-          ) : <View style={{ marginBottom: verticalScale(11), marginTop: verticalScale(11) }} />}
-        </View>
-      </View>
-      <View style={tw`absolute bottom-5 w-full flex-col items-center`}>
-        <TouchableOpacity
-          onPress={navigateToPlanPage}
-          activeOpacity={0.7}
-          disabled={isSaving}
-        >
-          <View
-            style={[tw`bg-[#A3CB31] rounded-full justify-center items-center shadow-lg ${isSaving ? 'opacity-50' : ''}`, {
-              height: verticalScale(56),
-              width: horizontalScale(225),
-              marginBottom: verticalScale(37.5)
-            }]}>
-            {isSaving ? (
-              <ActivityIndicator size="small" color="#FFFFFF" />
-            ) : (
-              <Text style={[tw`text-white font-bold font-dm`, { fontSize: moderateScale(15) }]}>
-                Save
-              </Text>
-            )}
+            {confirmEmailError ? (
+              <Text style={[tw`text-red-500`, { fontSize: moderateScale(11), marginBottom: verticalScale(11), marginTop: verticalScale(11) }]}>{confirmEmailError}</Text>
+            ) : <View style={{ marginBottom: verticalScale(11), marginTop: verticalScale(11) }} />}
           </View>
-        </TouchableOpacity>
-      </View>
+          </Animated.View>
+        </ScrollView>
+        <View style={tw`absolute bottom-5 w-full flex-col items-center`}>
+          <TouchableOpacity
+            onPress={navigateToPlanPage}
+            activeOpacity={0.7}
+            disabled={isSaving}
+          >
+            <View
+              style={[tw`bg-[#A3CB31] rounded-full justify-center items-center shadow-lg ${isSaving ? 'opacity-50' : ''}`, {
+                height: verticalScale(56),
+                width: horizontalScale(225),
+                marginBottom: verticalScale(37.5)
+              }]}>
+              {isSaving ? (
+                <ActivityIndicator size="small" color="#FFFFFF" />
+              ) : (
+                <Text style={[tw`text-white font-bold font-dm`, { fontSize: moderateScale(15) }]}>
+                  Save
+                </Text>
+              )}
+            </View>
+          </TouchableOpacity>
+        </View>
+      </KeyboardAvoidingView>
 
       {/* Toast notification */}
       <Toast

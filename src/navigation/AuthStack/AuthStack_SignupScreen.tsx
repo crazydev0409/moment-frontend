@@ -187,7 +187,12 @@ const AuthStack_SignupScreen: React.FC<Props> = ({ navigation, route }) => {
                   style={[tw`bg-white rounded-lg flex-1 font-dm font-bold`, { fontSize: moderateScale(16.875), marginTop: verticalScale(0.5) }]}
                   value={phone}
                   placeholder="Phone Number?"
-                  onChangeText={setPhone}
+                  keyboardType="phone-pad"
+                  onChangeText={(text) => {
+                    // Only allow digits
+                    const numericValue = text.replace(/[^0-9]/g, '');
+                    setPhone(numericValue);
+                  }}
                 />
 
               </View>

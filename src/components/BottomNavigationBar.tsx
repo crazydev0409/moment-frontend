@@ -1,5 +1,5 @@
-import React, { useState, useEffect, useCallback } from 'react';
-import { View, TouchableOpacity, Image, Modal, Text, TextInput, ScrollView, Alert, Platform, KeyboardAvoidingView } from 'react-native';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
+import { View, TouchableOpacity, Image, Modal, Text, TextInput, ScrollView, Alert, Platform, KeyboardAvoidingView, Animated } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -37,6 +37,10 @@ const BottomNavigationBar: React.FC<BottomNavigationBarProps> = ({
   const [contactSearchText, setContactSearchText] = useState('');
   const [isLoadingContacts, setIsLoadingContacts] = useState(false);
   const [isTransitioning, setIsTransitioning] = useState(false);
+
+  // Animation values for smooth modal transitions
+  const contactModalSlideAnim = useRef(new Animated.Value(0)).current;
+  const contactModalOpacityAnim = useRef(new Animated.Value(0)).current;
 
   // Handle Tab Navigation
   const handleHomePress = () => {
@@ -131,8 +135,21 @@ const BottomNavigationBar: React.FC<BottomNavigationBarProps> = ({
   };
 
   const handleCloseContactModal = () => {
-    setShowContactModal(false);
-    setContactSearchText('');
+    Animated.parallel([
+      Animated.timing(contactModalSlideAnim, {
+        toValue: 0,
+        duration: 300,
+        useNativeDriver: true,
+      }),
+      Animated.timing(contactModalOpacityAnim, {
+        toValue: 0,
+        duration: 300,
+        useNativeDriver: true,
+      }),
+    ]).start(() => {
+      setShowContactModal(false);
+      setContactSearchText('');
+    });
   };
 
   return (
@@ -247,10 +264,30 @@ const BottomNavigationBar: React.FC<BottomNavigationBarProps> = ({
         <Modal
           visible={showContactModal && !isTransitioning}
           transparent={true}
-          animationType="slide"
+          animationType="none"
           onRequestClose={handleCloseContactModal}
+          onShow={() => {
+            // Animate in when modal becomes visible
+            Animated.parallel([
+              Animated.timing(contactModalSlideAnim, {
+                toValue: 1,
+                duration: 300,
+                useNativeDriver: true,
+              }),
+              Animated.timing(contactModalOpacityAnim, {
+                toValue: 1,
+                duration: 300,
+                useNativeDriver: true,
+              }),
+            ]).start();
+          }}
         >
-          <View style={tw`flex-1`}>
+          <Animated.View
+            style={[
+              tw`flex-1`,
+              { opacity: contactModalOpacityAnim }
+            ]}
+          >
             <BlurView intensity={20} tint="dark" style={tw`absolute inset-0`}>
               <View style={tw`flex-1 bg-black opacity-40`} />
             </BlurView>
@@ -266,7 +303,19 @@ const BottomNavigationBar: React.FC<BottomNavigationBarProps> = ({
               >
                 <View style={tw`flex-1 justify-end`}>
                   <TouchableOpacity activeOpacity={1} onPress={(e) => e.stopPropagation()}>
-                    <View style={[tw`bg-white rounded-t-3xl`]}>
+                    <Animated.View
+                      style={[
+                        tw`bg-white rounded-t-3xl`,
+                        {
+                          transform: [{
+                            translateY: contactModalSlideAnim.interpolate({
+                              inputRange: [0, 1],
+                              outputRange: [300, 0],
+                            }),
+                          }],
+                        }
+                      ]}
+                    >
                       {/* Header - Fixed */}
                       <View style={[tw`flex-row justify-between items-center`, { paddingTop: verticalScale(22.5), paddingHorizontal: horizontalScale(15), paddingBottom: verticalScale(15) }]}>
                         <Text style={[tw`text-black font-bold font-dm`, { fontSize: moderateScale(18.75) }]}>Select Contact</Text>
@@ -282,7 +331,7 @@ const BottomNavigationBar: React.FC<BottomNavigationBarProps> = ({
                       <View style={[tw`bg-gray-100 rounded-2xl flex-row items-center`, { paddingHorizontal: horizontalScale(15), paddingVertical: verticalScale(11.25), marginBottom: verticalScale(15), marginHorizontal: horizontalScale(15) }]}>
                         <Image source={Search} style={{ width: horizontalScale(18.75), height: horizontalScale(18.75), marginRight: horizontalScale(7.5) }} />
                         <TextInput
-                          style={[tw`flex-1 text-black font-dm`, { fontSize: moderateScale(13.125) }]}
+                          style={tw`flex-1 text-black font-dm`}
                           placeholder="Search contacts"
                           placeholderTextColor="#999"
                           value={contactSearchText}
@@ -290,13 +339,13 @@ const BottomNavigationBar: React.FC<BottomNavigationBarProps> = ({
                         />
                       </View>
 
-                      {/* Contacts List */}
-                      <ScrollView style={{ maxHeight: verticalScale(337.5) }} showsVerticalScrollIndicator={false}>
-                        {isLoadingContacts ? (
-                          <View style={{ paddingVertical: verticalScale(37.5), alignItems: 'center' }}>
-                            <Text style={[tw`text-grey font-dm`, { fontSize: moderateScale(15) }]}>Loading contacts...</Text>
-                          </View>
-                        ) : filteredContacts.length > 0 ? (
+                      {/* Contacts List - Scrollable */}
+                      <ScrollView
+                        contentContainerStyle={{ paddingHorizontal: horizontalScale(15), paddingBottom: verticalScale(30) }}
+                        showsVerticalScrollIndicator={false}
+                        keyboardShouldPersistTaps="handled"
+                      >
+                        {filteredContacts.length > 0 ? (
                           filteredContacts.map((contact) => {
                             const isDisabled = !contact.contactUser?.id;
                             return (
@@ -331,7 +380,7 @@ const BottomNavigationBar: React.FC<BottomNavigationBarProps> = ({
                                     </Text>
                                   )}
                                   {isDisabled && (
-                                    <Text style={[tw`text-grey font-dm`, { fontSize: moderateScale(11.25), marginTop: 1 }]}>
+                                    <Text style={[tw`text-grey font-dm`, { fontSize: moderateScale(11.25), marginTop: verticalScale(3.75) }]}>
                                       Not registered
                                     </Text>
                                   )}
@@ -345,12 +394,12 @@ const BottomNavigationBar: React.FC<BottomNavigationBarProps> = ({
                           </View>
                         )}
                       </ScrollView>
-                    </View>
+                    </Animated.View>
                   </TouchableOpacity>
                 </View>
               </TouchableOpacity>
             </KeyboardAvoidingView>
-          </View>
+          </Animated.View>
         </Modal>
       )}
     </>
