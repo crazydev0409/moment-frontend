@@ -12,7 +12,7 @@ import {
   Animated,
   Platform,
   KeyboardAvoidingView,
-} from 'react-native';
+} from 'react-native'
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { useFocusEffect } from '@react-navigation/native';
 import * as Notifications from 'expo-notifications';
@@ -1783,22 +1783,20 @@ const AppStack_DateDetailScreen: React.FC<Props> = ({ navigation, route }) => {
 
 
       {/* Bottom Fixed Bar */}
-      {!(showContactModal || showCreateModal) && (
-        <View style={[tw`flex-1 justify-end bg-white rounded-t-3xl shadow-lg border-t border-gray-200`, { maxHeight: verticalScale(120) }]}>
-          <View style={[{ paddingTop: verticalScale(15), paddingBottom: verticalScale(37.5), justifyContent: 'flex-end' }, { paddingHorizontal: '4%' }]}>
-            {/* Book Meeting Button */}
-            <TouchableOpacity
-              onPress={handleBookMeetingPress}
-              activeOpacity={0.7}
-              style={[tw`bg-[#A3CB31] rounded-2xl items-center`, { paddingVertical: verticalScale(11.25) }]}
-            >
-              <Text style={[tw`text-white font-bold font-dm`, { fontSize: moderateScale(15) }]}>
-                Book a meeting
-              </Text>
-            </TouchableOpacity>
-          </View>
+      <View style={tw`absolute bottom-0 left-0 right-0 bg-white rounded-t-3xl shadow-lg border-t border-gray-200`}>
+        <View style={[{ paddingTop: verticalScale(15), paddingBottom: verticalScale(Platform.OS === 'ios' ? 35 : 45) }, { paddingHorizontal: '4%' }]}>
+          {/* Book Meeting Button */}
+          <TouchableOpacity
+            onPress={handleBookMeetingPress}
+            activeOpacity={0.7}
+            style={[tw`bg-[#A3CB31] rounded-2xl items-center`, { paddingVertical: verticalScale(11.25) }]}
+          >
+            <Text style={[tw`text-white font-bold font-dm`, { fontSize: moderateScale(15) }]}>
+              Book a meeting
+            </Text>
+          </TouchableOpacity>
         </View>
-      )}
+      </View>
       {/* Create Appointment Modal - Only render when contact modal is not active */}
       {!showContactModal && (
         <Modal
