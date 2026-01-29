@@ -197,15 +197,16 @@ const AppStack_ProfileScreen: React.FC<Props> = ({ navigation, route }) => {
 
       <KeyboardAvoidingView 
         style={tw`flex-1`}
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-        keyboardVerticalOffset={Platform.OS === 'ios' ? 60 : 60}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        keyboardVerticalOffset={Platform.OS === 'ios' ? 60 : 0}
       >
         <ScrollView 
-          contentContainerStyle={{ flexGrow: 1 }}
+          contentContainerStyle={{ flexGrow: 1, paddingBottom: verticalScale(150) }}
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
         >
-          <Animated.View style={[{ marginTop: verticalScale(37.5), paddingBottom: verticalScale(120), transform: [{ translateY }] }, { paddingHorizontal: '8%' }]}>
+          <Animated.View style={[{ marginTop: verticalScale(37.5), transform: [{ translateY }] }, { paddingHorizontal: '8%' }]}>
+
             {/* Header with back arrow and settings */}
             <View style={[tw`flex-row justify-between items-center`, { marginBottom: -verticalScale(7.5) }]}>
               <TouchableOpacity onPress={navigateToMainPage} activeOpacity={0.5}>

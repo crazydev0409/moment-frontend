@@ -1784,7 +1784,7 @@ const AppStack_DateDetailScreen: React.FC<Props> = ({ navigation, route }) => {
 
       {/* Bottom Fixed Bar */}
       <View style={tw`absolute bottom-0 left-0 right-0 bg-white rounded-t-3xl shadow-lg border-t border-gray-200`}>
-        <View style={[{ paddingTop: verticalScale(15), paddingBottom: verticalScale(Platform.OS === 'ios' ? 35 : 45) }, { paddingHorizontal: '4%' }]}>
+        <View style={[{ paddingTop: verticalScale(15), paddingBottom: verticalScale(Platform.OS === 'ios' ? 35 : 50) }, { paddingHorizontal: '4%' }]}>
           {/* Book Meeting Button */}
           <TouchableOpacity
             onPress={handleBookMeetingPress}
