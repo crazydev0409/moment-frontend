@@ -26,6 +26,7 @@
         {
           "android": {
             "targetSdkVersion": 35,
+            "kotlinVersion": "2.0.21",
             "usesCleartextTraffic": true
           },
           "ios": {
@@ -40,6 +41,9 @@
     "orientation": "portrait",
     "icon": "./assets/images/logo.png",
     "userInterfaceStyle": "light",
+    "androidStatusBar": {
+      "translucent": false
+    },
     "splash": {
       "image": "./assets/splash.png",
       "resizeMode": "contain",
@@ -70,10 +74,7 @@
         "android.permission.ACCESS_FINE_LOCATION"
       ],
       "package": "com.crazydev0409.catchapp",
-      "softwareKeyboardLayoutMode": "resize",
-      "statusBar": {
-        "translucent": false
-      }
+      "softwareKeyboardLayoutMode": "resize"
     },
     "notification": {
       "icon": "./assets/images/logo.png",
