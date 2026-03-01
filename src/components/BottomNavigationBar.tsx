@@ -119,9 +119,9 @@ const BottomNavigationBar: React.FC<BottomNavigationBarProps> = ({
     }
   }, [showContactModal, loadContacts]);
 
-  const filteredContacts = contacts.filter(contact =>
-    contact.displayName.toLowerCase().includes(contactSearchText.toLowerCase())
-  );
+  const filteredContacts = contacts
+    .filter(contact => contact.displayName.toLowerCase().includes(contactSearchText.toLowerCase()))
+    .sort((a, b) => a.displayName.localeCompare(b.displayName));
 
   const handleContactSelect = (contact: any) => {
     setShowContactModal(false);

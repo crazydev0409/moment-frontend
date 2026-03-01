@@ -72,9 +72,35 @@ export async function requestNotificationPermissions(): Promise<boolean> {
   }
 }
 
-// Request notification permissions and get push token
-// Note: This should be called after user authentication
+// Get the Expo push token for this device — must be called after permissions are granted
+// and after the user is authenticated (push token registration requires a project ID)
+export async function registerPushToken(): Promise<string | null> {
+  try {
+    const { status } = await Notifications.getPermissionsAsync();
+    if (status !== 'granted') {
+      console.log('Cannot get push token: notification permission not granted');
+      return null;
+    }
 
+    const projectId =
+      (Constants.expoConfig as any)?.extra?.eas?.projectId ||
+      (Constants.expoConfig as any)?.projectId ||
+      (Constants.manifest as any)?.extra?.eas?.projectId;
+
+    if (!projectId) {
+      console.warn('Cannot get push token: EAS projectId not found in app config');
+      return null;
+    }
+
+    const tokenData = await Notifications.getExpoPushTokenAsync({ projectId });
+    console.log('📱 Expo push token registered:', tokenData.data);
+    return tokenData.data;
+  } catch (error: any) {
+    // Physical device required — emulators/simulators cannot receive push notifications
+    console.warn('Could not register push token (requires physical device):', error.message);
+    return null;
+  }
+}
 
 // Helper function to navigate to DateDetailScreen with meeting date
 function navigateToMeetingDate(data: any) {

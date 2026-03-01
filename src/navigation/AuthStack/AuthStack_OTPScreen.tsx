@@ -10,6 +10,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import Loading from '../../components/Loading';
 import { BackArrow, Background, SMSVerification } from '~/lib/images';
 import { getDeviceInfo } from '../../services/deviceService';
+import { registerPushToken } from '../../services/notificationService';
 import { horizontalScale, verticalScale, moderateScale } from '~/helpers/responsive';
 
 type Props = NativeStackScreenProps<AuthStackParamList, 'AuthStack_OTPScreen'>;
@@ -89,18 +90,23 @@ const AuthStack_OTPScreen: React.FC<Props> = ({ navigation, route }) => {
                 // Set to your global atom
                 setUser(response.data);
 
-                // Register device
+                // Register device (with push token for background notifications)
                 try {
-                  const deviceInfo = await getDeviceInfo();
+                  const [deviceInfo, pushToken] = await Promise.all([
+                    getDeviceInfo(),
+                    registerPushToken(),
+                  ]);
 
                   console.log('📤 Registering device with backend...', {
                     ...deviceInfo,
                     rememberMe: route.params.rememberMe || false,
+                    hasPushToken: !!pushToken,
                   });
 
                   await http.post('/devices/register', {
                     ...deviceInfo,
                     rememberMe: route.params.rememberMe || false,
+                    ...(pushToken ? { pushToken } : {}),
                   });
                   console.log('✅ Device registered successfully');
                 } catch (error) {

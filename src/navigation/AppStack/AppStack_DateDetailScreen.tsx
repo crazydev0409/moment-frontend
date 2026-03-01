@@ -1062,9 +1062,9 @@ const AppStack_DateDetailScreen: React.FC<Props> = ({ navigation, route }) => {
     });
   };
 
-  const filteredContacts = contacts.filter(contact =>
-    contact.displayName.toLowerCase().includes(contactSearchText.toLowerCase())
-  );
+  const filteredContacts = contacts
+    .filter(contact => contact.displayName.toLowerCase().includes(contactSearchText.toLowerCase()))
+    .sort((a, b) => a.displayName.localeCompare(b.displayName));
 
   // Check if a specific time slot is occupied by a meeting
   const isTimeSlotOccupied = useCallback((hour: number, minute: number, meetings: MomentRequest[]) => {
@@ -2270,7 +2270,7 @@ const AppStack_DateDetailScreen: React.FC<Props> = ({ navigation, route }) => {
                             </TouchableOpacity>
                           </View>
                         ) : selectedRequest.receiverId === user.id && selectedRequest.status === 'pending' ? (
-                          // User is the receiver and status is pending - show Accept/Reject buttons
+                          // Receiver + pending — show Accept/Reject buttons
                           <View style={[tw`flex-row`, { gap: horizontalScale(11.25), marginTop: verticalScale(15) }]}>
                             <TouchableOpacity
                               onPress={handleRejectRequest}
@@ -2297,6 +2297,24 @@ const AppStack_DateDetailScreen: React.FC<Props> = ({ navigation, route }) => {
                               ) : (
                                 <Text style={[tw`text-white font-bold font-dm`, { fontSize: moderateScale(15) }]}>
                                   Accept
+                                </Text>
+                              )}
+                            </TouchableOpacity>
+                          </View>
+                        ) : selectedRequest.receiverId === user.id && selectedRequest.status === 'approved' ? (
+                          // Receiver + approved — show Cancel Meeting button
+                          <View style={{ marginTop: verticalScale(15) }}>
+                            <TouchableOpacity
+                              onPress={handleCancelMeeting}
+                              activeOpacity={0.7}
+                              disabled={isCanceling}
+                              style={[tw`bg-white rounded-2xl border-black border-[1px] items-center ${isCanceling ? 'opacity-50' : ''}`, { paddingVertical: verticalScale(15) }]}
+                            >
+                              {isCanceling ? (
+                                <ActivityIndicator size="small" color="#FFFFFF" />
+                              ) : (
+                                <Text style={[tw`text-black font-bold font-dm`, { fontSize: moderateScale(15) }]}>
+                                  Cancel Meeting
                                 </Text>
                               )}
                             </TouchableOpacity>

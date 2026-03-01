@@ -15,11 +15,12 @@ import { useDeviceContext } from 'twrnc';
 import tw from '~/tailwindcss';
 import {
   requestNotificationPermissions,
+  registerPushToken,
   setupNotificationResponseHandler,
   setupNotificationReceivedHandler,
 } from '~/services/notificationService';
 import { initializeSocket, disconnectSocket } from '~/services/socketService';
-import { checkDeviceRegistration } from '~/services/deviceService';
+import { checkDeviceRegistration, getDeviceInfo } from '~/services/deviceService';
 
 SplashScreen.preventAutoHideAsync(); // Keep native splash visible until app is ready
 
@@ -45,6 +46,9 @@ export default function App() {
           // Set user data
           setUser(deviceCheck.user);
 
+          // Register push token and update device registration so backend can reach us in background
+          await registerAndStorePushToken();
+
           // Import and sync contacts after authentication
           await importAndSyncContacts();
 
@@ -65,6 +69,9 @@ export default function App() {
             const response = await http.get('/users/profile');
             // Set to your global atom
             setUser(response.data);
+
+            // Register push token and update device registration so backend can reach us in background
+            await registerAndStorePushToken();
 
             // Import and sync contacts after authentication
             await importAndSyncContacts();
@@ -218,6 +225,24 @@ export default function App() {
         await requestNotificationPermissions();
       } catch (error) {
         console.error('Error requesting notification permissions:', error);
+      }
+    };
+
+    // Get Expo push token and send it to the backend so the server can send
+    // push notifications when the app is in the background or closed
+    const registerAndStorePushToken = async () => {
+      try {
+        const pushToken = await registerPushToken();
+        if (!pushToken) return;
+        const deviceInfo = await getDeviceInfo();
+        await http.post('/devices/register', {
+          ...deviceInfo,
+          rememberMe: true,
+          pushToken,
+        });
+        console.log('✅ Push token registered with backend');
+      } catch (error) {
+        console.error('Error registering push token with backend:', error);
       }
     };
 

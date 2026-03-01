@@ -163,11 +163,11 @@ const AppStack_ContactScreen: React.FC<Props> = ({ navigation, route }) => {
             contact.name.toLowerCase().includes(searchText.toLowerCase())
         )
         .sort((a, b) => {
-            // Sort enabled contacts first, then disabled ones
+            // Sort enabled contacts first, then disabled ones; alphabetically within each group
             const aDisabled = !a.backendContact?.contactUser?.id && !a.backendContact?.contactUserId;
             const bDisabled = !b.backendContact?.contactUser?.id && !b.backendContact?.contactUserId;
-            if (aDisabled === bDisabled) return 0;
-            return aDisabled ? 1 : -1; // Enabled contacts come first
+            if (aDisabled !== bDisabled) return aDisabled ? 1 : -1;
+            return a.name.localeCompare(b.name);
         });
 
     const handleContactPress = (contact: Contact) => {

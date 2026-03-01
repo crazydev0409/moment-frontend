@@ -23,7 +23,7 @@ import { BackArrow, Background, Avatar, Settings } from '~/lib/images';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import { http } from '~/helpers/http';
 import { horizontalScale, verticalScale, moderateScale } from '~/helpers/responsive';
-
+import { KeyboardAwareScrollView } from 'react-native-keyboard-aware-scroll-view';
 type Props = NativeStackScreenProps<
   AppStackParamList,
   'AppStack_ProfileScreen'
@@ -43,33 +43,7 @@ const AppStack_ProfileScreen: React.FC<Props> = ({ navigation, route }) => {
   const [showToast, setShowToast] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [user, setUser] = useAtom(userAtom);
-  const translateY = useRef(new Animated.Value(0)).current;
 
-  useEffect(() => {
-    const keyboardShowEvent = Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow';
-    const keyboardHideEvent = Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide';
-
-    const showSubscription = Keyboard.addListener(keyboardShowEvent, () => {
-      Animated.timing(translateY, {
-        toValue: -80,
-        duration: 250,
-        useNativeDriver: true,
-      }).start();
-    });
-
-    const hideSubscription = Keyboard.addListener(keyboardHideEvent, () => {
-      Animated.timing(translateY, {
-        toValue: 0,
-        duration: 250,
-        useNativeDriver: true,
-      }).start();
-    });
-
-    return () => {
-      showSubscription.remove();
-      hideSubscription.remove();
-    };
-  }, [translateY]);
 
   // Fetch and update user profile
   const fetchUserProfile = useCallback(async () => {
@@ -195,170 +169,166 @@ const AppStack_ProfileScreen: React.FC<Props> = ({ navigation, route }) => {
       <Image source={Background} style={tw`absolute w-full h-full`} />
       <View style={tw`absolute w-full h-full bg-black opacity-5`} />
 
-      <KeyboardAvoidingView 
+      <KeyboardAwareScrollView
         style={tw`flex-1`}
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        keyboardVerticalOffset={Platform.OS === 'ios' ? 60 : 0}
+        contentContainerStyle={{ flexGrow: 1, paddingBottom: verticalScale(150) }}
+        keyboardShouldPersistTaps="handled"
+        showsVerticalScrollIndicator={false}
+        enableOnAndroid={true} // Key for Android support
+        extraScrollHeight={50} // Adjust if needed for extra space above keyboard
       >
-        <ScrollView 
-          contentContainerStyle={{ flexGrow: 1, paddingBottom: verticalScale(150) }}
-          keyboardShouldPersistTaps="handled"
-          showsVerticalScrollIndicator={false}
-        >
-          <Animated.View style={[{ marginTop: verticalScale(37.5), transform: [{ translateY }] }, { paddingHorizontal: '8%' }]}>
+        <View style={[{ marginTop: verticalScale(37.5) }, { paddingHorizontal: '8%' }]}>
 
-            {/* Header with back arrow and settings */}
-            <View style={[tw`flex-row justify-between items-center`, { marginBottom: -verticalScale(7.5) }]}>
-              <TouchableOpacity onPress={navigateToMainPage} activeOpacity={0.5}>
-                <Image source={BackArrow} style={[tw``, { width: horizontalScale(24), height: horizontalScale(24) }]} resizeMode="contain" />
-              </TouchableOpacity>
-              <TouchableOpacity
-                activeOpacity={0.5}
-                onPress={() => navigation.navigate('AppStack_SettingsScreen')}
-              >
-                <Image source={Settings} style={[tw``, { width: horizontalScale(30), height: horizontalScale(30) }]} resizeMode="contain" />
-              </TouchableOpacity>
+          {/* Header with back arrow and settings */}
+          <View style={[tw`flex-row justify-between items-center`, { marginBottom: -verticalScale(7.5) }]}>
+            <TouchableOpacity onPress={navigateToMainPage} activeOpacity={0.5}>
+              <Image source={BackArrow} style={[tw``, { width: horizontalScale(24), height: horizontalScale(24) }]} resizeMode="contain" />
+            </TouchableOpacity>
+            <TouchableOpacity
+              activeOpacity={0.5}
+              onPress={() => navigation.navigate('AppStack_SettingsScreen')}
+            >
+              <Image source={Settings} style={[tw``, { width: horizontalScale(30), height: horizontalScale(30) }]} resizeMode="contain" />
+            </TouchableOpacity>
+          </View>
+
+          {/* Profile Picture */}
+          <View style={[tw`items-center`, { marginBottom: verticalScale(30) }]}>
+            <View style={[tw`rounded-full bg-white items-center justify-center shadow-sm`, { width: horizontalScale(82.5), height: horizontalScale(82.5) }]}>
+              <Image source={Avatar} style={[tw``, { width: horizontalScale(75), height: horizontalScale(75) }]} resizeMode="contain" />
             </View>
-
-            {/* Profile Picture */}
-            <View style={[tw`items-center`, { marginBottom: verticalScale(30) }]}>
-              <View style={[tw`rounded-full bg-white items-center justify-center shadow-sm`, { width: horizontalScale(82.5), height: horizontalScale(82.5) }]}>
-                <Image source={Avatar} style={[tw``, { width: horizontalScale(75), height: horizontalScale(75) }]} resizeMode="contain" />
-              </View>
-            </View>
-        <View style={tw``}>
-          <Text style={[tw`text-grey`, { fontSize: moderateScale(12), lineHeight: verticalScale(19), marginBottom: verticalScale(7.5) }]}>Name</Text>
-          <TextInput
-            autoCapitalize="words"
-            autoCorrect={false}
-            style={[tw`bg-white rounded-full w-full self-center font-dm font-normal font-bold tracking-[0.5px]`, {
-              height: verticalScale(51),
-              paddingHorizontal: horizontalScale(19),
-              fontSize: moderateScale(13)
-            }]}
-            value={name}
-            onChangeText={(t) => { setName(t); setNameError(''); }}
-            placeholder="Name"
-          />
-          {nameError ? (
-            <Text style={[tw`text-red-500`, { fontSize: moderateScale(11), marginBottom: verticalScale(11), marginTop: verticalScale(11) }]}>{nameError}</Text>
-          ) : <View style={{ marginBottom: verticalScale(11), marginTop: verticalScale(11) }} />}
-        </View>
-        <View style={tw``}>
-          <Text style={[tw`text-grey`, { fontSize: moderateScale(12), lineHeight: verticalScale(19), marginBottom: verticalScale(7.5) }]}>BIO</Text>
-          <TextInput
-            autoCapitalize="words"
-            autoCorrect={false}
-            style={[tw`bg-white rounded-full w-full self-center font-dm font-normal font-bold tracking-[0.5px]`, {
-              height: verticalScale(51),
-              paddingHorizontal: horizontalScale(19),
-              fontSize: moderateScale(13)
-            }]}
-            value={bio}
-            onChangeText={setBio}
-            placeholder="Text"
-          />
-          <View style={{ marginBottom: verticalScale(22.5) }}></View>
-        </View>
-        <View style={tw``}>
-          <Text style={[tw`text-grey`, { fontSize: moderateScale(12), lineHeight: verticalScale(19), marginBottom: verticalScale(7.5) }]}>Birthday</Text>
-
-          {/* Fake input container to match UI */}
-          <TouchableOpacity
-            onPress={() => setShowBirthdayPicker(true)}
-            activeOpacity={0.7}
-            style={[tw`bg-white rounded-full w-full justify-center`, {
-              height: verticalScale(51),
-              paddingHorizontal: horizontalScale(19)
-            }]}
-          >
-            <Text style={[tw`font-dm font-normal tracking-[0.5px] text-black`, { fontSize: moderateScale(13) }]}>
-              {birthday ? formatBirthday(birthday) : "18.08.1986"}
-            </Text>
-          </TouchableOpacity>
-
-          {showBirthdayPicker && (
-            <DateTimePicker
-              value={birthday || new Date()}
-              mode="date"
-              display="spinner"
-              onChange={(event, selectedDate) => {
-                setShowBirthdayPicker(false);
-                if (selectedDate) { setBirthday(selectedDate); setBirthdayError(''); };
-              }}
+          </View>
+          <View style={tw``}>
+            <Text style={[tw`text-grey`, { fontSize: moderateScale(12), lineHeight: verticalScale(19), marginBottom: verticalScale(7.5) }]}>Name</Text>
+            <TextInput
+              autoCapitalize="words"
+              autoCorrect={false}
+              style={[tw`bg-white rounded-full w-full self-center font-dm font-normal font-bold tracking-[0.5px]`, {
+                height: verticalScale(51),
+                paddingHorizontal: horizontalScale(19),
+                fontSize: moderateScale(13)
+              }]}
+              value={name}
+              onChangeText={(t) => { setName(t); setNameError(''); }}
+              placeholder="Name"
             />
-          )}
+            {nameError ? (
+              <Text style={[tw`text-red-500`, { fontSize: moderateScale(11), marginBottom: verticalScale(11), marginTop: verticalScale(11) }]}>{nameError}</Text>
+            ) : <View style={{ marginBottom: verticalScale(11), marginTop: verticalScale(11) }} />}
+          </View>
+          <View style={tw``}>
+            <Text style={[tw`text-grey`, { fontSize: moderateScale(12), lineHeight: verticalScale(19), marginBottom: verticalScale(7.5) }]}>BIO</Text>
+            <TextInput
+              autoCapitalize="words"
+              autoCorrect={false}
+              style={[tw`bg-white rounded-full w-full self-center font-dm font-normal font-bold tracking-[0.5px]`, {
+                height: verticalScale(51),
+                paddingHorizontal: horizontalScale(19),
+                fontSize: moderateScale(13)
+              }]}
+              value={bio}
+              onChangeText={setBio}
+              placeholder="Text"
+            />
+            <View style={{ marginBottom: verticalScale(22.5) }}></View>
+          </View>
+          <View style={tw``}>
+            <Text style={[tw`text-grey`, { fontSize: moderateScale(12), lineHeight: verticalScale(19), marginBottom: verticalScale(7.5) }]}>Birthday</Text>
 
-          {birthdayError ? (
-            <Text style={[tw`text-red-500`, { fontSize: moderateScale(11), marginBottom: verticalScale(11), marginTop: verticalScale(11) }]}>{birthdayError}</Text>
-          ) : <View style={{ marginBottom: verticalScale(11), marginTop: verticalScale(11) }} />}
-        </View>
-        <View style={tw``}>
-          <Text style={[tw`text-grey`, { fontSize: moderateScale(12), lineHeight: verticalScale(19), marginBottom: verticalScale(7.5) }]}>Email</Text>
-          <TextInput
-            style={[tw`bg-white rounded-full w-full self-center font-dm font-normal font-bold tracking-[0.5px]`, {
-              height: verticalScale(51),
-              paddingHorizontal: horizontalScale(19),
-              fontSize: moderateScale(13)
-            }]}
-            value={email}
-            keyboardType="email-address"
-            autoCapitalize="none"
-            autoCorrect={false}
-            onChangeText={(t) => { setEmail(t); setEmailError(''); }}
-            placeholder="Email"
-          />
+            {/* Fake input container to match UI */}
+            <TouchableOpacity
+              onPress={() => setShowBirthdayPicker(true)}
+              activeOpacity={0.7}
+              style={[tw`bg-white rounded-full w-full justify-center`, {
+                height: verticalScale(51),
+                paddingHorizontal: horizontalScale(19)
+              }]}
+            >
+              <Text style={[tw`font-dm font-normal tracking-[0.5px] text-black`, { fontSize: moderateScale(13) }]}>
+                {birthday ? formatBirthday(birthday) : "18.08.1986"}
+              </Text>
+            </TouchableOpacity>
 
-          {emailError ? (
-            <Text style={[tw`text-red-500`, { fontSize: moderateScale(11), marginBottom: verticalScale(11), marginTop: verticalScale(11) }]}>{emailError}</Text>
-          ) : <View style={{ marginBottom: verticalScale(11), marginTop: verticalScale(11) }} />}
-        </View>
-        <View style={tw``}>
-          <Text style={[tw`text-grey`, { fontSize: moderateScale(12), lineHeight: verticalScale(19), marginBottom: verticalScale(7.5) }]}>Confirm Email</Text>
-          <TextInput
-            style={[tw`bg-white rounded-full w-full self-center font-dm font-normal font-bold tracking-[0.5px]`, {
-              height: verticalScale(51),
-              paddingHorizontal: horizontalScale(19),
-              fontSize: moderateScale(13)
-            }]}
-            value={confirmEmail}
-            keyboardType="email-address"
-            autoCapitalize="none"
-            autoCorrect={false}
-            onChangeText={(t) => { setConfirmEmail(t); setConfirmEmailError(''); }}
-            placeholder="Confirm Email"
-          />
+            {showBirthdayPicker && (
+              <DateTimePicker
+                value={birthday || new Date()}
+                mode="date"
+                display="spinner"
+                onChange={(event, selectedDate) => {
+                  setShowBirthdayPicker(false);
+                  if (selectedDate) { setBirthday(selectedDate); setBirthdayError(''); };
+                }}
+              />
+            )}
+
+            {birthdayError ? (
+              <Text style={[tw`text-red-500`, { fontSize: moderateScale(11), marginBottom: verticalScale(11), marginTop: verticalScale(11) }]}>{birthdayError}</Text>
+            ) : <View style={{ marginBottom: verticalScale(11), marginTop: verticalScale(11) }} />}
+          </View>
+          <View style={tw``}>
+            <Text style={[tw`text-grey`, { fontSize: moderateScale(12), lineHeight: verticalScale(19), marginBottom: verticalScale(7.5) }]}>Email</Text>
+            <TextInput
+              style={[tw`bg-white rounded-full w-full self-center font-dm font-normal font-bold tracking-[0.5px]`, {
+                height: verticalScale(51),
+                paddingHorizontal: horizontalScale(19),
+                fontSize: moderateScale(13)
+              }]}
+              value={email}
+              keyboardType="email-address"
+              autoCapitalize="none"
+              autoCorrect={false}
+              onChangeText={(t) => { setEmail(t); setEmailError(''); }}
+              placeholder="Email"
+            />
+
+            {emailError ? (
+              <Text style={[tw`text-red-500`, { fontSize: moderateScale(11), marginBottom: verticalScale(11), marginTop: verticalScale(11) }]}>{emailError}</Text>
+            ) : <View style={{ marginBottom: verticalScale(11), marginTop: verticalScale(11) }} />}
+          </View>
+          <View style={tw``}>
+            <Text style={[tw`text-grey`, { fontSize: moderateScale(12), lineHeight: verticalScale(19), marginBottom: verticalScale(7.5) }]}>Confirm Email</Text>
+            <TextInput
+              style={[tw`bg-white rounded-full w-full self-center font-dm font-normal font-bold tracking-[0.5px]`, {
+                height: verticalScale(51),
+                paddingHorizontal: horizontalScale(19),
+                fontSize: moderateScale(13)
+              }]}
+              value={confirmEmail}
+              keyboardType="email-address"
+              autoCapitalize="none"
+              autoCorrect={false}
+              onChangeText={(t) => { setConfirmEmail(t); setConfirmEmailError(''); }}
+              placeholder="Confirm Email"
+            />
 
             {confirmEmailError ? (
               <Text style={[tw`text-red-500`, { fontSize: moderateScale(11), marginBottom: verticalScale(11), marginTop: verticalScale(11) }]}>{confirmEmailError}</Text>
             ) : <View style={{ marginBottom: verticalScale(11), marginTop: verticalScale(11) }} />}
           </View>
-          </Animated.View>
-        </ScrollView>
-        <View style={tw`absolute bottom-5 w-full flex-col items-center`}>
-          <TouchableOpacity
-            onPress={navigateToPlanPage}
-            activeOpacity={0.7}
-            disabled={isSaving}
-          >
-            <View
-              style={[tw`bg-[#A3CB31] rounded-full justify-center items-center shadow-lg ${isSaving ? 'opacity-50' : ''}`, {
-                height: verticalScale(56),
-                width: horizontalScale(225),
-                marginBottom: verticalScale(37.5)
-              }]}>
-              {isSaving ? (
-                <ActivityIndicator size="small" color="#FFFFFF" />
-              ) : (
-                <Text style={[tw`text-white font-bold font-dm`, { fontSize: moderateScale(15) }]}>
-                  Save
-                </Text>
-              )}
-            </View>
-          </TouchableOpacity>
         </View>
-      </KeyboardAvoidingView>
-
+      </KeyboardAwareScrollView>
+      <View style={tw`absolute bottom-5 w-full flex-col items-center`}>
+        <TouchableOpacity
+          onPress={navigateToPlanPage}
+          activeOpacity={0.7}
+          disabled={isSaving}
+        >
+          <View
+            style={[tw`bg-[#A3CB31] rounded-full justify-center items-center shadow-lg ${isSaving ? 'opacity-50' : ''}`, {
+              height: verticalScale(56),
+              width: horizontalScale(225),
+              marginBottom: verticalScale(37.5)
+            }]}>
+            {isSaving ? (
+              <ActivityIndicator size="small" color="#FFFFFF" />
+            ) : (
+              <Text style={[tw`text-white font-bold font-dm`, { fontSize: moderateScale(15) }]}>
+                Save
+              </Text>
+            )}
+          </View>
+        </TouchableOpacity>
+      </View>
       {/* Toast notification */}
       <Toast
         message="Profile has been updated successfully"

@@ -35,11 +35,12 @@ export const getDeviceInfo = async () => {
 };
 
 /**
- * Register device with backend
+ * Register device with backend (optionally include Expo push token for remote notifications)
  */
 export const registerDevice = async (
     userId: string,
-    rememberMe: boolean
+    rememberMe: boolean,
+    pushToken?: string | null
 ): Promise<boolean> => {
     try {
         const deviceInfo = await getDeviceInfo();
@@ -48,6 +49,7 @@ export const registerDevice = async (
             userId,
             rememberMe,
             ...deviceInfo,
+            ...(pushToken ? { pushToken } : {}),
         });
 
         return response.status === 200;
