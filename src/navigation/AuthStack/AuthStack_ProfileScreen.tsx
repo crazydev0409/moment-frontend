@@ -122,11 +122,12 @@ const AuthStack_ProfileScreen: React.FC<Props> = ({ navigation, route }) => {
       <View style={tw`absolute w-full h-full bg-black opacity-5`} />
       <KeyboardAvoidingView 
         style={tw`flex-1`}
-        behavior={Platform.OS === 'ios' ? 'padding' : 'padding'}
-        keyboardVerticalOffset={Platform.OS === 'ios' ? 60 : 20}
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        keyboardVerticalOffset={Platform.OS === 'ios' ? 60 : 0}
       >
         <ScrollView 
-          contentContainerStyle={{ flexGrow: 1, paddingBottom: verticalScale(150) }}
+          style={tw`flex-1`}
+          contentContainerStyle={{ flexGrow: 1 }}
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
         >
@@ -224,27 +225,29 @@ const AuthStack_ProfileScreen: React.FC<Props> = ({ navigation, route }) => {
             ) : <View style={{ marginBottom: verticalScale(11.25), marginTop: verticalScale(11.25) }} />}
           </View>
           </View>
+
+          <View style={{ flex: 1 }} />
+
+          <View style={tw`w-full flex-col items-center`}>
+            <TouchableOpacity
+              onPress={navigateToPlanPage}
+              activeOpacity={0.7}
+              disabled={isSaving}
+            >
+              <View
+                style={[tw`bg-[#A3CB31] rounded-full justify-center items-center shadow-lg ${isSaving ? 'opacity-50' : ''}`, { height: verticalScale(56.25), width: horizontalScale(225), marginBottom: verticalScale(37.5) }]}>
+                {isSaving ? (
+                  <ActivityIndicator size="small" color="#FFFFFF" />
+                ) : (
+                  <Text style={[tw`text-white font-bold font-dm`, { fontSize: moderateScale(15) }]}>
+                    Next
+                  </Text>
+                )}
+              </View>
+            </TouchableOpacity>
+          </View>
         </ScrollView>
       </KeyboardAvoidingView>
-
-      <View style={tw`absolute bottom-5 w-full flex-col items-center`}>
-        <TouchableOpacity
-          onPress={navigateToPlanPage}
-          activeOpacity={0.7}
-          disabled={isSaving}
-        >
-          <View
-            style={[tw`bg-[#A3CB31] rounded-full justify-center items-center shadow-lg ${isSaving ? 'opacity-50' : ''}`, { height: verticalScale(56.25), width: horizontalScale(225), marginBottom: verticalScale(37.5) }]}>
-            {isSaving ? (
-              <ActivityIndicator size="small" color="#FFFFFF" />
-            ) : (
-              <Text style={[tw`text-white font-bold font-dm`, { fontSize: moderateScale(15) }]}>
-                Next
-              </Text>
-            )}
-          </View>
-        </TouchableOpacity>
-      </View>
     </View>
   );
 };
