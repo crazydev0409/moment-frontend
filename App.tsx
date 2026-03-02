@@ -1,4 +1,6 @@
 // App.tsx
+// Must be imported before any component renders so TaskManager.defineTask runs at module level
+import '~/services/backgroundTaskService';
 import { useCallback, useEffect, useState } from 'react';
 import { View, Alert } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';

@@ -306,29 +306,30 @@ const AppStack_ProfileScreen: React.FC<Props> = ({ navigation, route }) => {
           </View>
           </View>
         </ScrollView>
-        <View style={tw`absolute bottom-5 w-full flex-col items-center`}>
-          <TouchableOpacity
-            onPress={navigateToPlanPage}
-            activeOpacity={0.7}
-            disabled={isSaving}
-          >
-            <View
-              style={[tw`bg-[#A3CB31] rounded-full justify-center items-center shadow-lg ${isSaving ? 'opacity-50' : ''}`, {
-                height: verticalScale(56),
-                width: horizontalScale(225),
-                marginBottom: verticalScale(37.5)
-              }]}>
-              {isSaving ? (
-                <ActivityIndicator size="small" color="#FFFFFF" />
-              ) : (
-                <Text style={[tw`text-white font-bold font-dm`, { fontSize: moderateScale(15) }]}>
-                  Save
-                </Text>
-              )}
-            </View>
-          </TouchableOpacity>
-        </View>
       </KeyboardAvoidingView>
+
+      <View style={tw`absolute bottom-5 w-full flex-col items-center`}>
+        <TouchableOpacity
+          onPress={navigateToPlanPage}
+          activeOpacity={0.7}
+          disabled={isSaving}
+        >
+          <View
+            style={[tw`bg-[#A3CB31] rounded-full justify-center items-center shadow-lg ${isSaving ? 'opacity-50' : ''}`, {
+              height: verticalScale(56),
+              width: horizontalScale(225),
+              marginBottom: verticalScale(37.5)
+            }]}>
+            {isSaving ? (
+              <ActivityIndicator size="small" color="#FFFFFF" />
+            ) : (
+              <Text style={[tw`text-white font-bold font-dm`, { fontSize: moderateScale(15) }]}>
+                Save
+              </Text>
+            )}
+          </View>
+        </TouchableOpacity>
+      </View>
 
       {/* Toast notification */}
       <Toast

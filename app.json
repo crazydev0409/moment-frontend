@@ -2,7 +2,7 @@
   "expo": {
     "name": "Catch",
     "slug": "ios-app",
-    "version": "1.0.1",
+    "version": "1.0.2",
     "extra": {
       "eas": {
         "projectId": "53303aed-83d0-469c-ae4f-8d2c27c784cb"
@@ -59,7 +59,8 @@
         "NSLocationWhenInUseUsageDescription": "Catch needs your location to provide weather updates and location-based features.",
         "NSLocationAlwaysUsageDescription": "Catch needs your location to provide weather updates and location-based features.",
         "NSContactsUsageDescription": "Catch needs access to your contacts to help you connect with friends and schedule meetings.",
-        "NSUserNotificationsUsageDescription": "Catch needs to send you notifications about meeting requests and updates."
+        "NSUserNotificationsUsageDescription": "Catch needs to send you notifications about meeting requests and updates.",
+        "UIBackgroundModes": ["remote-notification", "fetch"]
       }
     },
     "android": {

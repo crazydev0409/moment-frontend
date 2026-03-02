@@ -133,6 +133,10 @@ const AppStack_DateDetailScreen: React.FC<Props> = ({ navigation, route }) => {
   const contactModalSlideAnim = useRef(new Animated.Value(0)).current;
   const contactModalOpacityAnim = useRef(new Animated.Value(0)).current;
 
+  // Track which momentRequestId has already been auto-opened so that internal date
+  // navigation (which re-fetches momentRequests) does not re-trigger the modal.
+  const handledMomentRequestIdRef = useRef<string | null>(null);
+
   // Pending meeting (temporary placeholder while creating)
   const [pendingMeeting, setPendingMeeting] = useState<{
     startTime: Date;
@@ -734,16 +738,21 @@ const AppStack_DateDetailScreen: React.FC<Props> = ({ navigation, route }) => {
     };
   }, [fetchMomentRequests]);
 
-  // Auto-open modal when navigating with momentRequestId (from push notification or notification screen)
+  // Auto-open modal when navigating with momentRequestId (from push notification or notification screen).
+  // We guard with handledMomentRequestIdRef so that internal date navigation, which re-fetches
+  // momentRequests and therefore re-runs this effect, does not reopen the modal.
   useEffect(() => {
-    if (routeMomentRequestId && momentRequests.length > 0) {
+    if (
+      routeMomentRequestId &&
+      momentRequests.length > 0 &&
+      handledMomentRequestIdRef.current !== routeMomentRequestId
+    ) {
       const request = momentRequests.find(r => r.id === routeMomentRequestId);
       if (request) {
-        // Auto-open modal for any meeting (pending, approved, etc.) when coming from notification
+        handledMomentRequestIdRef.current = routeMomentRequestId;
         setSelectedRequest(request);
         setShowRequestModal(true);
         console.log('📬 Auto-opening moment request modal for:', routeMomentRequestId, 'Status:', request.status);
-        // Animate modal in
         Animated.parallel([
           Animated.timing(requestModalSlideAnim, {
             toValue: 1,

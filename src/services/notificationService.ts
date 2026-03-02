@@ -3,15 +3,32 @@ import { Platform } from 'react-native';
 import Constants from 'expo-constants';
 import { http } from '~/helpers/http';
 import { getDeviceInfo } from './deviceService';
+import { BACKGROUND_NOTIFICATION_TASK } from '~/services/backgroundTaskService';
 
 // Configure how notifications are handled when app is in foreground
 Notifications.setNotificationHandler({
   handleNotification: async () => ({
     shouldShowAlert: true,
+    shouldShowBanner: true,
+    shouldShowList: true,
     shouldPlaySound: true,
     shouldSetBadge: true,
   }),
 });
+
+// Android requires an explicit notification channel to display banners with sound.
+// This must be created before any notification can be shown on Android 8+.
+if (Platform.OS === 'android') {
+  Notifications.setNotificationChannelAsync('default', {
+    name: 'Default',
+    importance: Notifications.AndroidImportance.MAX,
+    vibrationPattern: [0, 250, 250, 250],
+    lightColor: '#A3CB31',
+    sound: 'default',
+    enableVibrate: true,
+    showBadge: true,
+  });
+}
 
 // Register notification categories for interactive notifications
 export async function registerNotificationCategories() {
@@ -64,6 +81,16 @@ export async function requestNotificationPermissions(): Promise<boolean> {
     // Register categories after permission is granted
     await registerNotificationCategories();
     console.log('📱 Notification categories registered');
+
+    // Register background notification task so the OS can wake the app
+    // when a data-only push arrives while the app is killed or backgrounded
+    try {
+      await Notifications.registerTaskAsync(BACKGROUND_NOTIFICATION_TASK);
+      console.log('📲 Background notification task registered');
+    } catch (err: any) {
+      // Task may already be registered — not a fatal error
+      console.warn('Background notification task registration:', err.message);
+    }
 
     return true;
   } catch (error) {
