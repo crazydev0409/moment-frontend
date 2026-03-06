@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { View, TouchableOpacity, Image, Modal, Text, TextInput, ScrollView, Alert, Platform, KeyboardAvoidingView, Animated } from 'react-native';
+import { View, TouchableOpacity, Image, Modal, Text, TextInput, ScrollView, Alert, Platform, KeyboardAvoidingView, Animated, Dimensions } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -307,7 +307,6 @@ const BottomNavigationBar: React.FC<BottomNavigationBarProps> = ({
                       style={[
                         tw`bg-white rounded-t-3xl`,
                         {
-                          maxHeight: '85%',
                           transform: [{
                             translateY: contactModalSlideAnim.interpolate({
                               inputRange: [0, 1],
@@ -342,7 +341,7 @@ const BottomNavigationBar: React.FC<BottomNavigationBarProps> = ({
 
                       {/* Contacts List - Scrollable */}
                       <ScrollView
-                        style={{ flex: 1 }}
+                        style={{ maxHeight: Dimensions.get('window').height * 0.6 }}
                         contentContainerStyle={{ paddingHorizontal: horizontalScale(15), paddingBottom: verticalScale(30) }}
                         showsVerticalScrollIndicator={false}
                         keyboardShouldPersistTaps="handled"

@@ -12,6 +12,7 @@ import {
   Animated,
   Platform,
   KeyboardAvoidingView,
+  Dimensions,
 } from 'react-native'
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { useFocusEffect } from '@react-navigation/native';
@@ -2387,7 +2388,6 @@ const AppStack_DateDetailScreen: React.FC<Props> = ({ navigation, route }) => {
                       style={[
                         tw`bg-white rounded-t-3xl`,
                         {
-                          maxHeight: '85%',
                           transform: [{
                             translateY: contactModalSlideAnim.interpolate({
                               inputRange: [0, 1],
@@ -2422,7 +2422,7 @@ const AppStack_DateDetailScreen: React.FC<Props> = ({ navigation, route }) => {
 
                       {/* Contacts List - Scrollable */}
                       <ScrollView
-                        style={{ flex: 1 }}
+                        style={{ maxHeight: Dimensions.get('window').height * 0.6 }}
                         contentContainerStyle={{ paddingHorizontal: horizontalScale(15), paddingBottom: verticalScale(30) }}
                         showsVerticalScrollIndicator={false}
                         keyboardShouldPersistTaps="handled"
