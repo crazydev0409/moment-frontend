@@ -2387,6 +2387,7 @@ const AppStack_DateDetailScreen: React.FC<Props> = ({ navigation, route }) => {
                       style={[
                         tw`bg-white rounded-t-3xl`,
                         {
+                          maxHeight: '85%',
                           transform: [{
                             translateY: contactModalSlideAnim.interpolate({
                               inputRange: [0, 1],
@@ -2421,6 +2422,7 @@ const AppStack_DateDetailScreen: React.FC<Props> = ({ navigation, route }) => {
 
                       {/* Contacts List - Scrollable */}
                       <ScrollView
+                        style={{ flex: 1 }}
                         contentContainerStyle={{ paddingHorizontal: horizontalScale(15), paddingBottom: verticalScale(30) }}
                         showsVerticalScrollIndicator={false}
                         keyboardShouldPersistTaps="handled"
