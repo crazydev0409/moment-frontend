@@ -307,6 +307,7 @@ const BottomNavigationBar: React.FC<BottomNavigationBarProps> = ({
                       style={[
                         tw`bg-white rounded-t-3xl`,
                         {
+                          maxHeight: '85%',
                           transform: [{
                             translateY: contactModalSlideAnim.interpolate({
                               inputRange: [0, 1],
@@ -341,6 +342,7 @@ const BottomNavigationBar: React.FC<BottomNavigationBarProps> = ({
 
                       {/* Contacts List - Scrollable */}
                       <ScrollView
+                        style={{ flex: 1 }}
                         contentContainerStyle={{ paddingHorizontal: horizontalScale(15), paddingBottom: verticalScale(30) }}
                         showsVerticalScrollIndicator={false}
                         keyboardShouldPersistTaps="handled"
