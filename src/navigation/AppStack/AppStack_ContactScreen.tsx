@@ -195,7 +195,7 @@ const AppStack_ContactScreen: React.FC<Props> = ({ navigation, route }) => {
 
             <KeyboardAvoidingView 
                 style={tw`flex-1`}
-                behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+                behavior="padding"
                 keyboardVerticalOffset={0}
             >
                 <ScrollView

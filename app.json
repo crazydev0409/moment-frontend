@@ -75,7 +75,7 @@
         "android.permission.ACCESS_FINE_LOCATION"
       ],
       "package": "com.crazydev0409.catchapp",
-      "softwareKeyboardLayoutMode": "resize"
+      "softwareKeyboardLayoutMode": "pan"
     },
     "notification": {
       "icon": "./assets/images/logo.png",
