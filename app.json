@@ -42,7 +42,9 @@
     "icon": "./assets/images/logo.png",
     "userInterfaceStyle": "light",
     "androidStatusBar": {
-      "translucent": false
+      "translucent": false,
+      "backgroundColor": "#000000",
+      "barStyle": "light-content"
     },
     "splash": {
       "image": "./assets/splash.png",

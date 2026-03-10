@@ -3,6 +3,7 @@
 import '~/services/backgroundTaskService';
 import { useCallback, useEffect, useState } from 'react';
 import { View, Alert } from 'react-native';
+import { StatusBar } from 'expo-status-bar';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import * as SplashScreen from 'expo-splash-screen';
 import * as Contacts from 'expo-contacts';
@@ -315,6 +316,7 @@ export default function App() {
   // App is ready - show the main navigator
   return (
     <SafeAreaProvider>
+      <StatusBar style="light" backgroundColor="#000000" translucent={false} />
       <View style={{ flex: 1 }} onLayout={onLayoutRootView}>
         <RootNavigator />
       </View>
