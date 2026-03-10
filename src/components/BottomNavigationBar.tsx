@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { View, TouchableOpacity, Image, Modal, Text, TextInput, ScrollView, Alert, Platform, KeyboardAvoidingView, Animated, Dimensions } from 'react-native';
+import { View, TouchableOpacity, Image, Modal, Text, TextInput, ScrollView, Alert, Platform, Animated, Dimensions } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -284,24 +284,19 @@ const BottomNavigationBar: React.FC<BottomNavigationBarProps> = ({
         >
           <Animated.View
             style={[
-              tw`flex-1`,
+              { height: Dimensions.get('window').height },
               { opacity: contactModalOpacityAnim }
             ]}
           >
             <BlurView intensity={20} tint="dark" style={tw`absolute inset-0`}>
               <View style={tw`flex-1 bg-black opacity-40`} />
             </BlurView>
-            <KeyboardAvoidingView
-              style={tw`flex-1`}
-              behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-              keyboardVerticalOffset={0}
+            <TouchableOpacity
+              style={{ height: Dimensions.get('window').height }}
+              activeOpacity={1}
+              onPress={handleCloseContactModal}
             >
-              <TouchableOpacity
-                style={tw`flex-1`}
-                activeOpacity={1}
-                onPress={handleCloseContactModal}
-              >
-                <View style={tw`flex-1 justify-end`}>
+              <View style={{ height: Dimensions.get('window').height, justifyContent: 'flex-end' }}>
                   <TouchableOpacity activeOpacity={1} onPress={(e) => e.stopPropagation()}>
                     <Animated.View
                       style={[
@@ -399,7 +394,6 @@ const BottomNavigationBar: React.FC<BottomNavigationBarProps> = ({
                   </TouchableOpacity>
                 </View>
               </TouchableOpacity>
-            </KeyboardAvoidingView>
           </Animated.View>
         </Modal>
       )}

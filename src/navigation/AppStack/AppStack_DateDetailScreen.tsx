@@ -2365,24 +2365,19 @@ const AppStack_DateDetailScreen: React.FC<Props> = ({ navigation, route }) => {
         >
           <Animated.View
             style={[
-              tw`flex-1`,
+              { height: Dimensions.get('window').height },
               { opacity: contactModalOpacityAnim }
             ]}
           >
             <BlurView intensity={20} tint="dark" style={tw`absolute inset-0`}>
               <View style={tw`flex-1 bg-black opacity-40`} />
             </BlurView>
-            <KeyboardAvoidingView
-              style={tw`flex-1`}
-              behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-              keyboardVerticalOffset={0}
+            <TouchableOpacity
+              style={{ height: Dimensions.get('window').height }}
+              activeOpacity={1}
+              onPress={handleCloseContactModal}
             >
-              <TouchableOpacity
-                style={tw`flex-1`}
-                activeOpacity={1}
-                onPress={handleCloseContactModal}
-              >
-                <View style={tw`flex-1 justify-end`}>
+              <View style={{ height: Dimensions.get('window').height, justifyContent: 'flex-end' }}>
                   <TouchableOpacity activeOpacity={1} onPress={(e) => e.stopPropagation()}>
                     <Animated.View
                       style={[
@@ -2480,7 +2475,6 @@ const AppStack_DateDetailScreen: React.FC<Props> = ({ navigation, route }) => {
                   </TouchableOpacity>
                 </View>
               </TouchableOpacity>
-            </KeyboardAvoidingView>
           </Animated.View>
         </Modal>
       )}
