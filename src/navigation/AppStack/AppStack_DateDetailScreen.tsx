@@ -133,6 +133,8 @@ const AppStack_DateDetailScreen: React.FC<Props> = ({ navigation, route }) => {
   const requestModalOpacityAnim = useRef(new Animated.Value(0)).current;
   const contactModalSlideAnim = useRef(new Animated.Value(0)).current;
   const contactModalOpacityAnim = useRef(new Animated.Value(0)).current;
+  const [contactModalContentHeight, setContactModalContentHeight] = useState(Dimensions.get('window').height);
+  const contactScrollMaxHeight = Math.max(contactModalContentHeight - verticalScale(130), verticalScale(150));
 
   // Track which momentRequestId has already been auto-opened so that internal date
   // navigation (which re-fetches momentRequests) does not re-trigger the modal.
@@ -2365,19 +2367,24 @@ const AppStack_DateDetailScreen: React.FC<Props> = ({ navigation, route }) => {
         >
           <Animated.View
             style={[
-              { height: Dimensions.get('window').height },
+              tw`flex-1`,
               { opacity: contactModalOpacityAnim }
             ]}
           >
             <BlurView intensity={20} tint="dark" style={tw`absolute inset-0`}>
               <View style={tw`flex-1 bg-black opacity-40`} />
             </BlurView>
-            <TouchableOpacity
-              style={{ height: Dimensions.get('window').height }}
-              activeOpacity={1}
-              onPress={handleCloseContactModal}
+            <KeyboardAvoidingView
+              style={tw`flex-1`}
+              behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+              keyboardVerticalOffset={0}
             >
-              <View style={{ height: Dimensions.get('window').height, justifyContent: 'flex-end' }}>
+              <TouchableOpacity
+                style={tw`flex-1`}
+                activeOpacity={1}
+                onPress={handleCloseContactModal}
+              >
+                <View style={tw`flex-1 justify-end`} onLayout={(e) => setContactModalContentHeight(e.nativeEvent.layout.height)}>
                   <TouchableOpacity activeOpacity={1} onPress={(e) => e.stopPropagation()}>
                     <Animated.View
                       style={[
@@ -2417,7 +2424,7 @@ const AppStack_DateDetailScreen: React.FC<Props> = ({ navigation, route }) => {
 
                       {/* Contacts List - Scrollable */}
                       <ScrollView
-                        style={{ maxHeight: Dimensions.get('window').height * 0.6 }}
+                        style={{ maxHeight: contactScrollMaxHeight }}
                         contentContainerStyle={{ paddingHorizontal: horizontalScale(15), paddingBottom: verticalScale(30) }}
                         showsVerticalScrollIndicator={false}
                         keyboardShouldPersistTaps="handled"
@@ -2475,6 +2482,7 @@ const AppStack_DateDetailScreen: React.FC<Props> = ({ navigation, route }) => {
                   </TouchableOpacity>
                 </View>
               </TouchableOpacity>
+            </KeyboardAvoidingView>
           </Animated.View>
         </Modal>
       )}

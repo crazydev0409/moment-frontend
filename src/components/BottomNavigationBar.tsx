@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { View, TouchableOpacity, Image, Modal, Text, TextInput, ScrollView, Alert, Platform, Animated, Dimensions } from 'react-native';
+import { View, TouchableOpacity, Image, Modal, Text, TextInput, ScrollView, Alert, Platform, KeyboardAvoidingView, Animated, Dimensions } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -41,6 +41,8 @@ const BottomNavigationBar: React.FC<BottomNavigationBarProps> = ({
   // Animation values for smooth modal transitions
   const contactModalSlideAnim = useRef(new Animated.Value(0)).current;
   const contactModalOpacityAnim = useRef(new Animated.Value(0)).current;
+  const [contactModalContentHeight, setContactModalContentHeight] = useState(Dimensions.get('window').height);
+  const contactScrollMaxHeight = Math.max(contactModalContentHeight - verticalScale(130), verticalScale(150));
 
   // Handle Tab Navigation
   const handleHomePress = () => {
@@ -154,7 +156,7 @@ const BottomNavigationBar: React.FC<BottomNavigationBarProps> = ({
 
   return (
     <>
-      <View style={[tw`absolute left-0 right-0 justify-center flex-row`, { gap: horizontalScale(7.5), bottom: Math.max(insets.bottom, 30) }]}>
+      <View style={[tw`absolute left-0 right-0 justify-center flex-row`, { gap: horizontalScale(7.5), bottom: Math.max(insets.bottom, 30) }, (showContactModal || showAddMenu) && { opacity: 0 }]}>
         <View style={[tw`flex-row items-center rounded-full bg-black overflow-hidden`, { gap: horizontalScale(7.5), padding: verticalScale(9.375) }]}>
           <TouchableOpacity
             activeOpacity={0.7}
@@ -284,19 +286,24 @@ const BottomNavigationBar: React.FC<BottomNavigationBarProps> = ({
         >
           <Animated.View
             style={[
-              { height: Dimensions.get('window').height },
+              tw`flex-1`,
               { opacity: contactModalOpacityAnim }
             ]}
           >
             <BlurView intensity={20} tint="dark" style={tw`absolute inset-0`}>
               <View style={tw`flex-1 bg-black opacity-40`} />
             </BlurView>
-            <TouchableOpacity
-              style={{ height: Dimensions.get('window').height }}
-              activeOpacity={1}
-              onPress={handleCloseContactModal}
+            <KeyboardAvoidingView
+              style={tw`flex-1`}
+              behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+              keyboardVerticalOffset={0}
             >
-              <View style={{ height: Dimensions.get('window').height, justifyContent: 'flex-end' }}>
+              <TouchableOpacity
+                style={tw`flex-1`}
+                activeOpacity={1}
+                onPress={handleCloseContactModal}
+              >
+                <View style={tw`flex-1 justify-end`} onLayout={(e) => setContactModalContentHeight(e.nativeEvent.layout.height)}>
                   <TouchableOpacity activeOpacity={1} onPress={(e) => e.stopPropagation()}>
                     <Animated.View
                       style={[
@@ -336,7 +343,7 @@ const BottomNavigationBar: React.FC<BottomNavigationBarProps> = ({
 
                       {/* Contacts List - Scrollable */}
                       <ScrollView
-                        style={{ maxHeight: Dimensions.get('window').height * 0.6 }}
+                        style={{ maxHeight: contactScrollMaxHeight }}
                         contentContainerStyle={{ paddingHorizontal: horizontalScale(15), paddingBottom: verticalScale(30) }}
                         showsVerticalScrollIndicator={false}
                         keyboardShouldPersistTaps="handled"
@@ -394,6 +401,7 @@ const BottomNavigationBar: React.FC<BottomNavigationBarProps> = ({
                   </TouchableOpacity>
                 </View>
               </TouchableOpacity>
+            </KeyboardAvoidingView>
           </Animated.View>
         </Modal>
       )}
