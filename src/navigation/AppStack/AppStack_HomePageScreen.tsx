@@ -163,6 +163,9 @@ const AppStack_HomePageScreen: React.FC<Props> = ({ navigation, route }) => {
   // Local contact avatars mapping (phone number -> avatar URI)
   const [localAvatars, setLocalAvatars] = useState<Map<string, string>>(new Map());
 
+  // Random progress value between 0.25 and 1 (generated once per app run)
+  const [progressValue] = useState(() => 0.25 + Math.random() * 0.75);
+
   useEffect(() => {
     // Generate dates for the current week
     const today = new Date();
@@ -850,11 +853,11 @@ const AppStack_HomePageScreen: React.FC<Props> = ({ navigation, route }) => {
                           ]} 
                         />
                         
-                        {/* Progress Fill - Fixed at 85% */}
+                        {/* Progress Fill - Random between 25% and 100% */}
                         <View 
                           style={[
                             tw`absolute flex-row items-center`,
-                            { width: '85%', left: 0 }
+                            { width: `${progressValue * 100}%`, left: 0 }
                           ]}
                         >
                           {/* Black Fill Bar */}
@@ -916,7 +919,7 @@ const AppStack_HomePageScreen: React.FC<Props> = ({ navigation, route }) => {
                             }
                           ]}
                         >
-                          0.85
+                          {progressValue.toFixed(2)}
                         </Text>
                       </View>
                     </View>
