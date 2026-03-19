@@ -9,7 +9,7 @@
       }
     },
     "web": {
-      "favicon": "./assets/images/logo.png"
+      "favicon": "./assets/images/icon-android.png"
     },
     "experiments": {
       "tsconfigPaths": true
@@ -39,7 +39,7 @@
       "@react-native-community/datetimepicker"
     ],
     "orientation": "portrait",
-    "icon": "./assets/images/logo.png",
+    "icon": "./assets/images/icon-android.png",
     "userInterfaceStyle": "light",
     "androidStatusBar": {
       "translucent": false,
@@ -55,6 +55,7 @@
       "**/*"
     ],
     "ios": {
+      "icon": "./assets/images/icon-ios.png",
       "bundleIdentifier": "com.crazydev0409.catchapp",
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false,
@@ -66,8 +67,9 @@
       }
     },
     "android": {
+      "icon": "./assets/images/icon-android.png",
       "adaptiveIcon": {
-        "foregroundImage": "./assets/images/logo.png",
+        "foregroundImage": "./assets/images/icon-android.png",
         "backgroundColor": "#A3CB31"
       },
       "permissions": [
@@ -80,7 +82,7 @@
       "softwareKeyboardLayoutMode": "pan"
     },
     "notification": {
-      "icon": "./assets/images/logo.png",
+      "icon": "./assets/images/icon-android.png",
       "color": "#000000",
       "iosDisplayInForeground": true,
       "androidMode": "default",

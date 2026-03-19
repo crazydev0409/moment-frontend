@@ -2,9 +2,9 @@
 // Must be imported before any component renders so TaskManager.defineTask runs at module level
 import '~/services/backgroundTaskService';
 import { useCallback, useEffect, useState } from 'react';
-import { View, Alert } from 'react-native';
+import { View, Alert, Platform } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
-import { SafeAreaProvider } from 'react-native-safe-area-context';
+import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as SplashScreen from 'expo-splash-screen';
 import * as Contacts from 'expo-contacts';
 import * as Location from 'expo-location';
@@ -316,10 +316,33 @@ export default function App() {
   // App is ready - show the main navigator
   return (
     <SafeAreaProvider>
+      <AppContent onLayoutRootView={onLayoutRootView} />
+    </SafeAreaProvider>
+  );
+}
+
+function AppContent({ onLayoutRootView }: { onLayoutRootView: (e: any) => void }) {
+  const insets = useSafeAreaInsets();
+  return (
+    <>
       <StatusBar style="light" backgroundColor="#000000" translucent={false} />
+      {/* Black status bar background: Android uses native config; iOS needs a view since status bar is transparent */}
+      {Platform.OS === 'ios' && (
+        <View
+          style={{
+            position: 'absolute',
+            top: 0,
+            left: 0,
+            right: 0,
+            height: insets.top,
+            backgroundColor: '#000000',
+            zIndex: 9999,
+          }}
+        />
+      )}
       <View style={{ flex: 1 }} onLayout={onLayoutRootView}>
         <RootNavigator />
       </View>
-    </SafeAreaProvider>
+    </>
   );
 }

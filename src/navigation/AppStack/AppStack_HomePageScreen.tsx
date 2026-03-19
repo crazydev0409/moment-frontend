@@ -1,6 +1,6 @@
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { useFocusEffect } from '@react-navigation/native';
-import React, { useEffect, useState, useCallback, useRef } from 'react';
+import React, { useEffect, useState, useCallback, useRef, useMemo } from 'react';
 import { Text, Image, View, TouchableOpacity, ScrollView, TextInput, Modal, ActivityIndicator } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { BlurView } from 'expo-blur';
@@ -80,6 +80,18 @@ const isSameDay = (date1: Date, date2: Date) => {
 
 const isAfter = (date1: Date, date2: Date) => {
   return date1.getTime() > date2.getTime();
+};
+
+// Deterministic hash: same input → same output across all devices (for progress value)
+const hashToProgress = (str: string): number => {
+  let hash = 0;
+  for (let i = 0; i < str.length; i++) {
+    const char = str.charCodeAt(i);
+    hash = ((hash << 5) - hash) + char;
+    hash = hash & hash;
+  }
+  const normalized = Math.abs(hash) / 2147483647;
+  return 0.25 + normalized * 0.75; // 0.25 to 1
 };
 
 const formatDate = (date: Date, formatStr: string): string => {
@@ -162,9 +174,6 @@ const AppStack_HomePageScreen: React.FC<Props> = ({ navigation, route }) => {
 
   // Local contact avatars mapping (phone number -> avatar URI)
   const [localAvatars, setLocalAvatars] = useState<Map<string, string>>(new Map());
-
-  // Random progress value between 0.25 and 1 (generated once per app run)
-  const [progressValue] = useState(() => 0.25 + Math.random() * 0.75);
 
   useEffect(() => {
     // Generate dates for the current week
@@ -627,6 +636,12 @@ const AppStack_HomePageScreen: React.FC<Props> = ({ navigation, route }) => {
 
   const filteredMeetings = getFilteredMeetings();
   const upcomingMeeting = getUpcomingMeeting();
+
+  // Deterministic progress value (0.25–1): same seed → same value on all devices
+  const progressValue = useMemo(() => {
+    const seed = upcomingMeeting?.id ?? `${userId || 'default'}-${selectedDate.toISOString().split('T')[0]}`;
+    return hashToProgress(seed);
+  }, [upcomingMeeting?.id, userId, selectedDate]);
 
   const isSelected = (date: Date) => {
     return (
