@@ -5,6 +5,8 @@ export const userAtom = atom({
   name: '',
   email: '',
   phoneNumber: '',
+  avatar: '',
+  timezone: 'UTC',
   birthday: '',
   bio: '',
   meetingTypes: [] as string[],

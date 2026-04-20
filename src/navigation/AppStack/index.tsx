@@ -9,10 +9,8 @@ import AppStack_ContactScreen from './AppStack_ContactScreen';
 import AppStack_ComingSoonScreen from './AppStack_ComingSoonScreen';
 import AppStack_SearchScreen from './AppStack_SearchScreen';
 import AppStack_NotificationScreen from './AppStack_NotificationScreen';
-import {
-  NativeStackScreenProps,
-  createNativeStackNavigator,
-} from '@react-navigation/native-stack';
+import AppStack_AvailabilityScreen from './AppStack_AvailabilityScreen';
+import { NativeStackScreenProps, createNativeStackNavigator } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../../index';
 import BottomNavigationBar from '~/components/BottomNavigationBar';
 import tw from '~/tailwindcss';
@@ -21,8 +19,14 @@ export type AppStackParamList = {
   AppStack_HomePageScreen: undefined;
   AppStack_ProfileScreen: undefined;
   AppStack_SettingsScreen: undefined;
+  AppStack_AvailabilityScreen: undefined;
   AppStack_CalendarScreen: undefined;
-  AppStack_DateDetailScreen: { date?: string; contact?: Contact; momentRequestId?: string };
+  AppStack_DateDetailScreen: {
+    date?: string;
+    contact?: Contact;
+    momentRequestId?: string;
+    bookingUserId?: string;
+  };
   AppStack_ContactScreen: undefined;
   AppStack_ComingSoonScreen: undefined;
   AppStack_SearchScreen: undefined;
@@ -38,18 +42,17 @@ interface Contact {
     name: string;
     avatar?: string;
   };
+  avatar?: string;
 }
 
 type Props = NativeStackScreenProps<RootStackParamList, 'AppStack'>;
 const Stack = createNativeStackNavigator<AppStackParamList>();
 
-
 const AppStackNavigator: React.FC = () => {
   return (
     <Stack.Navigator
       initialRouteName="AppStack_HomePageScreen"
-      screenOptions={{ headerShown: false }}
-    >
+      screenOptions={{ headerShown: false }}>
       <Stack.Screen name="AppStack_HomePageScreen">
         {(props: any) => (
           <View style={tw`flex-1`}>
@@ -88,6 +91,7 @@ const AppStackNavigator: React.FC = () => {
 
       <Stack.Screen name="AppStack_ProfileScreen" component={AppStack_ProfileScreen} />
       <Stack.Screen name="AppStack_SettingsScreen" component={AppStack_SettingsScreen} />
+      <Stack.Screen name="AppStack_AvailabilityScreen" component={AppStack_AvailabilityScreen} />
       <Stack.Screen name="AppStack_DateDetailScreen" component={AppStack_DateDetailScreen} />
       <Stack.Screen name="AppStack_SearchScreen" component={AppStack_SearchScreen} />
       <Stack.Screen name="AppStack_NotificationScreen" component={AppStack_NotificationScreen} />
@@ -96,9 +100,7 @@ const AppStackNavigator: React.FC = () => {
 };
 
 const AppStack: React.FC<any> = ({ navigation, route }) => {
-  return (
-    <AppStackNavigator />
-  );
+  return <AppStackNavigator />;
 };
 
 export default AppStack;

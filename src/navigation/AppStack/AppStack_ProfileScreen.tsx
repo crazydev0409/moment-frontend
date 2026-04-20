@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useCallback } from 'react';
-import { Alert, ActivityIndicator } from 'react-native';
-import Toast from '~/components/Toast';
 import {
+  Alert,
+  ActivityIndicator,
   View,
   Text,
   TextInput,
@@ -13,19 +13,18 @@ import {
 } from 'react-native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { useFocusEffect } from '@react-navigation/native';
+import DateTimePicker from '@react-native-community/datetimepicker';
+import QRCode from 'react-native-qrcode-svg';
 import tw from '~/tailwindcss';
+import Toast from '~/components/Toast';
 import { AppStackParamList } from '.';
 import { useAtom } from 'jotai';
 import { userAtom } from '../../store';
 import { BackArrow, Background, Avatar, Settings } from '~/lib/images';
-import DateTimePicker from '@react-native-community/datetimepicker';
 import { http } from '~/helpers/http';
 import { horizontalScale, verticalScale, moderateScale } from '~/helpers/responsive';
 
-type Props = NativeStackScreenProps<
-  AppStackParamList,
-  'AppStack_ProfileScreen'
->;
+type Props = NativeStackScreenProps<AppStackParamList, 'AppStack_ProfileScreen'>;
 
 const AppStack_ProfileScreen: React.FC<Props> = ({ navigation, route }) => {
   const [name, setName] = useState('');
@@ -88,38 +87,38 @@ const AppStack_ProfileScreen: React.FC<Props> = ({ navigation, route }) => {
 
     // --- Name required ---
     if (!name.trim()) {
-      setNameError("Name is required.");
+      setNameError('Name is required.');
       valid = false;
     }
 
     // --- Birthday required ---
     if (!birthday) {
-      setBirthdayError("Birthday is required.");
+      setBirthdayError('Birthday is required.');
       valid = false;
     }
 
     // --- Email required ---
     if (!email.trim()) {
-      setEmailError("Email is required.");
+      setEmailError('Email is required.');
       valid = false;
     }
 
     // Email format check
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (email && !emailRegex.test(email)) {
-      setEmailError("Please enter a valid email address.");
+      setEmailError('Please enter a valid email address.');
       valid = false;
     }
 
     // --- Confirm Email required ---
     if (!confirmEmail.trim()) {
-      setConfirmEmailError("Confirm Email is required.");
+      setConfirmEmailError('Confirm Email is required.');
       valid = false;
     }
 
     // Emails must match
     if (email && confirmEmail && email !== confirmEmail) {
-      setConfirmEmailError("Emails do not match.");
+      setConfirmEmailError('Emails do not match.');
       valid = false;
     }
 
@@ -127,12 +126,16 @@ const AppStack_ProfileScreen: React.FC<Props> = ({ navigation, route }) => {
     if (isSaving) return;
 
     const payload = {
-      name, bio, email, birthday
-    }
+      name,
+      bio,
+      email,
+      birthday,
+    };
 
     setIsSaving(true);
-    http.put('/users/profile', payload)
-      .then(async response => {
+    http
+      .put('/users/profile', payload)
+      .then(async (response) => {
         if (response.status === 200) {
           // Fetch updated profile and update atom
           await fetchUserProfile();
@@ -144,7 +147,7 @@ const AppStack_ProfileScreen: React.FC<Props> = ({ navigation, route }) => {
           Alert.alert('Error', 'Failed to update profile. Please try again.');
         }
       })
-      .catch(error => {
+      .catch((error) => {
         console.log({ error });
         Alert.alert('Error', 'An unexpected error occurred. Please try again.');
       })
@@ -161,166 +164,343 @@ const AppStack_ProfileScreen: React.FC<Props> = ({ navigation, route }) => {
     return `${day}.${month}.${year}`;
   };
 
+  const bookingQrValue = user.id ? `catch://book/${user.id}` : '';
+
   return (
     <View style={tw`flex-1 relative bg-white`}>
       <Image source={Background} style={tw`absolute w-full h-full`} />
       <View style={tw`absolute w-full h-full bg-black opacity-5`} />
 
-      <KeyboardAvoidingView 
+      <KeyboardAvoidingView
         style={tw`flex-1`}
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-        keyboardVerticalOffset={Platform.OS === 'ios' ? 60 : 0}
-      >
-        <ScrollView 
+        keyboardVerticalOffset={Platform.OS === 'ios' ? 60 : 0}>
+        <ScrollView
           style={tw`flex-1`}
           contentContainerStyle={{ flexGrow: 1 }}
           keyboardShouldPersistTaps="handled"
-          showsVerticalScrollIndicator={false}
-        >
+          showsVerticalScrollIndicator={false}>
           <View style={{ marginTop: verticalScale(37.5), paddingHorizontal: '8%' }}>
-
             {/* Header with back arrow and settings */}
-            <View style={[tw`flex-row justify-between items-center`, { marginBottom: -verticalScale(7.5) }]}>
+            <View
+              style={[
+                tw`flex-row justify-between items-center`,
+                { marginBottom: -verticalScale(7.5) },
+              ]}>
               <TouchableOpacity onPress={navigateToMainPage} activeOpacity={0.5}>
-                <Image source={BackArrow} style={[tw``, { width: horizontalScale(24), height: horizontalScale(24) }]} resizeMode="contain" />
+                <Image
+                  source={BackArrow}
+                  style={[tw``, { width: horizontalScale(24), height: horizontalScale(24) }]}
+                  resizeMode="contain"
+                />
               </TouchableOpacity>
               <TouchableOpacity
                 activeOpacity={0.5}
-                onPress={() => navigation.navigate('AppStack_SettingsScreen')}
-              >
-                <Image source={Settings} style={[tw``, { width: horizontalScale(30), height: horizontalScale(30) }]} resizeMode="contain" />
+                onPress={() => navigation.navigate('AppStack_SettingsScreen')}>
+                <Image
+                  source={Settings}
+                  style={[tw``, { width: horizontalScale(30), height: horizontalScale(30) }]}
+                  resizeMode="contain"
+                />
               </TouchableOpacity>
             </View>
 
             {/* Profile Picture */}
             <View style={[tw`items-center`, { marginBottom: verticalScale(30) }]}>
-              <View style={[tw`rounded-full bg-white items-center justify-center shadow-sm`, { width: horizontalScale(82.5), height: horizontalScale(82.5) }]}>
-                <Image source={Avatar} style={[tw``, { width: horizontalScale(75), height: horizontalScale(75) }]} resizeMode="contain" />
+              <View
+                style={[
+                  tw`rounded-full bg-white items-center justify-center shadow-sm`,
+                  { width: horizontalScale(82.5), height: horizontalScale(82.5) },
+                ]}>
+                <Image
+                  source={Avatar}
+                  style={[tw``, { width: horizontalScale(75), height: horizontalScale(75) }]}
+                  resizeMode="contain"
+                />
               </View>
             </View>
-        <View style={tw``}>
-          <Text style={[tw`text-grey`, { fontSize: moderateScale(12), lineHeight: verticalScale(19), marginBottom: verticalScale(7.5) }]}>Name</Text>
-          <TextInput
-            autoCapitalize="words"
-            autoCorrect={false}
-            style={[tw`bg-white rounded-full w-full self-center font-dm font-normal font-bold tracking-[0.5px]`, {
-              height: verticalScale(51),
-              paddingHorizontal: horizontalScale(19),
-              fontSize: moderateScale(13)
-            }]}
-            value={name}
-            onChangeText={(t) => { setName(t); setNameError(''); }}
-            placeholder="Name"
-          />
-          {nameError ? (
-            <Text style={[tw`text-red-500`, { fontSize: moderateScale(11), marginBottom: verticalScale(11), marginTop: verticalScale(11) }]}>{nameError}</Text>
-          ) : <View style={{ marginBottom: verticalScale(11), marginTop: verticalScale(11) }} />}
-        </View>
-        <View style={tw``}>
-          <Text style={[tw`text-grey`, { fontSize: moderateScale(12), lineHeight: verticalScale(19), marginBottom: verticalScale(7.5) }]}>BIO</Text>
-          <TextInput
-            autoCapitalize="words"
-            autoCorrect={false}
-            style={[tw`bg-white rounded-full w-full self-center font-dm font-normal font-bold tracking-[0.5px]`, {
-              height: verticalScale(51),
-              paddingHorizontal: horizontalScale(19),
-              fontSize: moderateScale(13)
-            }]}
-            value={bio}
-            onChangeText={setBio}
-            placeholder="Text"
-          />
-          <View style={{ marginBottom: verticalScale(22.5) }}></View>
-        </View>
-        <View style={tw``}>
-          <Text style={[tw`text-grey`, { fontSize: moderateScale(12), lineHeight: verticalScale(19), marginBottom: verticalScale(7.5) }]}>Birthday</Text>
+            {bookingQrValue ? (
+              <View
+                style={[
+                  tw`bg-white rounded-3xl items-center`,
+                  {
+                    paddingVertical: verticalScale(18.75),
+                    paddingHorizontal: horizontalScale(15),
+                    marginBottom: verticalScale(22.5),
+                  },
+                ]}>
+                <Text
+                  style={[
+                    tw`font-dm font-bold text-black`,
+                    { fontSize: moderateScale(15), marginBottom: verticalScale(6) },
+                  ]}>
+                  Booking QR
+                </Text>
+                <Text
+                  style={[
+                    tw`font-dm text-grey text-center`,
+                    { fontSize: moderateScale(11.25), marginBottom: verticalScale(12) },
+                  ]}>
+                  Anyone with Catch can scan this code to book time with you directly.
+                </Text>
+                <QRCode
+                  value={bookingQrValue}
+                  size={horizontalScale(135)}
+                  backgroundColor="white"
+                  color="black"
+                />
+              </View>
+            ) : null}
+            <View style={tw``}>
+              <Text
+                style={[
+                  tw`text-grey`,
+                  {
+                    fontSize: moderateScale(12),
+                    lineHeight: verticalScale(19),
+                    marginBottom: verticalScale(7.5),
+                  },
+                ]}>
+                Name
+              </Text>
+              <TextInput
+                autoCapitalize="words"
+                autoCorrect={false}
+                style={[
+                  tw`bg-white rounded-full w-full self-center font-dm font-normal font-bold tracking-[0.5px]`,
+                  {
+                    height: verticalScale(51),
+                    paddingHorizontal: horizontalScale(19),
+                    fontSize: moderateScale(13),
+                  },
+                ]}
+                value={name}
+                onChangeText={(t) => {
+                  setName(t);
+                  setNameError('');
+                }}
+                placeholder="Name"
+              />
+              {nameError ? (
+                <Text
+                  style={[
+                    tw`text-red-500`,
+                    {
+                      fontSize: moderateScale(11),
+                      marginBottom: verticalScale(11),
+                      marginTop: verticalScale(11),
+                    },
+                  ]}>
+                  {nameError}
+                </Text>
+              ) : (
+                <View style={{ marginBottom: verticalScale(11), marginTop: verticalScale(11) }} />
+              )}
+            </View>
+            <View style={tw``}>
+              <Text
+                style={[
+                  tw`text-grey`,
+                  {
+                    fontSize: moderateScale(12),
+                    lineHeight: verticalScale(19),
+                    marginBottom: verticalScale(7.5),
+                  },
+                ]}>
+                BIO
+              </Text>
+              <TextInput
+                autoCapitalize="words"
+                autoCorrect={false}
+                style={[
+                  tw`bg-white rounded-full w-full self-center font-dm font-normal font-bold tracking-[0.5px]`,
+                  {
+                    height: verticalScale(51),
+                    paddingHorizontal: horizontalScale(19),
+                    fontSize: moderateScale(13),
+                  },
+                ]}
+                value={bio}
+                onChangeText={setBio}
+                placeholder="Text"
+              />
+              <View style={{ marginBottom: verticalScale(22.5) }}></View>
+            </View>
+            <View style={tw``}>
+              <Text
+                style={[
+                  tw`text-grey`,
+                  {
+                    fontSize: moderateScale(12),
+                    lineHeight: verticalScale(19),
+                    marginBottom: verticalScale(7.5),
+                  },
+                ]}>
+                Birthday
+              </Text>
 
-          {/* Fake input container to match UI */}
-          <TouchableOpacity
-            onPress={() => setShowBirthdayPicker(true)}
-            activeOpacity={0.7}
-            style={[tw`bg-white rounded-full w-full justify-center`, {
-              height: verticalScale(51),
-              paddingHorizontal: horizontalScale(19)
-            }]}
-          >
-            <Text style={[tw`font-dm font-normal tracking-[0.5px] text-black`, { fontSize: moderateScale(13) }]}>
-              {birthday ? formatBirthday(birthday) : "18.08.1986"}
-            </Text>
-          </TouchableOpacity>
+              {/* Fake input container to match UI */}
+              <TouchableOpacity
+                onPress={() => setShowBirthdayPicker(true)}
+                activeOpacity={0.7}
+                style={[
+                  tw`bg-white rounded-full w-full justify-center`,
+                  {
+                    height: verticalScale(51),
+                    paddingHorizontal: horizontalScale(19),
+                  },
+                ]}>
+                <Text
+                  style={[
+                    tw`font-dm font-normal tracking-[0.5px] text-black`,
+                    { fontSize: moderateScale(13) },
+                  ]}>
+                  {birthday ? formatBirthday(birthday) : '18.08.1986'}
+                </Text>
+              </TouchableOpacity>
 
-          {showBirthdayPicker && (
-            <DateTimePicker
-              value={birthday || new Date()}
-              mode="date"
-              display="spinner"
-              onChange={(event, selectedDate) => {
-                setShowBirthdayPicker(false);
-                if (selectedDate) { setBirthday(selectedDate); setBirthdayError(''); };
-              }}
-            />
-          )}
+              {showBirthdayPicker && (
+                <DateTimePicker
+                  value={birthday || new Date()}
+                  mode="date"
+                  display="spinner"
+                  onChange={(event, selectedDate) => {
+                    setShowBirthdayPicker(false);
+                    if (selectedDate) {
+                      setBirthday(selectedDate);
+                      setBirthdayError('');
+                    }
+                  }}
+                />
+              )}
 
-          {birthdayError ? (
-            <Text style={[tw`text-red-500`, { fontSize: moderateScale(11), marginBottom: verticalScale(11), marginTop: verticalScale(11) }]}>{birthdayError}</Text>
-          ) : <View style={{ marginBottom: verticalScale(11), marginTop: verticalScale(11) }} />}
-        </View>
-        <View style={tw``}>
-          <Text style={[tw`text-grey`, { fontSize: moderateScale(12), lineHeight: verticalScale(19), marginBottom: verticalScale(7.5) }]}>Email</Text>
-          <TextInput
-            style={[tw`bg-white rounded-full w-full self-center font-dm font-normal font-bold tracking-[0.5px]`, {
-              height: verticalScale(51),
-              paddingHorizontal: horizontalScale(19),
-              fontSize: moderateScale(13)
-            }]}
-            value={email}
-            keyboardType="email-address"
-            autoCapitalize="none"
-            autoCorrect={false}
-            onChangeText={(t) => { setEmail(t); setEmailError(''); }}
-            placeholder="Email"
-          />
+              {birthdayError ? (
+                <Text
+                  style={[
+                    tw`text-red-500`,
+                    {
+                      fontSize: moderateScale(11),
+                      marginBottom: verticalScale(11),
+                      marginTop: verticalScale(11),
+                    },
+                  ]}>
+                  {birthdayError}
+                </Text>
+              ) : (
+                <View style={{ marginBottom: verticalScale(11), marginTop: verticalScale(11) }} />
+              )}
+            </View>
+            <View style={tw``}>
+              <Text
+                style={[
+                  tw`text-grey`,
+                  {
+                    fontSize: moderateScale(12),
+                    lineHeight: verticalScale(19),
+                    marginBottom: verticalScale(7.5),
+                  },
+                ]}>
+                Email
+              </Text>
+              <TextInput
+                style={[
+                  tw`bg-white rounded-full w-full self-center font-dm font-normal font-bold tracking-[0.5px]`,
+                  {
+                    height: verticalScale(51),
+                    paddingHorizontal: horizontalScale(19),
+                    fontSize: moderateScale(13),
+                  },
+                ]}
+                value={email}
+                keyboardType="email-address"
+                autoCapitalize="none"
+                autoCorrect={false}
+                onChangeText={(t) => {
+                  setEmail(t);
+                  setEmailError('');
+                }}
+                placeholder="Email"
+              />
 
-          {emailError ? (
-            <Text style={[tw`text-red-500`, { fontSize: moderateScale(11), marginBottom: verticalScale(11), marginTop: verticalScale(11) }]}>{emailError}</Text>
-          ) : <View style={{ marginBottom: verticalScale(11), marginTop: verticalScale(11) }} />}
-        </View>
-        <View style={tw``}>
-          <Text style={[tw`text-grey`, { fontSize: moderateScale(12), lineHeight: verticalScale(19), marginBottom: verticalScale(7.5) }]}>Confirm Email</Text>
-          <TextInput
-            style={[tw`bg-white rounded-full w-full self-center font-dm font-normal font-bold tracking-[0.5px]`, {
-              height: verticalScale(51),
-              paddingHorizontal: horizontalScale(19),
-              fontSize: moderateScale(13)
-            }]}
-            value={confirmEmail}
-            keyboardType="email-address"
-            autoCapitalize="none"
-            autoCorrect={false}
-            onChangeText={(t) => { setConfirmEmail(t); setConfirmEmailError(''); }}
-            placeholder="Confirm Email"
-          />
+              {emailError ? (
+                <Text
+                  style={[
+                    tw`text-red-500`,
+                    {
+                      fontSize: moderateScale(11),
+                      marginBottom: verticalScale(11),
+                      marginTop: verticalScale(11),
+                    },
+                  ]}>
+                  {emailError}
+                </Text>
+              ) : (
+                <View style={{ marginBottom: verticalScale(11), marginTop: verticalScale(11) }} />
+              )}
+            </View>
+            <View style={tw``}>
+              <Text
+                style={[
+                  tw`text-grey`,
+                  {
+                    fontSize: moderateScale(12),
+                    lineHeight: verticalScale(19),
+                    marginBottom: verticalScale(7.5),
+                  },
+                ]}>
+                Confirm Email
+              </Text>
+              <TextInput
+                style={[
+                  tw`bg-white rounded-full w-full self-center font-dm font-normal font-bold tracking-[0.5px]`,
+                  {
+                    height: verticalScale(51),
+                    paddingHorizontal: horizontalScale(19),
+                    fontSize: moderateScale(13),
+                  },
+                ]}
+                value={confirmEmail}
+                keyboardType="email-address"
+                autoCapitalize="none"
+                autoCorrect={false}
+                onChangeText={(t) => {
+                  setConfirmEmail(t);
+                  setConfirmEmailError('');
+                }}
+                placeholder="Confirm Email"
+              />
 
-            {confirmEmailError ? (
-              <Text style={[tw`text-red-500`, { fontSize: moderateScale(11), marginBottom: verticalScale(11), marginTop: verticalScale(11) }]}>{confirmEmailError}</Text>
-            ) : <View style={{ marginBottom: verticalScale(11), marginTop: verticalScale(11) }} />}
-          </View>
+              {confirmEmailError ? (
+                <Text
+                  style={[
+                    tw`text-red-500`,
+                    {
+                      fontSize: moderateScale(11),
+                      marginBottom: verticalScale(11),
+                      marginTop: verticalScale(11),
+                    },
+                  ]}>
+                  {confirmEmailError}
+                </Text>
+              ) : (
+                <View style={{ marginBottom: verticalScale(11), marginTop: verticalScale(11) }} />
+              )}
+            </View>
           </View>
 
           <View style={{ flex: 1 }} />
 
           <View style={tw`w-full flex-col items-center`}>
-            <TouchableOpacity
-              onPress={navigateToPlanPage}
-              activeOpacity={0.7}
-              disabled={isSaving}
-            >
+            <TouchableOpacity onPress={navigateToPlanPage} activeOpacity={0.7} disabled={isSaving}>
               <View
-                style={[tw`bg-[#A3CB31] rounded-full justify-center items-center shadow-lg ${isSaving ? 'opacity-50' : ''}`, {
-                  height: verticalScale(56),
-                  width: horizontalScale(225),
-                  marginBottom: verticalScale(37.5)
-                }]}>
+                style={[
+                  tw`bg-[#A3CB31] rounded-full justify-center items-center shadow-lg ${isSaving ? 'opacity-50' : ''}`,
+                  {
+                    height: verticalScale(56),
+                    width: horizontalScale(225),
+                    marginBottom: verticalScale(37.5),
+                  },
+                ]}>
                 {isSaving ? (
                   <ActivityIndicator size="small" color="#FFFFFF" />
                 ) : (

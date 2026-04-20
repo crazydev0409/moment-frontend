@@ -186,6 +186,8 @@ export function setupNotificationResponseHandler(
     const actionIdentifier = response.actionIdentifier;
     const eventType = data.eventType;
 
+    // Dismiss the notification the user just acted on
+    Notifications.dismissNotificationAsync(notification.request.identifier).catch(() => {});
 
 
     // Handle moment request created notifications (with accept/reject buttons)
@@ -473,15 +475,8 @@ export async function showPendingMomentRequestNotifications() {
       return;
     }
 
-    const projectId = (Constants.expoConfig as any)?.extra?.eas?.projectId ||
-      (Constants.expoConfig as any)?.projectId ||
-      (Constants.manifest as any)?.extra?.eas?.projectId ||
-      (Constants.manifest2 as any)?.extra?.eas?.projectId;
-
-    if (!projectId) {
-      console.log('Cannot show notifications: projectId not found');
-      return;
-    }
+    // Dismiss all previously delivered notifications to avoid stale duplicates
+    await Notifications.dismissAllNotificationsAsync();
 
     // Fetch pending moment requests from backend
     const response = await http.get('/users/moment-requests/pending');

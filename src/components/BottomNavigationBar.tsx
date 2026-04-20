@@ -1,11 +1,32 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { View, TouchableOpacity, Image, Modal, Text, TextInput, ScrollView, Alert, Platform, KeyboardAvoidingView, Animated, Dimensions } from 'react-native';
+import {
+  View,
+  TouchableOpacity,
+  Image,
+  Modal,
+  Text,
+  TextInput,
+  ScrollView,
+  Alert,
+  Platform,
+  KeyboardAvoidingView,
+  Animated,
+  Dimensions,
+} from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { BlurView } from 'expo-blur';
 import tw from '~/tailwindcss';
-import { HomeIcon, CalendarIcon, BusinessIcon, AddIcon, Search, Avatar, TwoPeople } from '~/lib/images';
+import {
+  HomeIcon,
+  CalendarIcon,
+  BusinessIcon,
+  AddIcon,
+  Search,
+  Avatar,
+  TwoPeople,
+} from '~/lib/images';
 import { AppStackParamList } from '~/navigation/AppStack';
 import { horizontalScale, verticalScale, moderateScale } from '~/helpers/responsive';
 import { http } from '~/helpers/http';
@@ -25,7 +46,7 @@ const BottomNavigationBar: React.FC<BottomNavigationBarProps> = ({
   onHomePress,
   onCalendarPress,
   onBusinessPress,
-  onProfilePress
+  onProfilePress,
 }) => {
   const navigation = useNavigation<NavigationProp>();
   const insets = useSafeAreaInsets();
@@ -41,8 +62,13 @@ const BottomNavigationBar: React.FC<BottomNavigationBarProps> = ({
   // Animation values for smooth modal transitions
   const contactModalSlideAnim = useRef(new Animated.Value(0)).current;
   const contactModalOpacityAnim = useRef(new Animated.Value(0)).current;
-  const [contactModalContentHeight, setContactModalContentHeight] = useState(Dimensions.get('window').height);
-  const contactScrollMaxHeight = Math.max(contactModalContentHeight - verticalScale(130), verticalScale(150));
+  const [contactModalContentHeight, setContactModalContentHeight] = useState(
+    Dimensions.get('window').height
+  );
+  const contactScrollMaxHeight = Math.max(
+    contactModalContentHeight - verticalScale(130),
+    verticalScale(150)
+  );
 
   // Handle Tab Navigation
   const handleHomePress = () => {
@@ -97,6 +123,11 @@ const BottomNavigationBar: React.FC<BottomNavigationBarProps> = ({
     });
   };
 
+  const handleManageAvailability = () => {
+    setShowAddMenu(false);
+    navigation.navigate('AppStack_AvailabilityScreen');
+  };
+
   const loadContacts = useCallback(async () => {
     setIsLoadingContacts(true);
     try {
@@ -104,11 +135,7 @@ const BottomNavigationBar: React.FC<BottomNavigationBarProps> = ({
       setContacts(response.data.contacts || []);
     } catch (error) {
       console.error('Error loading contacts:', error);
-      Alert.alert(
-        'Error',
-        'Failed to load contacts. Please try again.',
-        [{ text: 'OK' }]
-      );
+      Alert.alert('Error', 'Failed to load contacts. Please try again.', [{ text: 'OK' }]);
       setShowContactModal(false);
     } finally {
       setIsLoadingContacts(false);
@@ -122,7 +149,9 @@ const BottomNavigationBar: React.FC<BottomNavigationBarProps> = ({
   }, [showContactModal, loadContacts]);
 
   const filteredContacts = contacts
-    .filter(contact => contact.displayName.toLowerCase().includes(contactSearchText.toLowerCase()))
+    .filter((contact) =>
+      contact.displayName.toLowerCase().includes(contactSearchText.toLowerCase())
+    )
     .sort((a, b) => a.displayName.localeCompare(b.displayName));
 
   const handleContactSelect = (contact: any) => {
@@ -132,7 +161,7 @@ const BottomNavigationBar: React.FC<BottomNavigationBarProps> = ({
     const today = new Date().toISOString().split('T')[0];
     navigation.navigate('AppStack_DateDetailScreen', {
       date: today,
-      contact: contact
+      contact: contact,
     });
   };
 
@@ -156,43 +185,84 @@ const BottomNavigationBar: React.FC<BottomNavigationBarProps> = ({
 
   return (
     <>
-      <View style={[tw`absolute left-0 right-0 justify-center flex-row`, { gap: horizontalScale(7.5), bottom: Math.max(insets.bottom, 30) }, (showContactModal || showAddMenu) && { opacity: 0 }]}>
-        <View style={[tw`flex-row items-center rounded-full bg-black overflow-hidden`, { gap: horizontalScale(7.5), padding: verticalScale(9.375) }]}>
+      <View
+        style={[
+          tw`absolute left-0 right-0 justify-center flex-row`,
+          { gap: horizontalScale(7.5), bottom: Math.max(insets.bottom, 30) },
+          (showContactModal || showAddMenu) && { opacity: 0 },
+        ]}>
+        <View
+          style={[
+            tw`flex-row items-center rounded-full bg-black overflow-hidden`,
+            { gap: horizontalScale(7.5), padding: verticalScale(9.375) },
+          ]}>
           <TouchableOpacity
             activeOpacity={0.7}
             onPress={handleHomePress}
-            style={[tw`${selectedTab === 'home' ? 'bg-[#A3CB31]' : 'bg-[#222222]'} rounded-full items-center justify-center`, { padding: horizontalScale(15) }]}
-          >
-            <Image source={HomeIcon} style={{ width: horizontalScale(22.5), height: horizontalScale(22.5) }} resizeMode="contain" />
+            style={[
+              tw`${selectedTab === 'home' ? 'bg-[#A3CB31]' : 'bg-[#222222]'} rounded-full items-center justify-center`,
+              { padding: horizontalScale(15) },
+            ]}>
+            <Image
+              source={HomeIcon}
+              style={{ width: horizontalScale(22.5), height: horizontalScale(22.5) }}
+              resizeMode="contain"
+            />
           </TouchableOpacity>
           <TouchableOpacity
             activeOpacity={0.7}
             onPress={handleCalendarPress}
-            style={[tw`${selectedTab === 'calendar' ? 'bg-[#A3CB31]' : 'bg-[#222222]'} rounded-full items-center justify-center`, { padding: horizontalScale(15) }]}
-          >
-            <Image source={CalendarIcon} style={{ width: horizontalScale(22.5), height: horizontalScale(22.5) }} resizeMode="contain" />
+            style={[
+              tw`${selectedTab === 'calendar' ? 'bg-[#A3CB31]' : 'bg-[#222222]'} rounded-full items-center justify-center`,
+              { padding: horizontalScale(15) },
+            ]}>
+            <Image
+              source={CalendarIcon}
+              style={{ width: horizontalScale(22.5), height: horizontalScale(22.5) }}
+              resizeMode="contain"
+            />
           </TouchableOpacity>
           <TouchableOpacity
             activeOpacity={0.7}
             onPress={handleBusinessPress}
-            style={[tw`${selectedTab === 'business' ? 'bg-[#A3CB31]' : 'bg-[#222222]'} rounded-full items-center justify-center`, { padding: horizontalScale(15) }]}
-          >
-            <Image source={BusinessIcon} style={{ width: horizontalScale(22.5), height: horizontalScale(22.5) }} resizeMode="contain" />
+            style={[
+              tw`${selectedTab === 'business' ? 'bg-[#A3CB31]' : 'bg-[#222222]'} rounded-full items-center justify-center`,
+              { padding: horizontalScale(15) },
+            ]}>
+            <Image
+              source={BusinessIcon}
+              style={{ width: horizontalScale(22.5), height: horizontalScale(22.5) }}
+              resizeMode="contain"
+            />
           </TouchableOpacity>
           <TouchableOpacity
             activeOpacity={0.7}
             onPress={handleProfilePress}
-            style={[tw`${selectedTab === 'profile' ? 'bg-[#A3CB31]' : 'bg-[#222222]'} rounded-full items-center justify-center`, { padding: horizontalScale(15) }]}
-          >
-            <Image source={TwoPeople} tintColor="#FFFFFF" style={{ width: horizontalScale(22.5), height: horizontalScale(22.5) }} resizeMode="contain" />
+            style={[
+              tw`${selectedTab === 'profile' ? 'bg-[#A3CB31]' : 'bg-[#222222]'} rounded-full items-center justify-center`,
+              { padding: horizontalScale(15) },
+            ]}>
+            <Image
+              source={TwoPeople}
+              tintColor="#FFFFFF"
+              style={{ width: horizontalScale(22.5), height: horizontalScale(22.5) }}
+              resizeMode="contain"
+            />
           </TouchableOpacity>
         </View>
         <TouchableOpacity
-          style={[tw`bg-black rounded-full items-center justify-center`, { padding: horizontalScale(24.375) }]}
+          style={[
+            tw`bg-black rounded-full items-center justify-center`,
+            { padding: horizontalScale(24.375) },
+          ]}
           activeOpacity={0.7}
-          onPress={handleAddPress}
-        >
-          <Image source={AddIcon} tintColor="#FFFFFF" style={{ width: horizontalScale(22.5), height: horizontalScale(22.5) }} resizeMode="contain" />
+          onPress={handleAddPress}>
+          <Image
+            source={AddIcon}
+            tintColor="#FFFFFF"
+            style={{ width: horizontalScale(22.5), height: horizontalScale(22.5) }}
+            resizeMode="contain"
+          />
         </TouchableOpacity>
       </View>
 
@@ -202,58 +272,119 @@ const BottomNavigationBar: React.FC<BottomNavigationBarProps> = ({
           visible={showAddMenu}
           transparent={true}
           animationType="fade"
-          onRequestClose={() => setShowAddMenu(false)}
-        >
+          onRequestClose={() => setShowAddMenu(false)}>
           <View style={tw`flex-1`}>
             <TouchableOpacity
               style={tw`flex-1`}
               activeOpacity={1}
-              onPress={() => setShowAddMenu(false)}
-            >
+              onPress={() => setShowAddMenu(false)}>
               <BlurView intensity={20} tint="dark" style={tw`absolute inset-0`}>
                 <View style={tw`flex-1 bg-black opacity-40`} />
               </BlurView>
             </TouchableOpacity>
 
-            <View style={[tw`absolute bottom-0 left-0 right-0 items-center`, { paddingBottom: verticalScale(90) }]}>
-              <View style={[tw`bg-white rounded-3xl w-11/12 overflow-hidden`, { paddingHorizontal: horizontalScale(15) }]}>
+            <View
+              style={[
+                tw`absolute bottom-0 left-0 right-0 items-center`,
+                { paddingBottom: verticalScale(90) },
+              ]}>
+              <View
+                style={[
+                  tw`bg-white rounded-3xl w-11/12 overflow-hidden`,
+                  { paddingHorizontal: horizontalScale(15) },
+                ]}>
                 <TouchableOpacity
-                  style={[tw`flex-row items-center`, { paddingHorizontal: horizontalScale(22.5), paddingVertical: verticalScale(15) }]}
+                  style={[
+                    tw`flex-row items-center`,
+                    {
+                      paddingHorizontal: horizontalScale(22.5),
+                      paddingVertical: verticalScale(15),
+                    },
+                  ]}
                   activeOpacity={0.7}
-                  onPress={handleBookMeeting}
-                >
-                  <View style={[tw`rounded-full bg-gray-200 items-center justify-center`, { width: horizontalScale(37.5), height: horizontalScale(37.5), marginRight: horizontalScale(15) }]}>
-                    <Text style={[tw`text-black font-bold`, { fontSize: moderateScale(18.75) }]}>+</Text>
+                  onPress={handleBookMeeting}>
+                  <View
+                    style={[
+                      tw`rounded-full bg-gray-200 items-center justify-center`,
+                      {
+                        width: horizontalScale(37.5),
+                        height: horizontalScale(37.5),
+                        marginRight: horizontalScale(15),
+                      },
+                    ]}>
+                    <Text style={[tw`text-black font-bold`, { fontSize: moderateScale(18.75) }]}>
+                      +
+                    </Text>
                   </View>
-                  <Text style={[tw`text-black font-dm flex-1`, { fontSize: moderateScale(15) }]}>Book a meeting</Text>
+                  <Text style={[tw`text-black font-dm flex-1`, { fontSize: moderateScale(15) }]}>
+                    Book a meeting
+                  </Text>
                 </TouchableOpacity>
-                <View style={[tw`bg-gray-200`, { height: verticalScale(1.125), marginHorizontal: horizontalScale(22.5) }]} />
+                <View
+                  style={[
+                    tw`bg-gray-200`,
+                    { height: verticalScale(1.125), marginHorizontal: horizontalScale(22.5) },
+                  ]}
+                />
                 <TouchableOpacity
                   style={[
                     tw`flex-row items-center opacity-50`,
-                    { paddingHorizontal: horizontalScale(22.5), paddingVertical: verticalScale(15) }
+                    {
+                      paddingHorizontal: horizontalScale(22.5),
+                      paddingVertical: verticalScale(15),
+                    },
                   ]}
                   activeOpacity={1}
-                  disabled={true}
-                >
-                  <View style={[tw`rounded-full bg-gray-200 items-center justify-center`, { width: horizontalScale(37.5), height: horizontalScale(37.5), marginRight: horizontalScale(15) }]}>
-                    <Text style={[tw`text-black font-bold`, { fontSize: moderateScale(18.75) }]}>+</Text>
+                  disabled={true}>
+                  <View
+                    style={[
+                      tw`rounded-full bg-gray-200 items-center justify-center`,
+                      {
+                        width: horizontalScale(37.5),
+                        height: horizontalScale(37.5),
+                        marginRight: horizontalScale(15),
+                      },
+                    ]}>
+                    <Text style={[tw`text-black font-bold`, { fontSize: moderateScale(18.75) }]}>
+                      +
+                    </Text>
                   </View>
-                  <Text style={[tw`text-black font-dm flex-1`, { fontSize: moderateScale(15) }]}>Create meeting type</Text>
+                  <Text style={[tw`text-black font-dm flex-1`, { fontSize: moderateScale(15) }]}>
+                    Create meeting type
+                  </Text>
                 </TouchableOpacity>
-                <View style={[tw`bg-gray-200`, { height: verticalScale(1.125), marginHorizontal: horizontalScale(22.5) }]} />
+                <View
+                  style={[
+                    tw`bg-gray-200`,
+                    { height: verticalScale(1.125), marginHorizontal: horizontalScale(22.5) },
+                  ]}
+                />
                 <TouchableOpacity
                   style={[
-                    tw`flex-row items-center opacity-50`,
-                    { paddingHorizontal: horizontalScale(22.5), paddingVertical: verticalScale(15) }
+                    tw`flex-row items-center`,
+                    {
+                      paddingHorizontal: horizontalScale(22.5),
+                      paddingVertical: verticalScale(15),
+                    },
                   ]}
-                  activeOpacity={1}
-                  disabled={true}
-                >
-                  <View style={[tw`rounded-full bg-gray-200 items-center justify-center`, { width: horizontalScale(37.5), height: horizontalScale(37.5), marginRight: horizontalScale(15) }]}>
-                    <Text style={[tw`text-black font-bold`, { fontSize: moderateScale(18.75) }]}>+</Text>
+                  activeOpacity={0.7}
+                  onPress={handleManageAvailability}>
+                  <View
+                    style={[
+                      tw`rounded-full bg-gray-200 items-center justify-center`,
+                      {
+                        width: horizontalScale(37.5),
+                        height: horizontalScale(37.5),
+                        marginRight: horizontalScale(15),
+                      },
+                    ]}>
+                    <Text style={[tw`text-black font-bold`, { fontSize: moderateScale(18.75) }]}>
+                      +
+                    </Text>
                   </View>
-                  <Text style={[tw`text-black font-dm flex-1`, { fontSize: moderateScale(15) }]}>Manage availability</Text>
+                  <Text style={[tw`text-black font-dm flex-1`, { fontSize: moderateScale(15) }]}>
+                    Manage availability
+                  </Text>
                 </TouchableOpacity>
               </View>
             </View>
@@ -282,56 +413,81 @@ const BottomNavigationBar: React.FC<BottomNavigationBarProps> = ({
                 useNativeDriver: true,
               }),
             ]).start();
-          }}
-        >
-          <Animated.View
-            style={[
-              tw`flex-1`,
-              { opacity: contactModalOpacityAnim }
-            ]}
-          >
+          }}>
+          <Animated.View style={[tw`flex-1`, { opacity: contactModalOpacityAnim }]}>
             <BlurView intensity={20} tint="dark" style={tw`absolute inset-0`}>
               <View style={tw`flex-1 bg-black opacity-40`} />
             </BlurView>
             <KeyboardAvoidingView
               style={tw`flex-1`}
               behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-              keyboardVerticalOffset={0}
-            >
+              keyboardVerticalOffset={0}>
               <TouchableOpacity
                 style={tw`flex-1`}
                 activeOpacity={1}
-                onPress={handleCloseContactModal}
-              >
-                <View style={tw`flex-1 justify-end`} onLayout={(e) => setContactModalContentHeight(e.nativeEvent.layout.height)}>
+                onPress={handleCloseContactModal}>
+                <View
+                  style={tw`flex-1 justify-end`}
+                  onLayout={(e) => setContactModalContentHeight(e.nativeEvent.layout.height)}>
                   <TouchableOpacity activeOpacity={1} onPress={(e) => e.stopPropagation()}>
                     <Animated.View
                       style={[
                         tw`bg-white rounded-t-3xl`,
                         {
-                          transform: [{
-                            translateY: contactModalSlideAnim.interpolate({
-                              inputRange: [0, 1],
-                              outputRange: [300, 0],
-                            }),
-                          }],
-                        }
-                      ]}
-                    >
+                          transform: [
+                            {
+                              translateY: contactModalSlideAnim.interpolate({
+                                inputRange: [0, 1],
+                                outputRange: [300, 0],
+                              }),
+                            },
+                          ],
+                        },
+                      ]}>
                       {/* Header - Fixed */}
-                      <View style={[tw`flex-row justify-between items-center`, { paddingTop: verticalScale(22.5), paddingHorizontal: horizontalScale(15), paddingBottom: verticalScale(15) }]}>
-                        <Text style={[tw`text-black font-bold font-dm`, { fontSize: moderateScale(18.75) }]}>Select Contact</Text>
-                        <TouchableOpacity
-                          onPress={handleCloseContactModal}
-                          activeOpacity={0.7}
-                        >
-                          <Text style={[tw`text-[#A3CB31] font-dm`, { fontSize: moderateScale(15) }]}>Cancel</Text>
+                      <View
+                        style={[
+                          tw`flex-row justify-between items-center`,
+                          {
+                            paddingTop: verticalScale(22.5),
+                            paddingHorizontal: horizontalScale(15),
+                            paddingBottom: verticalScale(15),
+                          },
+                        ]}>
+                        <Text
+                          style={[
+                            tw`text-black font-bold font-dm`,
+                            { fontSize: moderateScale(18.75) },
+                          ]}>
+                          Select Contact
+                        </Text>
+                        <TouchableOpacity onPress={handleCloseContactModal} activeOpacity={0.7}>
+                          <Text
+                            style={[tw`text-[#A3CB31] font-dm`, { fontSize: moderateScale(15) }]}>
+                            Cancel
+                          </Text>
                         </TouchableOpacity>
                       </View>
 
                       {/* Search Bar - Fixed */}
-                      <View style={[tw`bg-gray-100 rounded-2xl flex-row items-center`, { paddingHorizontal: horizontalScale(15), paddingVertical: verticalScale(11.25), marginBottom: verticalScale(15), marginHorizontal: horizontalScale(15) }]}>
-                        <Image source={Search} style={{ width: horizontalScale(18.75), height: horizontalScale(18.75), marginRight: horizontalScale(7.5) }} />
+                      <View
+                        style={[
+                          tw`bg-gray-100 rounded-2xl flex-row items-center`,
+                          {
+                            paddingHorizontal: horizontalScale(15),
+                            paddingVertical: verticalScale(11.25),
+                            marginBottom: verticalScale(15),
+                            marginHorizontal: horizontalScale(15),
+                          },
+                        ]}>
+                        <Image
+                          source={Search}
+                          style={{
+                            width: horizontalScale(18.75),
+                            height: horizontalScale(18.75),
+                            marginRight: horizontalScale(7.5),
+                          }}
+                        />
                         <TextInput
                           style={tw`flex-1 text-black font-dm`}
                           placeholder="Search contacts"
@@ -344,10 +500,12 @@ const BottomNavigationBar: React.FC<BottomNavigationBarProps> = ({
                       {/* Contacts List - Scrollable */}
                       <ScrollView
                         style={{ maxHeight: contactScrollMaxHeight }}
-                        contentContainerStyle={{ paddingHorizontal: horizontalScale(15), paddingBottom: verticalScale(30) }}
+                        contentContainerStyle={{
+                          paddingHorizontal: horizontalScale(15),
+                          paddingBottom: verticalScale(30),
+                        }}
                         showsVerticalScrollIndicator={false}
-                        keyboardShouldPersistTaps="handled"
-                      >
+                        keyboardShouldPersistTaps="handled">
                         {filteredContacts.length > 0 ? (
                           filteredContacts.map((contact) => {
                             const isDisabled = !contact.contactUser?.id;
@@ -357,33 +515,65 @@ const BottomNavigationBar: React.FC<BottomNavigationBarProps> = ({
                                 style={[
                                   tw`flex-row items-center border-b border-gray-100`,
                                   { paddingVertical: verticalScale(15) },
-                                  isDisabled && tw`opacity-50`
+                                  isDisabled && tw`opacity-50`,
                                 ]}
                                 activeOpacity={isDisabled ? 1 : 0.7}
                                 onPress={() => !isDisabled && handleContactSelect(contact)}
-                                disabled={isDisabled}
-                              >
-                                <View style={[tw`rounded-full bg-gray-200 items-center justify-center overflow-hidden`, { width: horizontalScale(45), height: horizontalScale(45), marginRight: horizontalScale(15) }]}>
+                                disabled={isDisabled}>
+                                <View
+                                  style={[
+                                    tw`rounded-full bg-gray-200 items-center justify-center overflow-hidden`,
+                                    {
+                                      width: horizontalScale(45),
+                                      height: horizontalScale(45),
+                                      marginRight: horizontalScale(15),
+                                    },
+                                  ]}>
                                   {contact.contactUser?.avatar ? (
                                     <Image
                                       source={{ uri: contact.contactUser.avatar }}
-                                      style={{ width: horizontalScale(45), height: horizontalScale(45), borderRadius: 9999 }}
+                                      style={{
+                                        width: horizontalScale(45),
+                                        height: horizontalScale(45),
+                                        borderRadius: 9999,
+                                      }}
                                     />
                                   ) : (
-                                    <Image source={Avatar} style={{ width: horizontalScale(30), height: horizontalScale(30) }} />
+                                    <Image
+                                      source={Avatar}
+                                      style={{
+                                        width: horizontalScale(30),
+                                        height: horizontalScale(30),
+                                      }}
+                                    />
                                   )}
                                 </View>
                                 <View style={tw`flex-1`}>
-                                  <Text style={[tw`text-black font-bold font-dm`, { fontSize: moderateScale(15) }]}>
+                                  <Text
+                                    style={[
+                                      tw`text-black font-bold font-dm`,
+                                      { fontSize: moderateScale(15) },
+                                    ]}>
                                     {contact.displayName}
                                   </Text>
                                   {contact.contactPhone && (
-                                    <Text style={[tw`text-grey font-dm`, { fontSize: moderateScale(13.125) }]}>
+                                    <Text
+                                      style={[
+                                        tw`text-grey font-dm`,
+                                        { fontSize: moderateScale(13.125) },
+                                      ]}>
                                       {contact.contactPhone}
                                     </Text>
                                   )}
                                   {isDisabled && (
-                                    <Text style={[tw`text-grey font-dm`, { fontSize: moderateScale(11.25), marginTop: verticalScale(3.75) }]}>
+                                    <Text
+                                      style={[
+                                        tw`text-grey font-dm`,
+                                        {
+                                          fontSize: moderateScale(11.25),
+                                          marginTop: verticalScale(3.75),
+                                        },
+                                      ]}>
                                       Not registered
                                     </Text>
                                   )}
@@ -392,8 +582,11 @@ const BottomNavigationBar: React.FC<BottomNavigationBarProps> = ({
                             );
                           })
                         ) : (
-                          <View style={{ paddingVertical: verticalScale(37.5), alignItems: 'center' }}>
-                            <Text style={[tw`text-grey font-dm`, { fontSize: moderateScale(15) }]}>No contacts found</Text>
+                          <View
+                            style={{ paddingVertical: verticalScale(37.5), alignItems: 'center' }}>
+                            <Text style={[tw`text-grey font-dm`, { fontSize: moderateScale(15) }]}>
+                              No contacts found
+                            </Text>
                           </View>
                         )}
                       </ScrollView>
@@ -410,4 +603,3 @@ const BottomNavigationBar: React.FC<BottomNavigationBarProps> = ({
 };
 
 export default BottomNavigationBar;
-

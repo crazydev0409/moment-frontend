@@ -2,6 +2,7 @@
   "expo": {
     "name": "Catch",
     "slug": "ios-app",
+    "scheme": "catch",
     "version": "1.0.2",
     "extra": {
       "eas": {

@@ -2,13 +2,29 @@ import axios from "axios";
 
 export const getPlacesByQuery = async (query: string, apiKey: string) => {
   try {
-    const response = await axios.get(
-      `https://maps.googleapis.com/maps/api/place/textsearch/json?query=${encodeURIComponent(
-        query
-      )}&key=${apiKey}`
+    // Use Places API (New) — Text Search
+    const response = await axios.post(
+      'https://places.googleapis.com/v1/places:searchText',
+      { textQuery: query },
+      {
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Goog-Api-Key': apiKey,
+          'X-Goog-FieldMask': 'places.id,places.displayName,places.formattedAddress,places.location',
+        },
+      }
     );
-    return response.data.results;
-  } catch (error) {
-    console.error(error);
+    // Map to the same shape the rest of the app expects (legacy Places API format)
+    return (response.data.places || []).map((place: any) => ({
+      place_id: place.id,
+      name: place.displayName?.text || '',
+      formatted_address: place.formattedAddress || '',
+      geometry: place.location
+        ? { location: { lat: place.location.latitude, lng: place.location.longitude } }
+        : undefined,
+    }));
+  } catch (error: any) {
+    console.error('[Places API] request failed:', error.response?.data || error.message);
+    return [];
   }
 };
