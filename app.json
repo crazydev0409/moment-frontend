@@ -43,12 +43,6 @@
         {
           "cameraPermission": "Allow $(PRODUCT_NAME) to use your camera to scan booking QR codes."
         }
-      ],
-      [
-        "react-native-maps",
-        {
-          "googleMapsApiKey": "AIzaSyC4xWLooS8XR9tOC0V8a4SM-mgewmL5TNs"
-        }
       ]
     ],
     "orientation": "portrait",
@@ -70,6 +64,9 @@
     "ios": {
       "icon": "./assets/images/icon-ios.png",
       "bundleIdentifier": "com.crazydev0409.catchapp",
+      "config": {
+        "googleMapsApiKey": "AIzaSyC4xWLooS8XR9tOC0V8a4SM-mgewmL5TNs"
+      },
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false,
         "NSLocationWhenInUseUsageDescription": "Catch needs your location to provide weather updates and location-based features.",
@@ -85,6 +82,11 @@
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/icon-android.png",
         "backgroundColor": "#A3CB31"
+      },
+      "config": {
+        "googleMaps": {
+          "apiKey": "AIzaSyC4xWLooS8XR9tOC0V8a4SM-mgewmL5TNs"
+        }
       },
       "permissions": [
         "ACCESS_COARSE_LOCATION",
