@@ -1,9 +1,12 @@
 import * as Notifications from 'expo-notifications';
 import { Platform } from 'react-native';
 import Constants from 'expo-constants';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { http } from '~/helpers/http';
 import { getDeviceInfo } from './deviceService';
 import { BACKGROUND_NOTIFICATION_TASK } from '~/services/backgroundTaskService';
+
+const NOTIFIED_REQUESTS_KEY = 'notified_moment_request_ids';
 
 // Configure how notifications are handled when app is in foreground
 Notifications.setNotificationHandler({
@@ -465,7 +468,7 @@ export async function scheduleAllMeetingReminders(currentUserId: string) {
   }
 }
 
-// Fetch and display pending moment requests as notifications
+// Fetch and display pending moment requests as notifications (only new ones)
 export async function showPendingMomentRequestNotifications() {
   try {
     // Check if permission is granted
@@ -475,8 +478,10 @@ export async function showPendingMomentRequestNotifications() {
       return;
     }
 
-    // Dismiss all previously delivered notifications to avoid stale duplicates
-    await Notifications.dismissAllNotificationsAsync();
+    // Load IDs of requests we've already notified about
+    const stored = await AsyncStorage.getItem(NOTIFIED_REQUESTS_KEY);
+    const notifiedIds: string[] = stored ? JSON.parse(stored) : [];
+    const notifiedSet = new Set(notifiedIds);
 
     // Fetch pending moment requests from backend
     const response = await http.get('/users/moment-requests/pending');
@@ -487,10 +492,18 @@ export async function showPendingMomentRequestNotifications() {
       return;
     }
 
-    console.log(`📬 Found ${requests.length} pending moment request(s), displaying notifications...`);
+    // Filter to only requests we haven't notified about yet
+    const newRequests = requests.filter((r: any) => !notifiedSet.has(r.id));
 
-    // Display each pending request as a notification
-    for (const request of requests) {
+    if (newRequests.length === 0) {
+      console.log('No new pending moment requests to display');
+      return;
+    }
+
+    console.log(`📬 Found ${newRequests.length} new pending moment request(s), displaying notifications...`);
+
+    // Display each new pending request as a notification
+    for (const request of newRequests) {
       const senderName = request.sender?.name || request.sender?.phoneNumber || 'Someone';
       const title = request.title || request.notes || 'Meeting Request';
 
@@ -516,9 +529,16 @@ export async function showPendingMomentRequestNotifications() {
         },
         trigger: null, // Show immediately
       });
+
+      notifiedSet.add(request.id);
     }
 
-    console.log(`✅ Displayed ${requests.length} pending moment request notification(s)`);
+    // Persist updated notified IDs (keep only IDs that are still pending to avoid unbounded growth)
+    const currentPendingIds = requests.map((r: any) => r.id);
+    const updatedIds = [...notifiedSet].filter((id) => currentPendingIds.includes(id));
+    await AsyncStorage.setItem(NOTIFIED_REQUESTS_KEY, JSON.stringify(updatedIds));
+
+    console.log(`✅ Displayed ${newRequests.length} pending moment request notification(s)`);
   } catch (error: any) {
     console.error('Failed to show pending moment request notifications:', error.message);
     // Don't throw - this is a background operation that shouldn't block app initialization
