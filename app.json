@@ -37,7 +37,13 @@
       ],
       "expo-asset",
       "expo-font",
-      "@react-native-community/datetimepicker"
+      "@react-native-community/datetimepicker",
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "Allow $(PRODUCT_NAME) to use your camera to scan booking QR codes."
+        }
+      ]
     ],
     "orientation": "portrait",
     "icon": "./assets/images/icon-android.png",
@@ -63,6 +69,7 @@
         "NSLocationWhenInUseUsageDescription": "Catch needs your location to provide weather updates and location-based features.",
         "NSLocationAlwaysUsageDescription": "Catch needs your location to provide weather updates and location-based features.",
         "NSContactsUsageDescription": "Catch needs access to your contacts to help you connect with friends and schedule meetings.",
+        "NSCameraUsageDescription": "Catch needs your camera to scan booking QR codes.",
         "NSUserNotificationsUsageDescription": "Catch needs to send you notifications about meeting requests and updates.",
         "UIBackgroundModes": ["remote-notification", "fetch"]
       }
@@ -77,7 +84,8 @@
         "ACCESS_COARSE_LOCATION",
         "ACCESS_FINE_LOCATION",
         "android.permission.ACCESS_COARSE_LOCATION",
-        "android.permission.ACCESS_FINE_LOCATION"
+        "android.permission.ACCESS_FINE_LOCATION",
+        "android.permission.CAMERA"
       ],
       "package": "com.crazydev0409.catchapp",
       "softwareKeyboardLayoutMode": "pan"

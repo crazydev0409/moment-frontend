@@ -10,6 +10,7 @@ import AppStack_ComingSoonScreen from './AppStack_ComingSoonScreen';
 import AppStack_SearchScreen from './AppStack_SearchScreen';
 import AppStack_NotificationScreen from './AppStack_NotificationScreen';
 import AppStack_AvailabilityScreen from './AppStack_AvailabilityScreen';
+import AppStack_QRScannerScreen from './AppStack_QRScannerScreen';
 import { NativeStackScreenProps, createNativeStackNavigator } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../../index';
 import BottomNavigationBar from '~/components/BottomNavigationBar';
@@ -31,6 +32,7 @@ export type AppStackParamList = {
   AppStack_ComingSoonScreen: undefined;
   AppStack_SearchScreen: undefined;
   AppStack_NotificationScreen: undefined;
+  AppStack_QRScannerScreen: undefined;
 };
 
 interface Contact {
@@ -95,6 +97,7 @@ const AppStackNavigator: React.FC = () => {
       <Stack.Screen name="AppStack_DateDetailScreen" component={AppStack_DateDetailScreen} />
       <Stack.Screen name="AppStack_SearchScreen" component={AppStack_SearchScreen} />
       <Stack.Screen name="AppStack_NotificationScreen" component={AppStack_NotificationScreen} />
+      <Stack.Screen name="AppStack_QRScannerScreen" component={AppStack_QRScannerScreen} />
     </Stack.Navigator>
   );
 };

@@ -251,6 +251,85 @@ const AppStack_ProfileScreen: React.FC<Props> = ({ navigation, route }) => {
                 />
               </View>
             ) : null}
+
+            {/* Scan QR Code Button */}
+            <TouchableOpacity
+              onPress={() => navigation.navigate('AppStack_QRScannerScreen')}
+              activeOpacity={0.7}
+              style={[
+                tw`bg-black rounded-3xl flex-row items-center justify-center`,
+                {
+                  paddingVertical: verticalScale(15),
+                  marginBottom: verticalScale(22.5),
+                },
+              ]}>
+              <View
+                style={[
+                  tw`items-center justify-center`,
+                  {
+                    width: horizontalScale(20),
+                    height: horizontalScale(20),
+                    marginRight: horizontalScale(10),
+                  },
+                ]}>
+                <View
+                  style={[
+                    tw`absolute top-0 left-0`,
+                    {
+                      width: horizontalScale(7),
+                      height: horizontalScale(7),
+                      borderTopWidth: 2,
+                      borderLeftWidth: 2,
+                      borderColor: '#A3CB31',
+                    },
+                  ]}
+                />
+                <View
+                  style={[
+                    tw`absolute top-0 right-0`,
+                    {
+                      width: horizontalScale(7),
+                      height: horizontalScale(7),
+                      borderTopWidth: 2,
+                      borderRightWidth: 2,
+                      borderColor: '#A3CB31',
+                    },
+                  ]}
+                />
+                <View
+                  style={[
+                    tw`absolute bottom-0 left-0`,
+                    {
+                      width: horizontalScale(7),
+                      height: horizontalScale(7),
+                      borderBottomWidth: 2,
+                      borderLeftWidth: 2,
+                      borderColor: '#A3CB31',
+                    },
+                  ]}
+                />
+                <View
+                  style={[
+                    tw`absolute bottom-0 right-0`,
+                    {
+                      width: horizontalScale(7),
+                      height: horizontalScale(7),
+                      borderBottomWidth: 2,
+                      borderRightWidth: 2,
+                      borderColor: '#A3CB31',
+                    },
+                  ]}
+                />
+              </View>
+              <Text
+                style={[
+                  tw`text-white font-bold font-dm`,
+                  { fontSize: moderateScale(14) },
+                ]}>
+                Scan QR Code
+              </Text>
+            </TouchableOpacity>
+
             <View style={tw``}>
               <Text
                 style={[
