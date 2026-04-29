@@ -2288,8 +2288,9 @@ const AppStack_DateDetailScreen: React.FC<Props> = ({ navigation, route }) => {
                               Select Time
                             </Text>
                             <ScrollView
-                              style={{ maxHeight: verticalScale(150) }}
-                              showsVerticalScrollIndicator={false}>
+                              style={{ maxHeight: verticalScale(250) }}
+                              showsVerticalScrollIndicator={false}
+                              nestedScrollEnabled={true}>
                               <View style={[tw`flex-row flex-wrap`, { gap: verticalScale(7.5) }]}>
                                 {allTimeSlots.map((time) => {
                                   const isSelected = appointmentTime === time;

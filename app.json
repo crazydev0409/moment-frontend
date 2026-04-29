@@ -43,6 +43,12 @@
         {
           "cameraPermission": "Allow $(PRODUCT_NAME) to use your camera to scan booking QR codes."
         }
+      ],
+      [
+        "react-native-maps",
+        {
+          "googleMapsApiKey": "AIzaSyC4xWLooS8XR9tOC0V8a4SM-mgewmL5TNs"
+        }
       ]
     ],
     "orientation": "portrait",
