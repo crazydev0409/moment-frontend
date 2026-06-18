@@ -132,7 +132,7 @@ export async function registerPushToken(): Promise<string | null> {
   }
 }
 
-// Helper function to navigate to DateDetailScreen with meeting date
+// Helper function to navigate to CalendarScreen with meeting date
 function navigateToMeetingDate(data: any) {
   try {
     // Import navigation ref dynamically to avoid circular dependencies
@@ -157,14 +157,14 @@ function navigateToMeetingDate(data: any) {
         dateParam = today.toISOString().split('T')[0];
       }
 
-      // Navigate to DateDetailScreen within AppStack
+      // Navigate to CalendarScreen within AppStack
       // Use CommonActions to navigate to nested screen
       const { CommonActions } = require('@react-navigation/native');
       navigationRef.dispatch(
         CommonActions.navigate({
           name: 'AppStack',
           params: {
-            screen: 'AppStack_DateDetailScreen',
+            screen: 'AppStack_CalendarScreen',
             params: {
               date: dateParam,
               momentRequestId: data.momentRequestId
@@ -205,7 +205,7 @@ export function setupNotificationResponseHandler(
         handleRejectRequest(requestId, onReject);
       } else if (actionIdentifier === Notifications.DEFAULT_ACTION_IDENTIFIER) {
         // User tapped the notification itself (not a button)
-        // Navigate to DateDetailScreen with momentRequestId to auto-open modal
+        // Navigate to CalendarScreen with momentRequestId to auto-open modal
         console.log('📬 Moment request notification tapped:', requestId);
         navigateToMeetingDate({
           ...data,
@@ -262,7 +262,7 @@ async function handleAcceptRequest(requestId: string, onAccept: (requestId: stri
     console.log('✅ Moment request accepted via notification:', requestId);
 
     // Trigger refresh by sending a silent local notification
-    // This will be caught by notification listeners in DateDetailScreen and HomePage
+    // This will be caught by notification listeners in CalendarScreen and HomePage
     // to refresh the receiver's screen immediately
     try {
       await Notifications.scheduleNotificationAsync({
@@ -298,7 +298,7 @@ async function handleRejectRequest(requestId: string, onReject: (requestId: stri
     console.log('❌ Moment request rejected via notification:', requestId);
 
     // Trigger refresh by sending a silent local notification
-    // This will be caught by notification listeners in DateDetailScreen and HomePage
+    // This will be caught by notification listeners in CalendarScreen and HomePage
     // to refresh the receiver's screen immediately
     try {
       await Notifications.scheduleNotificationAsync({

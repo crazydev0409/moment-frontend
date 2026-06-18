@@ -1,38 +1,83 @@
+import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import React from 'react';
 import { View } from 'react-native';
-import AppStack_HomePageScreen from './AppStack_HomePageScreen';
-import AppStack_ProfileScreen from './AppStack_ProfileScreen';
-import AppStack_SettingsScreen from './AppStack_SettingsScreen';
-import AppStack_CalendarScreen from './AppStack_CalendarScreen';
-import AppStack_DateDetailScreen from './AppStack_DateDetailScreen';
-import AppStack_ContactScreen from './AppStack_ContactScreen';
-import AppStack_ComingSoonScreen from './AppStack_ComingSoonScreen';
-import AppStack_SearchScreen from './AppStack_SearchScreen';
-import AppStack_NotificationScreen from './AppStack_NotificationScreen';
+
 import AppStack_AvailabilityScreen from './AppStack_AvailabilityScreen';
+import AppStack_AvailableTimesScreen from './AppStack_AvailableTimesScreen';
+import AppStack_CalendarScreen from './AppStack_CalendarScreen';
+import AppStack_CalendarSettingsScreen from './AppStack_CalendarSettingsScreen';
+import AppStack_ComingSoonScreen from './AppStack_ComingSoonScreen';
+import AppStack_ContactScreen from './AppStack_ContactScreen';
+import AppStack_ContactProfileScreen from './AppStack_ContactProfileScreen';
+
+import AppStack_HomePageScreen from './AppStack_HomePageScreen';
+import AppStack_HookEditorScreen from './AppStack_HookEditorScreen';
+import AppStack_MeetingHistoryScreen from './AppStack_MeetingHistoryScreen';
+import AppStack_MyHooksScreen from './AppStack_MyHooksScreen';
+import AppStack_NotificationDetailScreen from './AppStack_NotificationDetailScreen';
+import AppStack_NotificationScreen from './AppStack_NotificationScreen';
+import AppStack_ProfileScreen from './AppStack_ProfileScreen';
+import AppStack_ProfileSettingsScreen from './AppStack_ProfileSettingsScreen';
 import AppStack_QRScannerScreen from './AppStack_QRScannerScreen';
-import { NativeStackScreenProps, createNativeStackNavigator } from '@react-navigation/native-stack';
-import { RootStackParamList } from '../../index';
+import AppStack_SearchScreen from './AppStack_SearchScreen';
+import AppStack_SendCatchScreen from './AppStack_SendCatchScreen';
+import AppStack_SettingsScreen from './AppStack_SettingsScreen';
+
 import BottomNavigationBar from '~/components/BottomNavigationBar';
 import tw from '~/tailwindcss';
 
 export type AppStackParamList = {
-  AppStack_HomePageScreen: undefined;
+  AppStack_HomePageScreen: {
+    toast?: {
+      title: string;
+      subtitle: string;
+    };
+  } | undefined;
   AppStack_ProfileScreen: undefined;
+  AppStack_ProfileSettingsScreen: undefined;
   AppStack_SettingsScreen: undefined;
   AppStack_AvailabilityScreen: undefined;
-  AppStack_CalendarScreen: undefined;
-  AppStack_DateDetailScreen: {
+  AppStack_CalendarSettingsScreen: undefined;
+  AppStack_CalendarScreen: {
     date?: string;
     contact?: Contact;
     momentRequestId?: string;
     bookingUserId?: string;
-  };
+  } | undefined;
   AppStack_ContactScreen: undefined;
+  AppStack_ContactProfileScreen: {
+    contactId: string;
+    contactUserId?: string;
+    contactName?: string;
+  };
+  AppStack_AvailableTimesScreen: {
+    contactId: string;
+    contactUserId: string;
+    contactName: string;
+  };
+  AppStack_MeetingHistoryScreen: {
+    contactUserId: string;
+    contactName: string;
+  };
   AppStack_ComingSoonScreen: undefined;
   AppStack_SearchScreen: undefined;
   AppStack_NotificationScreen: undefined;
+  AppStack_NotificationDetailScreen: {
+    notificationId: string;
+  };
   AppStack_QRScannerScreen: undefined;
+  AppStack_SendCatchScreen: {
+    mode: 'one' | 'group';
+    initialDate?: string;
+    initialTime?: string;
+    initialContact?: Contact;
+  };
+  AppStack_MyHooksScreen: {
+    toast?: string;
+  } | undefined;
+  AppStack_HookEditorScreen: {
+    hookId?: string;
+  } | undefined;
 };
 
 interface Contact {
@@ -47,7 +92,6 @@ interface Contact {
   avatar?: string;
 }
 
-type Props = NativeStackScreenProps<RootStackParamList, 'AppStack'>;
 const Stack = createNativeStackNavigator<AppStackParamList>();
 
 const AppStackNavigator: React.FC = () => {
@@ -92,12 +136,20 @@ const AppStackNavigator: React.FC = () => {
       </Stack.Screen>
 
       <Stack.Screen name="AppStack_ProfileScreen" component={AppStack_ProfileScreen} />
+      <Stack.Screen name="AppStack_ProfileSettingsScreen" component={AppStack_ProfileSettingsScreen} />
       <Stack.Screen name="AppStack_SettingsScreen" component={AppStack_SettingsScreen} />
       <Stack.Screen name="AppStack_AvailabilityScreen" component={AppStack_AvailabilityScreen} />
-      <Stack.Screen name="AppStack_DateDetailScreen" component={AppStack_DateDetailScreen} />
+      <Stack.Screen name="AppStack_CalendarSettingsScreen" component={AppStack_CalendarSettingsScreen} />
       <Stack.Screen name="AppStack_SearchScreen" component={AppStack_SearchScreen} />
       <Stack.Screen name="AppStack_NotificationScreen" component={AppStack_NotificationScreen} />
+      <Stack.Screen name="AppStack_NotificationDetailScreen" component={AppStack_NotificationDetailScreen} />
       <Stack.Screen name="AppStack_QRScannerScreen" component={AppStack_QRScannerScreen} />
+      <Stack.Screen name="AppStack_SendCatchScreen" component={AppStack_SendCatchScreen} />
+      <Stack.Screen name="AppStack_MyHooksScreen" component={AppStack_MyHooksScreen} />
+      <Stack.Screen name="AppStack_HookEditorScreen" component={AppStack_HookEditorScreen} />
+      <Stack.Screen name="AppStack_ContactProfileScreen" component={AppStack_ContactProfileScreen} />
+      <Stack.Screen name="AppStack_AvailableTimesScreen" component={AppStack_AvailableTimesScreen} />
+      <Stack.Screen name="AppStack_MeetingHistoryScreen" component={AppStack_MeetingHistoryScreen} />
     </Stack.Navigator>
   );
 };

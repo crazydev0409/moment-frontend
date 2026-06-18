@@ -1,3 +1,7 @@
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useNavigation } from '@react-navigation/native';
+import { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import { BlurView } from 'expo-blur';
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
   View,
@@ -13,25 +17,35 @@ import {
   Animated,
   Dimensions,
 } from 'react-native';
-import { useNavigation } from '@react-navigation/native';
-import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { BlurView } from 'expo-blur';
-import tw from '~/tailwindcss';
+import { http } from '~/helpers/http';
+import { horizontalScale, verticalScale, moderateScale } from '~/helpers/responsive';
 import {
   HomeIcon,
   CalendarIcon,
-  BusinessIcon,
-  AddIcon,
-  Search,
+  MeshIcon,
+  PlusIcon,
+  CrossIcon,
+  SearchIcon,
   Avatar,
   TwoPeople,
 } from '~/lib/images';
 import { AppStackParamList } from '~/navigation/AppStack';
-import { horizontalScale, verticalScale, moderateScale } from '~/helpers/responsive';
-import { http } from '~/helpers/http';
+import tw from '~/tailwindcss';
 
 type NavigationProp = NativeStackNavigationProp<AppStackParamList>;
+type HomeOnboardingStep = 0 | 1 | 2 | 3 | 4;
+type ButtonFrame = {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+};
+
+const HOME_ONBOARDING_KEY = 'hasSeenHomeOnboardingTour';
+const ONBOARDING_GREEN = '#9AC51F';
+const ONBOARDING_INK = '#171927';
+const ONBOARDING_MUTED = '#6F7780';
 
 interface BottomNavigationBarProps {
   selectedTab?: string;
@@ -53,13 +67,16 @@ const BottomNavigationBar: React.FC<BottomNavigationBarProps> = ({
 
   // State for Modals
   const [showAddMenu, setShowAddMenu] = useState(false);
+  const [showMeetingTypeModal, setShowMeetingTypeModal] = useState(false);
   const [showContactModal, setShowContactModal] = useState(false);
   const [contacts, setContacts] = useState<any[]>([]);
   const [contactSearchText, setContactSearchText] = useState('');
-  const [isLoadingContacts, setIsLoadingContacts] = useState(false);
-  const [isTransitioning, setIsTransitioning] = useState(false);
+  const isTransitioning = false;
+  const [homeOnboardingStep, setHomeOnboardingStep] = useState<HomeOnboardingStep | null>(null);
+  const [addButtonFrame, setAddButtonFrame] = useState<ButtonFrame | null>(null);
 
   // Animation values for smooth modal transitions
+  const addButtonRef = useRef<View>(null);
   const contactModalSlideAnim = useRef(new Animated.Value(0)).current;
   const contactModalOpacityAnim = useRef(new Animated.Value(0)).current;
   const [contactModalContentHeight, setContactModalContentHeight] = useState(
@@ -69,6 +86,58 @@ const BottomNavigationBar: React.FC<BottomNavigationBarProps> = ({
     contactModalContentHeight - verticalScale(130),
     verticalScale(150)
   );
+  const screenWidth = Dimensions.get('window').width;
+  const navGap = horizontalScale(7.5);
+  const addButtonSize = horizontalScale(71.25);
+  const showHomeOnboarding = selectedTab === 'home' && homeOnboardingStep !== null;
+  const showOnboardingAddMenu =
+    showHomeOnboarding &&
+    homeOnboardingStep !== null &&
+    homeOnboardingStep >= 2 &&
+    !showContactModal &&
+    !isTransitioning;
+
+  useEffect(() => {
+    let mounted = true;
+
+    const loadHomeOnboarding = async () => {
+      if (selectedTab !== 'home') return;
+
+      try {
+        const hasSeen = await AsyncStorage.getItem(HOME_ONBOARDING_KEY);
+        if (!hasSeen && mounted) {
+          setHomeOnboardingStep(0);
+        }
+      } catch (error) {
+        console.error('Error loading home onboarding state:', error);
+      }
+    };
+
+    loadHomeOnboarding();
+
+    return () => {
+      mounted = false;
+    };
+  }, [selectedTab]);
+
+  const completeHomeOnboarding = async () => {
+    setHomeOnboardingStep(null);
+    setShowAddMenu(false);
+    try {
+      await AsyncStorage.setItem(HOME_ONBOARDING_KEY, 'true');
+    } catch (error) {
+      console.error('Error saving home onboarding state:', error);
+    }
+  };
+
+  const handleHomeOnboardingNext = () => {
+    if (homeOnboardingStep === null) return;
+    if (homeOnboardingStep >= 4) {
+      completeHomeOnboarding();
+      return;
+    }
+    setHomeOnboardingStep((homeOnboardingStep + 1) as HomeOnboardingStep);
+  };
 
   // Handle Tab Navigation
   const handleHomePress = () => {
@@ -105,22 +174,25 @@ const BottomNavigationBar: React.FC<BottomNavigationBarProps> = ({
 
   // Add Button & Modal Logic
   const handleAddPress = () => {
+    addButtonRef.current?.measureInWindow((x, y, width, height) => {
+      setAddButtonFrame({ x, y, width, height });
+    });
+
+    if (showHomeOnboarding && homeOnboardingStep !== null && homeOnboardingStep < 2) {
+      setHomeOnboardingStep(2);
+      return;
+    }
     setShowAddMenu(true);
   };
 
   const handleBookMeeting = () => {
-    // Set transitioning flag to prevent double modal rendering
-    setIsTransitioning(true);
     setShowAddMenu(false);
-    // iOS production builds require more time for modal animations and BlurView cleanup
-    // Use requestAnimationFrame for smoother transition and platform-specific delay
-    const transitionDelay = Platform.OS === 'ios' ? 500 : 200;
-    requestAnimationFrame(() => {
-      setTimeout(() => {
-        setIsTransitioning(false);
-        setShowContactModal(true);
-      }, transitionDelay);
-    });
+    setShowMeetingTypeModal(true);
+  };
+
+  const handleMeetingTypeSelect = (mode: 'one' | 'group') => {
+    setShowMeetingTypeModal(false);
+    navigation.navigate('AppStack_SendCatchScreen', { mode });
   };
 
   const handleManageAvailability = () => {
@@ -128,8 +200,12 @@ const BottomNavigationBar: React.FC<BottomNavigationBarProps> = ({
     navigation.navigate('AppStack_AvailabilityScreen');
   };
 
+  const handleMyHooks = () => {
+    setShowAddMenu(false);
+    navigation.navigate('AppStack_MyHooksScreen');
+  };
+
   const loadContacts = useCallback(async () => {
-    setIsLoadingContacts(true);
     try {
       const response = await http.get('/users/contacts');
       setContacts(response.data.contacts || []);
@@ -137,8 +213,6 @@ const BottomNavigationBar: React.FC<BottomNavigationBarProps> = ({
       console.error('Error loading contacts:', error);
       Alert.alert('Error', 'Failed to load contacts. Please try again.', [{ text: 'OK' }]);
       setShowContactModal(false);
-    } finally {
-      setIsLoadingContacts(false);
     }
   }, []);
 
@@ -157,11 +231,11 @@ const BottomNavigationBar: React.FC<BottomNavigationBarProps> = ({
   const handleContactSelect = (contact: any) => {
     setShowContactModal(false);
     setContactSearchText('');
-    // Navigate to DateDetailScreen with selected contact
+    // Navigate to CalendarScreen with selected contact
     const today = new Date().toISOString().split('T')[0];
-    navigation.navigate('AppStack_DateDetailScreen', {
+    navigation.navigate('AppStack_CalendarScreen', {
       date: today,
-      contact: contact,
+      contact,
     });
   };
 
@@ -183,82 +257,315 @@ const BottomNavigationBar: React.FC<BottomNavigationBarProps> = ({
     });
   };
 
+  const renderDashboardPreview = () => (
+    <View style={{ gap: verticalScale(6), width: horizontalScale(144) }}>
+      <View style={tw`flex-row gap-2`}>
+        <View
+          style={[
+            tw`rounded-xl items-center justify-center`,
+            {
+              backgroundColor: '#DDEFA2',
+              height: horizontalScale(58),
+              width: horizontalScale(34),
+            },
+          ]}>
+          {[0, 1, 2].map((item) => (
+            <View
+              key={item}
+              style={{
+                backgroundColor: '#FFFFFF',
+                borderRadius: 3,
+                height: verticalScale(4),
+                marginVertical: verticalScale(3),
+                width: horizontalScale(14),
+              }}
+            />
+          ))}
+        </View>
+        <View
+          style={[
+            tw`rounded-xl justify-center`,
+            {
+              backgroundColor: '#F4F5F6',
+              flex: 1,
+              height: horizontalScale(58),
+              paddingHorizontal: horizontalScale(12),
+            },
+          ]}>
+          <View
+            style={{
+              backgroundColor: '#D6DDE3',
+              borderRadius: 4,
+              height: verticalScale(5),
+              marginBottom: verticalScale(10),
+              width: horizontalScale(32),
+            }}
+          />
+          <View style={tw`flex-row items-center gap-2`}>
+            <View
+              style={{
+                backgroundColor: '#C9D1D8',
+                borderRadius: horizontalScale(8),
+                height: horizontalScale(16),
+                width: horizontalScale(16),
+              }}
+            />
+            <View>
+              <View
+                style={{
+                  backgroundColor: '#C9D1D8',
+                  borderRadius: 4,
+                  height: verticalScale(5),
+                  marginBottom: verticalScale(5),
+                  width: horizontalScale(54),
+                }}
+              />
+              <View
+                style={{
+                  backgroundColor: '#D6DDE3',
+                  borderRadius: 4,
+                  height: verticalScale(4),
+                  width: horizontalScale(30),
+                }}
+              />
+            </View>
+          </View>
+        </View>
+      </View>
+      <View
+        style={[
+          tw`rounded-xl flex-row items-center justify-between`,
+          {
+            backgroundColor: '#F4F5F6',
+            height: horizontalScale(58),
+            paddingHorizontal: horizontalScale(12),
+          },
+        ]}>
+        <View>
+          {[0, 1, 2].map((item) => (
+            <View
+              key={item}
+              style={{
+                backgroundColor: item === 0 ? '#D6DDE3' : '#C9D1D8',
+                borderRadius: 4,
+                height: verticalScale(6),
+                marginVertical: verticalScale(3),
+                width: item === 0 ? horizontalScale(28) : horizontalScale(item === 1 ? 72 : 50),
+              }}
+            />
+          ))}
+        </View>
+        <View
+          style={{
+            backgroundColor: '#C9D1D8',
+            borderRadius: horizontalScale(20),
+            height: horizontalScale(40),
+            width: horizontalScale(40),
+          }}
+        />
+      </View>
+    </View>
+  );
+
+  const renderMeetingsPreview = () => (
+    <View
+      style={[
+        tw`rounded-xl`,
+        {
+          backgroundColor: '#F6F7F8',
+          height: horizontalScale(138),
+          padding: horizontalScale(16),
+          width: horizontalScale(118),
+        },
+      ]}>
+      <View style={tw`flex-row gap-1 mb-3`}>
+        {[34, 36, 38].map((width) => (
+          <View
+            key={width}
+            style={{
+              backgroundColor: '#D1D8DE',
+              borderRadius: 4,
+              height: verticalScale(6),
+              width: horizontalScale(width),
+            }}
+          />
+        ))}
+      </View>
+      {[0, 1, 2].map((item) => (
+        <View
+          key={item}
+          style={{
+            backgroundColor: '#D8DEE4',
+            borderRadius: 5,
+            height: verticalScale(30),
+            marginBottom: verticalScale(7),
+          }}
+        />
+      ))}
+    </View>
+  );
+
+  const renderOnboardingCard = ({
+    title,
+    body,
+    top,
+    left,
+    right,
+    width,
+    tail = 'bottom-left',
+    preview,
+  }: {
+    title: string;
+    body: string;
+    top?: number;
+    left?: number;
+    right?: number;
+    width: number;
+    tail?: 'bottom-left' | 'right' | 'none';
+    preview?: React.ReactNode;
+  }) => (
+    <View
+      style={[
+        tw`absolute bg-white`,
+        {
+          borderRadius: horizontalScale(16),
+          left,
+          right,
+          top,
+          width,
+          paddingHorizontal: horizontalScale(16),
+          paddingVertical: verticalScale(14),
+        },
+      ]}>
+      <View style={tw`flex-row items-center justify-between`}>
+        <View style={{ flex: 1, paddingRight: preview ? horizontalScale(14) : 0 }}>
+          <Text
+            style={[
+              tw`font-dm`,
+              {
+                color: ONBOARDING_INK,
+                fontSize: moderateScale(21),
+                lineHeight: moderateScale(27),
+                marginBottom: verticalScale(7),
+              },
+            ]}>
+            {title}
+          </Text>
+          <Text
+            style={[
+              tw`font-dm`,
+              {
+                color: ONBOARDING_MUTED,
+                fontSize: moderateScale(16),
+                lineHeight: moderateScale(20),
+              },
+            ]}>
+            {body}
+          </Text>
+          <TouchableOpacity activeOpacity={0.8} onPress={handleHomeOnboardingNext}>
+            <Text
+              style={[
+                tw`font-bold font-dm`,
+                {
+                  color: ONBOARDING_GREEN,
+                  fontSize: moderateScale(17),
+                  marginTop: verticalScale(13),
+                },
+              ]}>
+              Got It
+            </Text>
+          </TouchableOpacity>
+        </View>
+        {preview}
+      </View>
+      {tail === 'bottom-left' && (
+        <View
+          style={[
+            tw`absolute bg-white`,
+            {
+              bottom: -horizontalScale(9),
+              height: horizontalScale(22),
+              left: horizontalScale(34),
+              transform: [{ rotate: '45deg' }],
+              width: horizontalScale(22),
+            },
+          ]}
+        />
+      )}
+      {tail === 'right' && (
+        <View
+          style={[
+            tw`absolute bg-white`,
+            {
+              height: horizontalScale(22),
+              right: -horizontalScale(8),
+              top: '58%',
+              transform: [{ rotate: '45deg' }],
+              width: horizontalScale(22),
+            },
+          ]}
+        />
+      )}
+    </View>
+  );
+
   return (
     <>
       <View
         style={[
           tw`absolute left-0 right-0 justify-center flex-row`,
-          { gap: horizontalScale(7.5), bottom: Math.max(insets.bottom, 30) },
-          (showContactModal || showAddMenu) && { opacity: 0 },
+          { gap: navGap, bottom: Math.max(insets.bottom, 30) },
+          showContactModal && { opacity: 0 },
         ]}>
         <View
           style={[
-            tw`flex-row items-center rounded-full bg-black overflow-hidden`,
-            { gap: horizontalScale(7.5), padding: verticalScale(9.375) },
+            tw`flex-row items-center rounded-full overflow-hidden`,
+            {
+              backgroundColor: '#1C1D26',
+              gap: horizontalScale(7.5),
+              padding: verticalScale(9.375),
+            },
           ]}>
-          <TouchableOpacity
-            activeOpacity={0.7}
-            onPress={handleHomePress}
-            style={[
-              tw`${selectedTab === 'home' ? 'bg-[#A3CB31]' : 'bg-[#222222]'} rounded-full items-center justify-center`,
-              { padding: horizontalScale(15) },
-            ]}>
-            <Image
-              source={HomeIcon}
-              style={{ width: horizontalScale(22.5), height: horizontalScale(22.5) }}
-              resizeMode="contain"
-            />
-          </TouchableOpacity>
-          <TouchableOpacity
-            activeOpacity={0.7}
-            onPress={handleCalendarPress}
-            style={[
-              tw`${selectedTab === 'calendar' ? 'bg-[#A3CB31]' : 'bg-[#222222]'} rounded-full items-center justify-center`,
-              { padding: horizontalScale(15) },
-            ]}>
-            <Image
-              source={CalendarIcon}
-              style={{ width: horizontalScale(22.5), height: horizontalScale(22.5) }}
-              resizeMode="contain"
-            />
-          </TouchableOpacity>
-          <TouchableOpacity
-            activeOpacity={0.7}
-            onPress={handleBusinessPress}
-            style={[
-              tw`${selectedTab === 'business' ? 'bg-[#A3CB31]' : 'bg-[#222222]'} rounded-full items-center justify-center`,
-              { padding: horizontalScale(15) },
-            ]}>
-            <Image
-              source={BusinessIcon}
-              style={{ width: horizontalScale(22.5), height: horizontalScale(22.5) }}
-              resizeMode="contain"
-            />
-          </TouchableOpacity>
-          <TouchableOpacity
-            activeOpacity={0.7}
-            onPress={handleProfilePress}
-            style={[
-              tw`${selectedTab === 'profile' ? 'bg-[#A3CB31]' : 'bg-[#222222]'} rounded-full items-center justify-center`,
-              { padding: horizontalScale(15) },
-            ]}>
-            <Image
-              source={TwoPeople}
-              tintColor="#FFFFFF"
-              style={{ width: horizontalScale(22.5), height: horizontalScale(22.5) }}
-              resizeMode="contain"
-            />
-          </TouchableOpacity>
+          {([
+            { tab: 'home', icon: HomeIcon, tint: true, onPress: handleHomePress },
+            { tab: 'calendar', icon: CalendarIcon, tint: true, onPress: handleCalendarPress },
+            { tab: 'business', icon: MeshIcon, tint: true, onPress: handleBusinessPress },
+            { tab: 'profile', icon: TwoPeople, tint: true, onPress: handleProfilePress },
+          ] as const).map(({ tab, icon, tint, onPress }) => (
+            <TouchableOpacity
+              key={tab}
+              activeOpacity={0.7}
+              onPress={onPress}
+              style={{
+                backgroundColor: selectedTab === tab ? '#97B92A' : '#2D2F3C',
+                borderRadius: 9999,
+                alignItems: 'center',
+                justifyContent: 'center',
+                padding: horizontalScale(15),
+              }}>
+              <Image
+                source={icon}
+                tintColor="#FFFFFF"
+                style={{ width: horizontalScale(22.5), height: horizontalScale(22.5) }}
+                resizeMode="contain"
+              />
+            </TouchableOpacity>
+          ))}
         </View>
         <TouchableOpacity
-          style={[
-            tw`bg-black rounded-full items-center justify-center`,
-            { padding: horizontalScale(24.375) },
-          ]}
+          ref={addButtonRef}
+          style={{
+            backgroundColor: '#2D2F3C',
+            borderRadius: 9999,
+            alignItems: 'center',
+            justifyContent: 'center',
+            width: addButtonSize,
+            height: addButtonSize,
+          }}
           activeOpacity={0.7}
           onPress={handleAddPress}>
           <Image
-            source={AddIcon}
+            source={PlusIcon}
             tintColor="#FFFFFF"
             style={{ width: horizontalScale(22.5), height: horizontalScale(22.5) }}
             resizeMode="contain"
@@ -266,39 +573,78 @@ const BottomNavigationBar: React.FC<BottomNavigationBarProps> = ({
         </TouchableOpacity>
       </View>
 
+      {showHomeOnboarding && homeOnboardingStep !== null && homeOnboardingStep < 2 && (
+        <Modal visible transparent animationType="fade" onRequestClose={completeHomeOnboarding}>
+          <View style={tw`flex-1`}>
+            <BlurView intensity={10} tint="dark" style={tw`absolute inset-0`}>
+              <View style={tw`flex-1 bg-black opacity-20`} />
+            </BlurView>
+            {homeOnboardingStep === 0 &&
+              renderOnboardingCard({
+                title: 'Dashboard',
+                body: 'Your next scheduled meeting will appear here.',
+                top: Math.max(insets.top + verticalScale(136), verticalScale(190)),
+                left: horizontalScale(16),
+                width: screenWidth - horizontalScale(32),
+                preview: renderDashboardPreview(),
+              })}
+            {homeOnboardingStep === 1 &&
+              renderOnboardingCard({
+                title: 'Your meetings',
+                body: 'Your meetings for this day will appear here, grouped by hooks.',
+                top: verticalScale(532),
+                left: horizontalScale(16),
+                width: screenWidth - horizontalScale(48),
+                preview: renderMeetingsPreview(),
+              })}
+          </View>
+        </Modal>
+      )}
+
       {/* Add Menu Popup Modal - Only render when contact modal is not active */}
       {!showContactModal && !isTransitioning && (
         <Modal
-          visible={showAddMenu}
-          transparent={true}
+          visible={showAddMenu || showOnboardingAddMenu}
+          transparent
           animationType="fade"
-          onRequestClose={() => setShowAddMenu(false)}>
+          onRequestClose={() => {
+            if (showOnboardingAddMenu) {
+              completeHomeOnboarding();
+              return;
+            }
+            setShowAddMenu(false);
+          }}>
           <View style={tw`flex-1`}>
             <TouchableOpacity
               style={tw`flex-1`}
               activeOpacity={1}
-              onPress={() => setShowAddMenu(false)}>
-              <BlurView intensity={20} tint="dark" style={tw`absolute inset-0`}>
-                <View style={tw`flex-1 bg-black opacity-40`} />
+              onPress={() => {
+                if (showOnboardingAddMenu) return;
+                setShowAddMenu(false);
+              }}>
+              <BlurView intensity={12} tint="dark" style={tw`absolute inset-0`}>
+                <View style={tw`flex-1 bg-black opacity-25`} />
               </BlurView>
             </TouchableOpacity>
 
             <View
               style={[
-                tw`absolute bottom-0 left-0 right-0 items-center`,
-                { paddingBottom: verticalScale(90) },
+                tw`absolute right-0 items-end`,
+                {
+                  bottom: Math.max(insets.bottom + verticalScale(77), verticalScale(107)),
+                  gap: verticalScale(9),
+                  paddingRight: horizontalScale(28),
+                },
               ]}>
-              <View
-                style={[
-                  tw`bg-white rounded-3xl w-11/12 overflow-hidden`,
-                  { paddingHorizontal: horizontalScale(15) },
-                ]}>
+              <View style={[tw`items-end`, { gap: verticalScale(9) }]}>
                 <TouchableOpacity
                   style={[
-                    tw`flex-row items-center`,
+                    tw`bg-white rounded-full flex-row items-center`,
                     {
-                      paddingHorizontal: horizontalScale(22.5),
-                      paddingVertical: verticalScale(15),
+                      minWidth: horizontalScale(172),
+                      paddingLeft: horizontalScale(12),
+                      paddingRight: horizontalScale(18),
+                      paddingVertical: verticalScale(8),
                     },
                   ]}
                   activeOpacity={0.7}
@@ -307,64 +653,54 @@ const BottomNavigationBar: React.FC<BottomNavigationBarProps> = ({
                     style={[
                       tw`rounded-full bg-gray-200 items-center justify-center`,
                       {
-                        width: horizontalScale(37.5),
-                        height: horizontalScale(37.5),
-                        marginRight: horizontalScale(15),
+                        width: horizontalScale(35),
+                        height: horizontalScale(35),
+                        marginRight: horizontalScale(10),
                       },
                     ]}>
-                    <Text style={[tw`text-black font-bold`, { fontSize: moderateScale(18.75) }]}>
-                      +
-                    </Text>
+                    <Text style={[tw`text-black font-dm`, { fontSize: moderateScale(24) }]}>→</Text>
                   </View>
-                  <Text style={[tw`text-black font-dm flex-1`, { fontSize: moderateScale(15) }]}>
-                    Book a meeting
+                  <Text style={[tw`text-black font-dm`, { fontSize: moderateScale(17) }]}>
+                    Send a Catch
                   </Text>
                 </TouchableOpacity>
-                <View
-                  style={[
-                    tw`bg-gray-200`,
-                    { height: verticalScale(1.125), marginHorizontal: horizontalScale(22.5) },
-                  ]}
-                />
+                <View style={{ display: 'none', height: 0 }} />
                 <TouchableOpacity
                   style={[
-                    tw`flex-row items-center opacity-50`,
+                    tw`bg-white rounded-full flex-row items-center`,
                     {
-                      paddingHorizontal: horizontalScale(22.5),
-                      paddingVertical: verticalScale(15),
+                      minWidth: horizontalScale(150),
+                      paddingLeft: horizontalScale(12),
+                      paddingRight: horizontalScale(18),
+                      paddingVertical: verticalScale(8),
                     },
                   ]}
-                  activeOpacity={1}
-                  disabled={true}>
+                  activeOpacity={0.82}
+                  onPress={handleMyHooks}>
                   <View
                     style={[
                       tw`rounded-full bg-gray-200 items-center justify-center`,
                       {
-                        width: horizontalScale(37.5),
-                        height: horizontalScale(37.5),
-                        marginRight: horizontalScale(15),
+                        width: horizontalScale(35),
+                        height: horizontalScale(35),
+                        marginRight: horizontalScale(10),
                       },
                     ]}>
-                    <Text style={[tw`text-black font-bold`, { fontSize: moderateScale(18.75) }]}>
-                      +
-                    </Text>
+                    <Text style={[tw`text-black font-dm`, { fontSize: moderateScale(20) }]}>♩</Text>
                   </View>
-                  <Text style={[tw`text-black font-dm flex-1`, { fontSize: moderateScale(15) }]}>
-                    Create meeting type
+                  <Text style={[tw`text-black font-dm`, { fontSize: moderateScale(17) }]}>
+                    My Hooks
                   </Text>
                 </TouchableOpacity>
-                <View
-                  style={[
-                    tw`bg-gray-200`,
-                    { height: verticalScale(1.125), marginHorizontal: horizontalScale(22.5) },
-                  ]}
-                />
+                <View style={{ display: 'none', height: 0 }} />
                 <TouchableOpacity
                   style={[
-                    tw`flex-row items-center`,
+                    tw`bg-white rounded-full flex-row items-center`,
                     {
-                      paddingHorizontal: horizontalScale(22.5),
-                      paddingVertical: verticalScale(15),
+                      minWidth: horizontalScale(202),
+                      paddingLeft: horizontalScale(12),
+                      paddingRight: horizontalScale(18),
+                      paddingVertical: verticalScale(8),
                     },
                   ]}
                   activeOpacity={0.7}
@@ -373,30 +709,193 @@ const BottomNavigationBar: React.FC<BottomNavigationBarProps> = ({
                     style={[
                       tw`rounded-full bg-gray-200 items-center justify-center`,
                       {
-                        width: horizontalScale(37.5),
-                        height: horizontalScale(37.5),
-                        marginRight: horizontalScale(15),
+                        width: horizontalScale(35),
+                        height: horizontalScale(35),
+                        marginRight: horizontalScale(10),
                       },
                     ]}>
-                    <Text style={[tw`text-black font-bold`, { fontSize: moderateScale(18.75) }]}>
-                      +
-                    </Text>
+                    <Image
+                      source={CalendarIcon}
+                      tintColor="#171927"
+                      style={{ width: horizontalScale(20), height: horizontalScale(20) }}
+                      resizeMode="contain"
+                    />
                   </View>
-                  <Text style={[tw`text-black font-dm flex-1`, { fontSize: moderateScale(15) }]}>
+                  <Text style={[tw`text-black font-dm`, { fontSize: moderateScale(17) }]}>
                     Manage availability
                   </Text>
                 </TouchableOpacity>
               </View>
             </View>
+            {showOnboardingAddMenu &&
+              homeOnboardingStep === 2 &&
+              renderOnboardingCard({
+                title: 'Send a Catch',
+                body: 'Use this to create and send a new meeting request.',
+                top: verticalScale(576),
+                left: horizontalScale(16),
+                width: horizontalScale(270),
+                tail: 'right',
+              })}
+            {showOnboardingAddMenu &&
+              homeOnboardingStep === 3 &&
+              renderOnboardingCard({
+                title: 'My Hooks',
+                body: 'Hooks are reusable meeting templates you can use again and again.',
+                top: verticalScale(583),
+                left: horizontalScale(16),
+                width: horizontalScale(298),
+                tail: 'right',
+              })}
+            {showOnboardingAddMenu &&
+              homeOnboardingStep === 4 &&
+              renderOnboardingCard({
+                title: 'Manage availability',
+                body: 'Set your availability so others can see when you’re free to meet.',
+                top: verticalScale(546),
+                left: horizontalScale(16),
+                width: horizontalScale(214),
+                tail: 'right',
+              })}
+            <View
+              style={[
+                tw`absolute`,
+                addButtonFrame
+                  ? {
+                      height: addButtonFrame.height,
+                      left: addButtonFrame.x,
+                      top: addButtonFrame.y,
+                      width: addButtonFrame.width,
+                    }
+                  : {
+                      bottom: Math.max(insets.bottom, 30),
+                      right: horizontalScale(28),
+                    },
+              ]}>
+              <TouchableOpacity
+                style={{
+                  backgroundColor: '#2D2F3C',
+                  borderRadius: 9999,
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  width: addButtonSize,
+                  height: addButtonSize,
+                }}
+                activeOpacity={0.8}
+                onPress={() => {
+                  if (showOnboardingAddMenu) {
+                    completeHomeOnboarding();
+                    return;
+                  }
+                  setShowAddMenu(false);
+                }}>
+                <Image
+                  source={CrossIcon}
+                  tintColor="#FFFFFF"
+                  style={{ width: horizontalScale(22.5), height: horizontalScale(22.5) }}
+                  resizeMode="contain"
+                />
+              </TouchableOpacity>
+            </View>
           </View>
         </Modal>
       )}
 
+      <Modal
+        visible={showMeetingTypeModal}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setShowMeetingTypeModal(false)}>
+        <View style={tw`flex-1`}>
+          <TouchableOpacity
+            style={tw`flex-1`}
+            activeOpacity={1}
+            onPress={() => setShowMeetingTypeModal(false)}>
+            <BlurView intensity={12} tint="dark" style={tw`absolute inset-0`}>
+              <View style={tw`flex-1 bg-black opacity-20`} />
+            </BlurView>
+          </TouchableOpacity>
+
+          <View
+            style={[
+              tw`absolute left-0 right-0 bottom-0 bg-white rounded-t-3xl`,
+              {
+                paddingHorizontal: horizontalScale(16),
+                paddingTop: verticalScale(16),
+                paddingBottom: Math.max(insets.bottom + verticalScale(20), verticalScale(34)),
+              },
+            ]}>
+            <View
+              style={[
+                tw`self-center rounded-full bg-gray-300`,
+                {
+                  width: horizontalScale(64),
+                  height: verticalScale(4),
+                  marginBottom: verticalScale(22),
+                },
+              ]}
+            />
+            <Text
+              style={[
+                tw`font-bold font-dm text-black`,
+                { fontSize: moderateScale(28), marginBottom: verticalScale(18) },
+              ]}>
+              Select catch type
+            </Text>
+
+            {[
+              { mode: 'one' as const, title: '1-on-1', subtitle: 'Send to one person' },
+              { mode: 'group' as const, title: 'Group', subtitle: 'Send to multiple people' },
+            ].map((item, index) => (
+              <TouchableOpacity
+                key={item.mode}
+                activeOpacity={0.8}
+                onPress={() => handleMeetingTypeSelect(item.mode)}
+                style={[
+                  tw`flex-row items-center`,
+                  {
+                    paddingVertical: verticalScale(18),
+                    borderBottomWidth: index === 0 ? 1 : 0,
+                    borderBottomColor: '#E8EDF2',
+                  },
+                ]}>
+                <View
+                  style={[
+                    tw`rounded-full bg-gray-100 items-center justify-center`,
+                    {
+                      width: horizontalScale(56),
+                      height: horizontalScale(56),
+                      marginRight: horizontalScale(16),
+                    },
+                  ]}>
+                  <Image
+                    source={TwoPeople}
+                    tintColor="#79828B"
+                    style={{ width: horizontalScale(28), height: horizontalScale(28) }}
+                    resizeMode="contain"
+                  />
+                </View>
+                <View style={tw`flex-1`}>
+                  <Text style={[tw`font-dm text-black`, { fontSize: moderateScale(22) }]}>
+                    {item.title}
+                  </Text>
+                  <Text
+                    style={[tw`font-dm text-grey`, { fontSize: moderateScale(16), marginTop: 2 }]}>
+                    {item.subtitle}
+                  </Text>
+                </View>
+                <Text style={[tw`font-dm text-gray-400`, { fontSize: moderateScale(24) }]}>›</Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+        </View>
+      </Modal>
+
       {/* Contact Selection Modal - Only render when add menu is not active */}
-      {!showAddMenu && (
+      {!showAddMenu && !showMeetingTypeModal && (
         <Modal
           visible={showContactModal && !isTransitioning}
-          transparent={true}
+          transparent
           animationType="none"
           onRequestClose={handleCloseContactModal}
           onShow={() => {
@@ -481,7 +980,7 @@ const BottomNavigationBar: React.FC<BottomNavigationBarProps> = ({
                           },
                         ]}>
                         <Image
-                          source={Search}
+                          source={SearchIcon}
                           style={{
                             width: horizontalScale(18.75),
                             height: horizontalScale(18.75),

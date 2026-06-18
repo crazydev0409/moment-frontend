@@ -1,297 +1,351 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useState } from 'react';
 import {
-    View,
-    Text,
-    TouchableOpacity,
-    Image,
-    ScrollView,
-    TextInput,
-    Modal,
-    Alert,
-    KeyboardAvoidingView,
-    Platform,
+  ActivityIndicator,
+  Alert,
+  Image,
+  KeyboardAvoidingView,
+  Platform,
+  RefreshControl,
+  ScrollView,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
 } from 'react-native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
-import { BlurView } from 'expo-blur';
+import { useFocusEffect } from '@react-navigation/native';
 import * as Contacts from 'expo-contacts';
+
 import tw from '~/tailwindcss';
 import { AppStackParamList } from '.';
-import { Background, Notification, Avatar, AddIcon, HomeIcon, CalendarIcon, BusinessIcon, ProfileIcon, Search, BackArrow } from '~/lib/images';
+import { Avatar } from '~/lib/images';
 import { http } from '~/helpers/http';
-
 import { horizontalScale, verticalScale, moderateScale } from '~/helpers/responsive';
+import { colors } from '~/lib/theme';
 import { hashPhoneNumber } from '~/utils/phoneHash';
 
-type Props = NativeStackScreenProps<
-    AppStackParamList,
-    'AppStack_ContactScreen'
->;
+type Props = NativeStackScreenProps<AppStackParamList, 'AppStack_ContactScreen'>;
 
-interface Contact {
-    id: string;
-    name: string;
-    imageUri?: string;
-    backendContact?: any;
+interface BackendContact {
+  id: string;
+  displayName: string;
+  contactPhone?: string;
+  autoConfirm?: boolean;
+  contactUser?: { id: string; name: string; avatar?: string | null } | null;
+  contactUserId?: string | null;
 }
 
-const AppStack_ContactScreen: React.FC<Props> = ({ navigation, route }) => {
-    const [contacts, setContacts] = useState<Contact[]>([]);
-    const [searchText, setSearchText] = useState('');
-    const [isLoading, setIsLoading] = useState(true);
+interface DisplayContact {
+  id: string;
+  name: string;
+  imageUri?: string;
+  backend: BackendContact;
+  isRegistered: boolean;
+}
 
+const AppStack_ContactScreen: React.FC<Props> = ({ navigation }) => {
+  const [contacts, setContacts] = useState<DisplayContact[]>([]);
+  const [searchText, setSearchText] = useState('');
+  const [isLoading, setIsLoading] = useState(true);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [notifCount] = useState(0);
 
-    useEffect(() => {
-        loadContacts();
-    }, []);
+  const loadContacts = useCallback(async (showSpinner = true) => {
+    try {
+      if (showSpinner) setIsLoading(true);
 
-    // Register add button handler
+      const { status: existingStatus } = await Contacts.getPermissionsAsync();
+      let finalStatus = existingStatus;
+      if (existingStatus !== 'granted') {
+        const { status } = await Contacts.requestPermissionsAsync();
+        finalStatus = status;
+      }
 
+      const phoneToAvatarMap = new Map<string, string>();
 
-    const loadContacts = async () => {
-        try {
-            // Check permission status first
-            const { status: existingStatus } = await Contacts.getPermissionsAsync();
-            let finalStatus = existingStatus;
-
-            // Only request if not already granted
-            if (existingStatus !== 'granted') {
-                const { status } = await Contacts.requestPermissionsAsync();
-                finalStatus = status;
-            }
-
-            if (finalStatus === 'granted') {
-                const { data } = await Contacts.getContactsAsync({
-                    fields: [
-                        Contacts.Fields.Name,
-                        Contacts.Fields.Image,
-                        Contacts.Fields.PhoneNumbers
-                    ],
-                });
-
-                // Create a map of hashed phone numbers to local contact avatars
-                const phoneToAvatarMap = new Map<string, string>();
-
-                await Promise.all(data.map(async (contact) => {
-                    if (contact.phoneNumbers && contact.phoneNumbers.length > 0 && contact.image?.uri) {
-                        const avatarUri = contact.image.uri;
-                        await Promise.all(contact.phoneNumbers.map(async (phone) => {
-                            // Normalize phone number
-                            const normalized = phone.number?.replace(/[\s\-\(\)]/g, '') || '';
-                            if (normalized && avatarUri) {
-                                const hashed = await hashPhoneNumber(normalized);
-                                phoneToAvatarMap.set(hashed, avatarUri);
-                            }
-                        }));
-                    }
-                }));
-
-                // Import contacts to backend first
-                await importContactsToBackend(data);
-
-                // Then fetch the backend contacts (which have the full data structure)
-                const response = await http.get('/users/contacts');
-                const backendContacts = response.data.contacts || [];
-
-                // Format for display, matching local avatars to backend contacts
-                const formattedContacts: Contact[] = backendContacts.map((contact: any) => {
-                    // Backend returns hashed phone numbers
-                    const hashedContactPhone = contact.contactPhone || '';
-                    let localAvatar = phoneToAvatarMap.get(hashedContactPhone);
-
-                    return {
-                        id: contact.id,
-                        name: contact.displayName || 'Unknown',
-                        imageUri: localAvatar, // Use local device avatar
-                        // Store the full backend contact for navigation
-                        backendContact: contact
-                    };
-                });
-
-                setContacts(formattedContacts);
-            } else {
-                Alert.alert('Permission Denied', 'Please grant contacts permission to view your contacts.');
-            }
-        } catch (error) {
-            console.error('Error loading contacts:', error);
-            Alert.alert('Error', 'Failed to load contacts.');
-        } finally {
-            setIsLoading(false);
-        }
-    };
-
-    const importContactsToBackend = async (contactsData: Contacts.Contact[]) => {
-        try {
-            // Prepare contacts for API
-            const contactsToImport = contactsData
-                .filter(contact => {
-                    // Filter contacts that have name and at least one phone number
-                    return contact.name &&
-                        contact.phoneNumbers &&
-                        contact.phoneNumbers.length > 0;
-                })
-                .map(contact => {
-                    // Get the first phone number
-                    const phoneNumber = contact.phoneNumbers![0].number;
-
-                    return {
-                        phoneNumber: phoneNumber || '',
-                        displayName: contact.name || 'Unknown',
-                        phoneBookId: contact.id
-                    };
-                })
-                .filter(contact => contact.phoneNumber); // Filter out contacts without phone numbers
-
-            if (contactsToImport.length === 0) {
-                console.log('No contacts with phone numbers to import');
-                return;
-            }
-
-            // Call the import API
-            const response = await http.post('/users/contacts/import', {
-                contacts: contactsToImport
-            });
-
-            console.log('Contacts imported successfully:', response.data);
-        } catch (error) {
-            console.error('Error importing contacts to backend:', error);
-            // Don't show error to user, as this is a background operation
-        }
-    };
-
-    const filteredContacts = contacts
-        .filter(contact =>
-            contact.name.toLowerCase().includes(searchText.toLowerCase())
-        )
-        .sort((a, b) => {
-            // Sort enabled contacts first, then disabled ones; alphabetically within each group
-            const aDisabled = !a.backendContact?.contactUser?.id && !a.backendContact?.contactUserId;
-            const bDisabled = !b.backendContact?.contactUser?.id && !b.backendContact?.contactUserId;
-            if (aDisabled !== bDisabled) return aDisabled ? 1 : -1;
-            return a.name.localeCompare(b.name);
+      if (finalStatus === 'granted') {
+        const { data } = await Contacts.getContactsAsync({
+          fields: [Contacts.Fields.Name, Contacts.Fields.Image, Contacts.Fields.PhoneNumbers],
         });
 
-    const handleContactPress = (contact: Contact) => {
-        if (!contact.backendContact) {
-            Alert.alert('Error', 'Contact information not available');
-            return;
+        await Promise.all(
+          data.map(async (c) => {
+            if (c.phoneNumbers && c.image?.uri) {
+              await Promise.all(
+                c.phoneNumbers.map(async (p) => {
+                  const norm = p.number?.replace(/[\s\-\(\)]/g, '') || '';
+                  if (norm) {
+                    const hashed = await hashPhoneNumber(norm);
+                    phoneToAvatarMap.set(hashed, c.image!.uri!);
+                  }
+                })
+              );
+            }
+          })
+        );
+
+        try {
+          const importable = data
+            .filter((c) => c.name && c.phoneNumbers?.length)
+            .map((c) => ({
+              phoneNumber: c.phoneNumbers![0].number || '',
+              displayName: c.name || 'Unknown',
+              phoneBookId: c.id,
+            }))
+            .filter((c) => c.phoneNumber);
+          if (importable.length > 0) {
+            await http.post('/users/contacts/import', { contacts: importable });
+          }
+        } catch {
+          // silent — background import failure is non-critical
         }
+      }
 
-        // Navigate to DateDetailScreen with selected contact
-        const today = new Date();
-        const todayString = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+      const res = await http.get('/users/contacts');
+      const backendContacts: BackendContact[] = res.data.contacts || [];
 
-        navigation.navigate('AppStack_DateDetailScreen', {
-            date: todayString,
-            contact: contact.backendContact
-        });
-    };
+      const formatted: DisplayContact[] = backendContacts.map((bc) => ({
+        id: bc.id,
+        name: bc.displayName || 'Unknown',
+        imageUri: bc.contactPhone ? phoneToAvatarMap.get(bc.contactPhone) : undefined,
+        backend: bc,
+        isRegistered: !!(bc.contactUserId || bc.contactUser?.id),
+      }));
 
+      formatted.sort((a, b) => {
+        if (a.isRegistered !== b.isRegistered) return a.isRegistered ? -1 : 1;
+        return a.name.localeCompare(b.name);
+      });
 
+      setContacts(formatted);
+    } catch (err) {
+      console.error('loadContacts error:', err);
+      Alert.alert('Error', 'Failed to load contacts.');
+    } finally {
+      setIsLoading(false);
+      setIsRefreshing(false);
+    }
+  }, []);
 
-    return (
-        <View style={tw`flex-1 relative bg-white`}>
-            <Image source={Background} style={tw`absolute w-full h-full`} />
-            <View style={tw`absolute w-full h-full bg-black opacity-5`} />
+  useFocusEffect(
+    useCallback(() => {
+      loadContacts();
+    }, [loadContacts])
+  );
 
-            <KeyboardAvoidingView 
-                style={tw`flex-1`}
-                behavior="padding"
-                keyboardVerticalOffset={0}
-            >
-                <ScrollView
-                    style={tw`flex-1`}
-                    contentContainerStyle={{ paddingBottom: verticalScale(90) }}
-                    showsVerticalScrollIndicator={false}
-                    keyboardShouldPersistTaps="handled"
-                >
-                <View style={[{ marginTop: verticalScale(60) }, { paddingHorizontal: '8%' }]}>
-                    {/* Header */}
-                    <View style={[tw`flex-row justify-between items-center`, { marginBottom: verticalScale(22.5) }]}>
-                        <TouchableOpacity
-                            onPress={() => navigation.goBack()}
-                            activeOpacity={0.5}
-                        >
-                            <Image source={BackArrow} style={{ width: horizontalScale(24), height: horizontalScale(24) }} resizeMode="contain" />
-                        </TouchableOpacity>
-                        <TouchableOpacity
-                            activeOpacity={0.5}
-                            onPress={() => navigation.navigate('AppStack_NotificationScreen')}
-                        >
-                            <Image source={Notification} style={{ width: horizontalScale(48.75), height: horizontalScale(48.75) }} />
-                        </TouchableOpacity>
-                    </View>
+  const onRefresh = useCallback(() => {
+    setIsRefreshing(true);
+    loadContacts(false);
+  }, [loadContacts]);
 
-                    {/* Search Bar */}
-                    <View style={{ marginBottom: verticalScale(22.5) }}>
-                        <View style={[tw`bg-white rounded-2xl flex-row items-center shadow-sm`, { paddingHorizontal: horizontalScale(15), paddingVertical: verticalScale(11.25) }]}>
-                            <TextInput
-                                style={[tw`flex-1 text-black font-dm`, { fontSize: moderateScale(13.125) }]}
-                                placeholder="Search your contacts"
-                                placeholderTextColor="#999"
-                                value={searchText}
-                                onChangeText={setSearchText}
-                            />
-                            <Image source={Search} style={{ width: horizontalScale(18.75), height: horizontalScale(18.75) }} />
-                        </View>
-                    </View>
+  const filtered = contacts.filter((c) =>
+    c.name.toLowerCase().includes(searchText.toLowerCase())
+  );
 
-                    {/* Contacts List */}
-                    <View style={{ marginBottom: verticalScale(15) }}>
-                        {isLoading ? (
-                            <Text style={[tw`text-center text-grey font-dm`, { paddingVertical: verticalScale(30), fontSize: moderateScale(13.125) }]}>Loading contacts...</Text>
-                        ) : filteredContacts.length > 0 ? (
-                            filteredContacts.map((contact) => {
-                                const isDisabled = !contact.backendContact?.contactUser?.id && !contact.backendContact?.contactUserId;
-                                return (
-                                    <TouchableOpacity
-                                        key={contact.id}
-                                        style={[
-                                            tw`rounded-2xl flex-row items-center shadow-sm`,
-                                            { padding: horizontalScale(15), marginBottom: verticalScale(11.25) },
-                                            isDisabled ? tw`bg-gray-100` : tw`bg-white`
-                                        ]}
-                                        activeOpacity={isDisabled ? 1 : 0.7}
-                                        onPress={() => !isDisabled && handleContactPress(contact)}
-                                        disabled={isDisabled}
-                                    >
-                                        <View style={[tw`rounded-full bg-gray-200 items-center justify-center overflow-hidden`, { width: horizontalScale(45), height: horizontalScale(45), marginRight: horizontalScale(15) }]}>
-                                            {contact.imageUri ? (
-                                                <Image
-                                                    source={{ uri: contact.imageUri }}
-                                                    style={{ width: horizontalScale(45), height: horizontalScale(45), borderRadius: 9999 }}
-                                                />
-                                            ) : (
-                                                <Image source={Avatar} style={{ width: horizontalScale(30), height: horizontalScale(30) }} />
-                                            )}
-                                        </View>
-                                        <View style={tw`flex-1`}>
-                                            <Text style={[tw`text-black font-bold font-dm`, { fontSize: moderateScale(13.125) }]}>
-                                                {contact.name}
-                                            </Text>
-                                            {isDisabled && (
-                                                <Text style={[tw`text-grey font-dm`, { fontSize: moderateScale(11.25), marginTop: 1 }]}>
-                                                    Not registered
-                                                </Text>
-                                            )}
-                                        </View>
-                                    </TouchableOpacity>
-                                );
-                            })
-                        ) : (
-                            <Text style={[tw`text-center text-grey font-dm`, { paddingVertical: verticalScale(30), fontSize: moderateScale(13.125) }]}>
-                                {searchText ? 'No contacts found' : 'No contacts available'}
-                            </Text>
-                        )}
-                    </View>
-                </View>
-                </ScrollView>
-            </KeyboardAvoidingView>
+  const handleContactPress = (c: DisplayContact) => {
+    navigation.navigate('AppStack_ContactProfileScreen', {
+      contactId: c.backend.id,
+      contactUserId: c.backend.contactUserId || c.backend.contactUser?.id,
+      contactName: c.name,
+    });
+  };
 
-            {/* Add Menu Popup Modal */}
+  const handleHookIconPress = (c: DisplayContact) => {
+    navigation.navigate('AppStack_ContactProfileScreen', {
+      contactId: c.backend.id,
+      contactUserId: c.backend.contactUserId || c.backend.contactUser?.id,
+      contactName: c.name,
+    });
+  };
 
+  const HookCircleIcon = () => (
+    <View
+      style={[
+        tw`rounded-full items-center justify-center`,
+        {
+          width: horizontalScale(40),
+          height: horizontalScale(40),
+          backgroundColor: colors.greenTint,
+        },
+      ]}>
+      <Text style={{ fontSize: moderateScale(18), color: colors.greenText }}>🪝</Text>
+    </View>
+  );
+
+  return (
+    <View style={[tw`flex-1`, { backgroundColor: colors.pageBg }]}>
+      <KeyboardAvoidingView
+        style={tw`flex-1`}
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        keyboardVerticalOffset={0}>
+        {/* Header */}
+        <View
+          style={[
+            tw`flex-row items-center justify-between`,
+            { marginTop: verticalScale(58), paddingHorizontal: '8%', marginBottom: verticalScale(18) },
+          ]}>
+          <Text style={[tw`font-dm font-bold`, { color: colors.ink, fontSize: moderateScale(28) }]}>
+            Contacts
+          </Text>
+          <TouchableOpacity
+            onPress={() => navigation.navigate('AppStack_NotificationScreen')}
+            activeOpacity={0.7}
+            style={{ position: 'relative' }}>
+            <View
+              style={[
+                tw`rounded-full items-center justify-center`,
+                {
+                  width: horizontalScale(46),
+                  height: horizontalScale(46),
+                  backgroundColor: colors.card,
+                },
+              ]}>
+              <Text style={{ fontSize: moderateScale(22) }}>🔔</Text>
+            </View>
+            {notifCount > 0 && (
+              <View
+                style={[
+                  tw`absolute rounded-full items-center justify-center`,
+                  {
+                    top: -2,
+                    right: -2,
+                    width: horizontalScale(18),
+                    height: horizontalScale(18),
+                    backgroundColor: colors.green,
+                  },
+                ]}>
+                <Text
+                  style={[tw`font-dm font-bold`, { color: colors.white, fontSize: moderateScale(10) }]}>
+                  {notifCount}
+                </Text>
+              </View>
+            )}
+          </TouchableOpacity>
         </View>
-    );
+
+        <ScrollView
+          style={tw`flex-1`}
+          contentContainerStyle={{ paddingHorizontal: '8%', paddingBottom: verticalScale(120) }}
+          showsVerticalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled"
+          refreshControl={
+            <RefreshControl refreshing={isRefreshing} onRefresh={onRefresh} tintColor={colors.green} />
+          }>
+          {/* Search bar */}
+          <View
+            style={[
+              tw`flex-row items-center rounded-2xl`,
+              {
+                backgroundColor: colors.card,
+                paddingHorizontal: horizontalScale(16),
+                paddingVertical: verticalScale(12),
+                marginBottom: verticalScale(16),
+              },
+            ]}>
+            <TextInput
+              style={[tw`flex-1 font-dm`, { color: colors.ink, fontSize: moderateScale(14) }]}
+              placeholder="Search contacts"
+              placeholderTextColor={colors.placeholder}
+              value={searchText}
+              onChangeText={setSearchText}
+            />
+            <Text style={{ fontSize: moderateScale(18), color: colors.grey }}>🔍</Text>
+          </View>
+
+          {/* Invite CTA */}
+          <TouchableOpacity
+            activeOpacity={0.7}
+            style={[tw`flex-row items-center`, { marginBottom: verticalScale(16) }]}>
+            <Text style={[tw`font-dm font-bold`, { color: colors.greenText, fontSize: moderateScale(15) }]}>
+              👤+ Invite
+            </Text>
+          </TouchableOpacity>
+
+          {/* Contacts list */}
+          {isLoading ? (
+            <View style={{ paddingTop: verticalScale(60), alignItems: 'center' }}>
+              <ActivityIndicator size="large" color={colors.green} />
+            </View>
+          ) : filtered.length === 0 ? (
+            <Text
+              style={[
+                tw`text-center font-dm`,
+                { color: colors.grey, paddingVertical: verticalScale(40), fontSize: moderateScale(14) },
+              ]}>
+              {searchText ? 'No contacts found' : 'No contacts yet'}
+            </Text>
+          ) : (
+            filtered.map((contact) => (
+              <TouchableOpacity
+                key={contact.id}
+                activeOpacity={0.7}
+                onPress={() => handleContactPress(contact)}
+                style={[
+                  tw`flex-row items-center rounded-2xl`,
+                  {
+                    backgroundColor: colors.card,
+                    padding: horizontalScale(14),
+                    marginBottom: verticalScale(10),
+                  },
+                ]}>
+                {/* Avatar with verified badge */}
+                <View style={{ position: 'relative', marginRight: horizontalScale(14) }}>
+                  <View
+                    style={[
+                      tw`rounded-full overflow-hidden items-center justify-center`,
+                      { width: horizontalScale(52), height: horizontalScale(52), backgroundColor: colors.field },
+                    ]}>
+                    {contact.imageUri ? (
+                      <Image
+                        source={{ uri: contact.imageUri }}
+                        style={{ width: horizontalScale(52), height: horizontalScale(52) }}
+                      />
+                    ) : (
+                      <Image source={Avatar} style={{ width: horizontalScale(32), height: horizontalScale(32) }} />
+                    )}
+                  </View>
+                  {contact.isRegistered && (
+                    <View
+                      style={[
+                        tw`absolute rounded-full items-center justify-center`,
+                        {
+                          bottom: 0,
+                          right: 0,
+                          width: horizontalScale(18),
+                          height: horizontalScale(18),
+                          backgroundColor: '#2D7FF9',
+                          borderWidth: 1.5,
+                          borderColor: colors.card,
+                        },
+                      ]}>
+                      <Text style={{ color: colors.white, fontSize: moderateScale(9), fontWeight: 'bold' }}>✓</Text>
+                    </View>
+                  )}
+                </View>
+
+                {/* Name */}
+                <Text
+                  numberOfLines={1}
+                  style={[
+                    tw`flex-1 font-dm font-bold`,
+                    { color: contact.isRegistered ? colors.ink : colors.grey, fontSize: moderateScale(15) },
+                  ]}>
+                  {contact.name}
+                </Text>
+
+                {/* Hook icon */}
+                {contact.isRegistered && (
+                  <TouchableOpacity onPress={() => handleHookIconPress(contact)} activeOpacity={0.7}>
+                    <HookCircleIcon />
+                  </TouchableOpacity>
+                )}
+              </TouchableOpacity>
+            ))
+          )}
+        </ScrollView>
+      </KeyboardAvoidingView>
+    </View>
+  );
 };
 
 export default AppStack_ContactScreen;
-

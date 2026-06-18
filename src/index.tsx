@@ -27,7 +27,7 @@ const linking = {
     screens: {
       AppStack: {
         screens: {
-          AppStack_DateDetailScreen: 'book/:bookingUserId',
+          AppStack_CalendarScreen: 'book/:bookingUserId',
         },
       },
       AuthStack: 'auth',

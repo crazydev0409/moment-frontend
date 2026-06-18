@@ -1,15 +1,35 @@
+import React, { useCallback, useState } from 'react';
+import {
+  ActivityIndicator,
+  Image,
+  RefreshControl,
+  ScrollView,
+  Text,
+  TouchableOpacity,
+  View,
+} from 'react-native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
-import React, { useEffect, useState } from 'react';
-import { Text, View, TouchableOpacity, ScrollView, ActivityIndicator, RefreshControl, Image } from 'react-native';
-import { AppStackParamList } from '.';
+import { useFocusEffect } from '@react-navigation/native';
+
 import tw from '~/tailwindcss';
+import { AppStackParamList } from '.';
+import {
+  BackArrow,
+  UpcomingIcon,
+  CheckIcon,
+  CrossIcon,
+  RescheduleIcon,
+  UserIcon,
+  UserXIcon,
+  NotificationsIcon,
+} from '~/lib/images';
 import { http } from '~/helpers/http';
 import { horizontalScale, verticalScale, moderateScale } from '~/helpers/responsive';
-import { BellIcon, BellRinging } from '~/lib/images';
+import { colors } from '~/lib/theme';
 
 type Props = NativeStackScreenProps<AppStackParamList, 'AppStack_NotificationScreen'>;
 
-interface Notification {
+interface AppNotification {
   id: string;
   type: string;
   title: string;
@@ -19,264 +39,219 @@ interface Notification {
   createdAt: string;
 }
 
+type NotifGroup = { label: string; items: AppNotification[] };
+
+function groupNotifications(notifications: AppNotification[]): NotifGroup[] {
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const weekAgo = new Date(today);
+  weekAgo.setDate(today.getDate() - 7);
+
+  const todayItems: AppNotification[] = [];
+  const weekItems: AppNotification[] = [];
+  const earlierItems: AppNotification[] = [];
+
+  notifications.forEach((n) => {
+    const d = new Date(n.createdAt);
+    d.setHours(0, 0, 0, 0);
+    if (d.getTime() === today.getTime()) {
+      todayItems.push(n);
+    } else if (d >= weekAgo) {
+      weekItems.push(n);
+    } else {
+      earlierItems.push(n);
+    }
+  });
+
+  const groups: NotifGroup[] = [];
+  if (todayItems.length) groups.push({ label: 'Today', items: todayItems });
+  if (weekItems.length) groups.push({ label: 'This Week', items: weekItems });
+  if (earlierItems.length) groups.push({ label: 'Earlier', items: earlierItems });
+  return groups;
+}
+
+function getNotifIconMeta(type: string): { icon: number; bg: string; positive: boolean } {
+  switch (type) {
+    case 'moment_request_created':
+      return { icon: UpcomingIcon, bg: colors.greenTint, positive: true };
+    case 'moment_request_accepted':
+      return { icon: CheckIcon, bg: colors.greenTint, positive: true };
+    case 'moment_request_rejected':
+    case 'moment_request_canceled':
+      return { icon: CrossIcon, bg: colors.field, positive: false };
+    case 'moment_request_rescheduled':
+      return { icon: RescheduleIcon, bg: colors.greenTint, positive: true };
+    case 'meeting_reminder':
+      return { icon: UpcomingIcon, bg: colors.greenTint, positive: true };
+    default:
+      if (type.includes('invit') || type.includes('added')) {
+        return { icon: UserIcon, bg: colors.greenTint, positive: true };
+      }
+      if (type.includes('removed')) {
+        return { icon: UserXIcon, bg: colors.field, positive: false };
+      }
+      return { icon: NotificationsIcon, bg: colors.field, positive: false };
+  }
+}
+
+function formatNotifTime(dateString: string): string {
+  const d = new Date(dateString);
+  const now = new Date();
+  const diff = now.getTime() - d.getTime();
+  const days = Math.floor(diff / 86400000);
+
+  if (days === 0) {
+    return `Today • ${d.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })}`;
+  }
+  return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+}
+
 const AppStack_NotificationScreen: React.FC<Props> = ({ navigation }) => {
-  const [notifications, setNotifications] = useState<Notification[]>([]);
+  const [notifications, setNotifications] = useState<AppNotification[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [unreadCount, setUnreadCount] = useState(0);
-  const [isMarkingAllRead, setIsMarkingAllRead] = useState(false);
 
-  useEffect(() => {
-    fetchNotifications();
-  }, []);
-
-  const fetchNotifications = async () => {
+  const fetchNotifications = useCallback(async (showSpinner = true) => {
     try {
-      const response = await http.get('/users/notifications');
-      setNotifications(response.data.notifications || []);
-      setUnreadCount(response.data.unreadCount || 0);
-    } catch (error) {
-      console.error('Error fetching notifications:', error);
+      if (showSpinner) setLoading(true);
+      const res = await http.get('/users/notifications');
+      setNotifications(res.data.notifications || []);
+    } catch (err) {
+      console.error('fetchNotifications error:', err);
     } finally {
       setLoading(false);
       setRefreshing(false);
     }
-  };
+  }, []);
 
-  const handleRefresh = () => {
-    setRefreshing(true);
-    fetchNotifications();
-  };
+  useFocusEffect(useCallback(() => { fetchNotifications(); }, [fetchNotifications]));
 
-  const markAsRead = async (notificationIds: string[]) => {
-    try {
-      await http.post('/users/notifications/read', { notificationIds });
-      // Update local state
-      setNotifications(prev =>
-        prev.map(notif =>
-          notificationIds.includes(notif.id) ? { ...notif, isRead: true } : notif
-        )
-      );
-      setUnreadCount(prev => Math.max(0, prev - notificationIds.length));
-    } catch (error) {
-      console.error('Error marking notification as read:', error);
+  const onRefresh = useCallback(() => { setRefreshing(true); fetchNotifications(false); }, [fetchNotifications]);
+
+  const handlePress = async (n: AppNotification) => {
+    if (!n.isRead) {
+      try {
+        await http.post('/users/notifications/read', { notificationIds: [n.id] });
+        setNotifications((prev) =>
+          prev.map((x) => (x.id === n.id ? { ...x, isRead: true } : x))
+        );
+      } catch {}
     }
+    navigation.navigate('AppStack_NotificationDetailScreen', { notificationId: n.id });
   };
 
-  const markAllAsRead = async () => {
-    if (isMarkingAllRead) return;
-
-    try {
-      setIsMarkingAllRead(true);
-      await http.post('/users/notifications/read-all');
-      setNotifications(prev => prev.map(notif => ({ ...notif, isRead: true })));
-      setUnreadCount(0);
-    } catch (error) {
-      console.error('Error marking all notifications as read:', error);
-    } finally {
-      setIsMarkingAllRead(false);
-    }
-  };
-
-  const handleNotificationPress = async (notification: Notification) => {
-    // Mark as read if unread
-    if (!notification.isRead) {
-      await markAsRead([notification.id]);
-    }
-
-    // Handle navigation based on notification type
-    if (notification.data) {
-      const data = typeof notification.data === 'string' ? JSON.parse(notification.data) : notification.data;
-      const eventType = data.eventType || notification.type;
-      
-      console.log('📬 Notification pressed:', { eventType, data });
-
-      let dateParam: string;
-      
-      // If notification has startTime in data, use it directly
-      if (data.startTime) {
-        const meetingDate = new Date(data.startTime);
-        const year = meetingDate.getFullYear();
-        const month = String(meetingDate.getMonth() + 1).padStart(2, '0');
-        const day = String(meetingDate.getDate()).padStart(2, '0');
-        dateParam = `${year}-${month}-${day}`;
-        console.log('📅 Extracted date from startTime:', { startTime: data.startTime, dateParam });
-      } 
-      // If no startTime but we have momentRequestId, fetch the meeting to get the date
-      else if (data.momentRequestId) {
-        console.log('📅 No startTime in notification, fetching meeting details for:', data.momentRequestId);
-        
-        try {
-          // Fetch both received and sent requests to find the meeting
-          const [receivedRes, sentRes] = await Promise.all([
-            http.get('/users/moment-requests/received'),
-            http.get('/users/moment-requests/sent'),
-          ]);
-
-          const allRequests = [
-            ...(receivedRes.data.requests || []),
-            ...(sentRes.data.requests || []),
-          ];
-
-          // Find the specific meeting
-          const meeting = allRequests.find((req: any) => req.id === data.momentRequestId);
-          
-          if (meeting && meeting.startTime) {
-            const meetingDate = new Date(meeting.startTime);
-            const year = meetingDate.getFullYear();
-            const month = String(meetingDate.getMonth() + 1).padStart(2, '0');
-            const day = String(meetingDate.getDate()).padStart(2, '0');
-            dateParam = `${year}-${month}-${day}`;
-            console.log('📅 Fetched meeting date:', { startTime: meeting.startTime, dateParam });
-          } else {
-            console.warn('📅 Meeting not found or has no startTime, using today');
-            dateParam = new Date().toISOString().split('T')[0];
-          }
-        } catch (error) {
-          console.error('📅 Error fetching meeting details:', error);
-          dateParam = new Date().toISOString().split('T')[0];
-        }
-      } 
-      // Fallback to today if no date info available
-      else {
-        dateParam = new Date().toISOString().split('T')[0];
-        console.log('📅 No date info available, using today:', dateParam);
-      }
-
-      // Navigate to DateDetailScreen with the date and momentRequestId
-      console.log('🚀 Navigating to DateDetailScreen with:', { date: dateParam, momentRequestId: data.momentRequestId });
-      
-      navigation.navigate('AppStack_DateDetailScreen', {
-        date: dateParam,
-        momentRequestId: data.momentRequestId
-      });
-    }
-  };
-
-  const formatTime = (dateString: string) => {
-    const date = new Date(dateString);
-    const now = new Date();
-    const diff = now.getTime() - date.getTime();
-    const minutes = Math.floor(diff / 60000);
-    const hours = Math.floor(diff / 3600000);
-    const days = Math.floor(diff / 86400000);
-
-    if (minutes < 1) return 'Just now';
-    if (minutes < 60) return `${minutes}m ago`;
-    if (hours < 24) return `${hours}h ago`;
-    if (days < 7) return `${days}d ago`;
-
-    return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-  };
-
-  const getNotificationIcon = (type: string) => {
-    switch (type) {
-      case 'moment_request_created':
-        return <Text style={{ fontSize: moderateScale(22.5) }}>📅</Text>;
-      case 'moment_request_accepted':
-        return <Text style={{ fontSize: moderateScale(22.5) }}>✅</Text>;
-      case 'moment_request_rejected':
-        return <Text style={{ fontSize: moderateScale(22.5) }}>❌</Text>;
-      case 'moment_request_canceled':
-        return <Text style={{ fontSize: moderateScale(22.5) }}>🚫</Text>;
-      case 'moment_request_rescheduled':
-        return <Text style={{ fontSize: moderateScale(22.5) }}>🔄</Text>;
-      case 'meeting_reminder':
-        return <Text style={{ fontSize: moderateScale(22.5) }}>⏰</Text>;
-      default:
-        return <Image source={BellRinging} style={{ width: moderateScale(22.5), height: moderateScale(22.5) }} resizeMode="contain" />;
-    }
-  };
+  const groups = groupNotifications(notifications);
 
   return (
-    <View style={tw`flex-1 bg-white`}>
+    <View style={[tw`flex-1`, { backgroundColor: colors.pageBg }]}>
       {/* Header */}
-      <View style={[tw`border-b border-gray-200`, { marginTop: verticalScale(45), paddingBottom: verticalScale(15), paddingHorizontal: '4%' }]}>
-        <View style={tw`flex-row justify-between items-center`}>
-          <TouchableOpacity
-            onPress={() => navigation.goBack()}
-            activeOpacity={0.7}
-            style={[tw`items-center justify-center`, { width: horizontalScale(37.5), height: horizontalScale(37.5) }]}
-          >
-            <Text style={[tw``, { fontSize: moderateScale(22.5) }]}>←</Text>
-          </TouchableOpacity>
-          <Text style={[tw`text-black font-bold font-dm flex-1 text-center`, { fontSize: moderateScale(18.75) }]}>
+      <View
+        style={[
+          tw`flex-row items-center`,
+          { marginTop: verticalScale(55), paddingHorizontal: '8%', marginBottom: verticalScale(16) },
+        ]}>
+        <TouchableOpacity onPress={() => navigation.goBack()} activeOpacity={0.7}>
+          <Image source={BackArrow} style={{ width: horizontalScale(24), height: horizontalScale(24) }} resizeMode="contain" />
+        </TouchableOpacity>
+        <View style={tw`flex-1 items-center`}>
+          <Text style={[tw`font-dm font-bold`, { color: colors.ink, fontSize: moderateScale(18.75) }]}>
             Notifications
           </Text>
-          {unreadCount > 0 && (
-            <TouchableOpacity
-              onPress={markAllAsRead}
-              activeOpacity={0.7}
-              disabled={isMarkingAllRead}
-            >
-              {isMarkingAllRead ? (
-                <ActivityIndicator size="small" color="#A3CB31" />
-              ) : (
-                <Text style={[tw`text-[#A3CB31] font-dm`, { fontSize: moderateScale(13) }]}>Mark all read</Text>
-              )}
-            </TouchableOpacity>
-          )}
-          {unreadCount === 0 && <View style={{ width: horizontalScale(37.5) }} />}
         </View>
+        <View style={{ width: horizontalScale(24) }} />
       </View>
 
-      {/* Notifications List */}
       {loading ? (
         <View style={tw`flex-1 items-center justify-center`}>
-          <ActivityIndicator size="large" color="#A3CB31" />
+          <ActivityIndicator size="large" color={colors.green} />
+        </View>
+      ) : notifications.length === 0 ? (
+        <View style={tw`flex-1 items-center justify-center`}>
+          <Text style={{ fontSize: moderateScale(80), marginBottom: verticalScale(8) }}>😑</Text>
+          <Text style={[tw`font-dm`, { color: colors.grey, fontSize: moderateScale(16) }]}>
+            No notifications yet
+          </Text>
         </View>
       ) : (
         <ScrollView
           style={tw`flex-1`}
-          contentContainerStyle={{ paddingBottom: verticalScale(22.5) }}
+          contentContainerStyle={{ paddingHorizontal: '8%', paddingBottom: verticalScale(40) }}
           showsVerticalScrollIndicator={false}
-          refreshControl={
-            <RefreshControl
-              refreshing={refreshing}
-              onRefresh={handleRefresh}
-              tintColor="#A3CB31"
-            />
-          }
-        >
-          {notifications.length === 0 ? (
-            <View style={[tw`flex-1 items-center justify-center`, { paddingVertical: verticalScale(75) }]}>
-              <Image source={BellIcon} style={{ width: moderateScale(56), height: moderateScale(56), marginBottom: verticalScale(15) }} resizeMode="contain" />
-              <Text style={[tw`text-grey font-dm`, { fontSize: moderateScale(15) }]}>No notifications yet</Text>
-            </View>
-          ) : (
-            notifications.map((notification) => (
-              <TouchableOpacity
-                key={notification.id}
-                style={[tw`flex-row items-start border-b border-gray-100 ${!notification.isRead ? 'bg-[#A3CB31]/5' : ''
-                  }`, { paddingHorizontal: horizontalScale(22.5), paddingVertical: verticalScale(15) }]}
-                activeOpacity={0.7}
-                onPress={() => handleNotificationPress(notification)}
-              >
-                {/* Icon */}
-                <View style={[tw`rounded-full bg-gray-200 items-center justify-center`, { width: horizontalScale(45), height: horizontalScale(45), marginRight: horizontalScale(15) }]}>
-                  {getNotificationIcon(notification.type)}
-                </View>
+          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.green} />}>
+          {groups.map((group) => (
+            <View key={group.label}>
+              <Text
+                style={[
+                  tw`font-dm`,
+                  {
+                    color: colors.grey,
+                    fontSize: moderateScale(13),
+                    marginBottom: verticalScale(8),
+                    marginTop: verticalScale(4),
+                  },
+                ]}>
+                {group.label}
+              </Text>
+              {group.items.map((n) => {
+                const { icon, bg, positive } = getNotifIconMeta(n.type);
+                return (
+                  <TouchableOpacity
+                    key={n.id}
+                    activeOpacity={0.7}
+                    onPress={() => handlePress(n)}
+                    style={[
+                      tw`flex-row items-center rounded-2xl`,
+                      {
+                        backgroundColor: colors.card,
+                        padding: horizontalScale(14),
+                        marginBottom: verticalScale(8),
+                      },
+                    ]}>
+                    {/* Icon circle */}
+                    <View
+                      style={[
+                        tw`rounded-full items-center justify-center`,
+                        {
+                          width: horizontalScale(42),
+                          height: horizontalScale(42),
+                          backgroundColor: bg,
+                          marginRight: horizontalScale(12),
+                        },
+                      ]}>
+                      <Image
+                        source={icon}
+                        tintColor={positive ? colors.green : colors.grey}
+                        style={{ width: horizontalScale(20), height: horizontalScale(20) }}
+                        resizeMode="contain"
+                      />
+                    </View>
 
-                {/* Content */}
-                <View style={tw`flex-1`}>
-                  <View style={[tw`flex-row items-start justify-between`, { marginBottom: verticalScale(3.75) }]}>
-                    <Text style={[tw`text-black font-bold font-dm flex-1`, { fontSize: moderateScale(13), paddingRight: horizontalScale(7.5) }]}>
-                      {notification.title}
-                    </Text>
-                    {!notification.isRead && (
-                      <View style={[tw`rounded-full bg-[#A3CB31]`, { width: horizontalScale(7.5), height: horizontalScale(7.5), marginTop: verticalScale(3.75) }]} />
+                    {/* Content */}
+                    <View style={tw`flex-1`}>
+                      <Text
+                        numberOfLines={1}
+                        style={[tw`font-dm font-bold`, { color: colors.ink, fontSize: moderateScale(13.5) }]}>
+                        {n.title}
+                      </Text>
+                      <Text style={[tw`font-dm`, { color: colors.grey, fontSize: moderateScale(12) }]}>
+                        {formatNotifTime(n.createdAt)}
+                      </Text>
+                    </View>
+
+                    {/* Unread dot */}
+                    {!n.isRead && (
+                      <View
+                        style={[
+                          tw`rounded-full`,
+                          { width: horizontalScale(8), height: horizontalScale(8), backgroundColor: colors.green, marginLeft: horizontalScale(8) },
+                        ]}
+                      />
                     )}
-                  </View>
-                  <Text style={[tw`text-grey font-dm`, { fontSize: moderateScale(13), marginBottom: verticalScale(7.5) }]}>
-                    {notification.body}
-                  </Text>
-                  <Text style={[tw`text-grey font-dm`, { fontSize: moderateScale(11) }]}>
-                    {formatTime(notification.createdAt)}
-                  </Text>
-                </View>
-              </TouchableOpacity>
-            ))
-          )}
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+          ))}
         </ScrollView>
       )}
     </View>
@@ -284,4 +259,3 @@ const AppStack_NotificationScreen: React.FC<Props> = ({ navigation }) => {
 };
 
 export default AppStack_NotificationScreen;
-

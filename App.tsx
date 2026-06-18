@@ -4,6 +4,8 @@ import '~/services/backgroundTaskService';
 import { useCallback, useEffect, useState } from 'react';
 import { View, Alert, Platform } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
+import { useFonts } from 'expo-font';
+import { Inter_400Regular, Inter_700Bold } from '@expo-google-fonts/inter';
 import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as SplashScreen from 'expo-splash-screen';
 import * as Contacts from 'expo-contacts';
@@ -29,6 +31,10 @@ SplashScreen.preventAutoHideAsync(); // Keep native splash visible until app is 
 
 export default function App() {
   useDeviceContext(tw);
+  const [fontsLoaded, fontError] = useFonts({
+    Inter_400Regular,
+    Inter_700Bold,
+  });
   const [appIsReady, setAppIsReady] = useState(false);
   const [__, setUser] = useAtom(userAtom);
   console.log({ __ });
@@ -302,13 +308,13 @@ export default function App() {
   }, []);
 
   const onLayoutRootView = useCallback(async () => {
-    if (appIsReady) {
+    if (appIsReady && (fontsLoaded || fontError)) {
       // Hide the native splash screen once app is ready
       await SplashScreen.hideAsync();
     }
-  }, [appIsReady]);
+  }, [appIsReady, fontError, fontsLoaded]);
 
-  if (!appIsReady) {
+  if (!appIsReady || (!fontsLoaded && !fontError)) {
     // Native splash is still showing while app initializes
     return null;
   }

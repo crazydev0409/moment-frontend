@@ -1,7 +1,6 @@
 import axios from 'axios';
 
-const apiBaseUrl = process.env.EXPO_PUBLIC_API_BASE_URL || 'https://moment-mvp.gissage.org/api';
-
+const apiBaseUrl = process.env.EXPO_PUBLIC_API_BASE_URL;
 export const http = axios.create({
   baseURL: apiBaseUrl,
   headers: {

@@ -1,604 +1,224 @@
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useCallback, useState } from 'react';
 import {
   Alert,
-  ActivityIndicator,
-  View,
-  Text,
-  TextInput,
-  TouchableOpacity,
   Image,
-  KeyboardAvoidingView,
   ScrollView,
-  Platform,
+  Text,
+  TouchableOpacity,
+  View,
 } from 'react-native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { useFocusEffect } from '@react-navigation/native';
-import DateTimePicker from '@react-native-community/datetimepicker';
-import QRCode from 'react-native-qrcode-svg';
-import tw from '~/tailwindcss';
-import Toast from '~/components/Toast';
-import { AppStackParamList } from '.';
 import { useAtom } from 'jotai';
-import { userAtom } from '../../store';
-import { BackArrow, Background, Avatar, Settings } from '~/lib/images';
+
+import tw from '~/tailwindcss';
+import { AppStackParamList } from '.';
+import {
+  BackArrow,
+  Avatar,
+  QRIcon,
+  UserSettingsIcon,
+  ThemeIcon,
+  NotificationsIcon,
+  SecurityIcon,
+  PayIcon,
+  CalendarGearIcon,
+  BrainIcon,
+  LogOutIcon,
+} from '~/lib/images';
 import { http } from '~/helpers/http';
 import { horizontalScale, verticalScale, moderateScale } from '~/helpers/responsive';
+import { colors } from '~/lib/theme';
+import { userAtom } from '../../store';
+import Toast from '~/components/Toast';
 
 type Props = NativeStackScreenProps<AppStackParamList, 'AppStack_ProfileScreen'>;
 
-const AppStack_ProfileScreen: React.FC<Props> = ({ navigation, route }) => {
-  const [name, setName] = useState('');
-  const [bio, setBio] = useState('');
-  const [birthday, setBirthday] = useState<Date | null>(new Date(1986, 7, 18)); // Default: 18.08.1986
-  const [showBirthdayPicker, setShowBirthdayPicker] = useState(false);
-  const [email, setEmail] = useState('mail@mail.com');
-  const [confirmEmail, setConfirmEmail] = useState('mail@mail.com');
-  const [nameError, setNameError] = useState('');
-  const [birthdayError, setBirthdayError] = useState('');
-  const [emailError, setEmailError] = useState('');
-  const [confirmEmailError, setConfirmEmailError] = useState('');
-  const [showToast, setShowToast] = useState(false);
-  const [isSaving, setIsSaving] = useState(false);
-  const [user, setUser] = useAtom(userAtom);
+interface MenuItem {
+  icon: number;
+  label: string;
+  onPress: () => void;
+}
 
-  // Fetch and update user profile
-  const fetchUserProfile = useCallback(async () => {
+const APP_VERSION = '1.86';
+
+const AppStack_ProfileScreen: React.FC<Props> = ({ navigation }) => {
+  const [user, setUser] = useAtom(userAtom);
+  const [showLogoutToast, setShowLogoutToast] = useState(false);
+
+  const fetchProfile = useCallback(async () => {
     try {
-      const response = await http.get('/users/profile');
-      if (response.data) {
-        setUser(response.data);
-        // Update local state with fetched data
-        if (response.data.name) setName(response.data.name);
-        if (response.data.email) {
-          setEmail(response.data.email);
-          setConfirmEmail(response.data.email);
-        }
-        if (response.data.bio) setBio(response.data.bio);
-        if (response.data.birthday) {
-          setBirthday(new Date(response.data.birthday));
-        }
-      }
-    } catch (error) {
-      console.error('Error fetching user profile:', error);
-    }
+      const res = await http.get('/users/profile');
+      if (res.data) setUser(res.data);
+    } catch {}
   }, [setUser]);
 
-  // Fetch profile on mount and when screen comes into focus
-  useEffect(() => {
-    fetchUserProfile();
-  }, [fetchUserProfile]);
+  useFocusEffect(useCallback(() => { fetchProfile(); }, [fetchProfile]));
 
-  useFocusEffect(
-    useCallback(() => {
-      fetchUserProfile();
-    }, [fetchUserProfile])
-  );
-  const navigateToMainPage = () => {
-    navigation.navigate('AppStack_HomePageScreen');
-  };
-  const navigateToPlanPage = () => {
-    let valid = true;
-
-    // Reset before validating
-    setNameError('');
-    setBirthdayError('');
-    setEmailError('');
-    setConfirmEmailError('');
-
-    // --- Name required ---
-    if (!name.trim()) {
-      setNameError('Name is required.');
-      valid = false;
-    }
-
-    // --- Birthday required ---
-    if (!birthday) {
-      setBirthdayError('Birthday is required.');
-      valid = false;
-    }
-
-    // --- Email required ---
-    if (!email.trim()) {
-      setEmailError('Email is required.');
-      valid = false;
-    }
-
-    // Email format check
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (email && !emailRegex.test(email)) {
-      setEmailError('Please enter a valid email address.');
-      valid = false;
-    }
-
-    // --- Confirm Email required ---
-    if (!confirmEmail.trim()) {
-      setConfirmEmailError('Confirm Email is required.');
-      valid = false;
-    }
-
-    // Emails must match
-    if (email && confirmEmail && email !== confirmEmail) {
-      setConfirmEmailError('Emails do not match.');
-      valid = false;
-    }
-
-    if (!valid) return;
-    if (isSaving) return;
-
-    const payload = {
-      name,
-      bio,
-      email,
-      birthday,
-    };
-
-    setIsSaving(true);
-    http
-      .put('/users/profile', payload)
-      .then(async (response) => {
-        if (response.status === 200) {
-          // Fetch updated profile and update atom
-          await fetchUserProfile();
-          setShowToast(true);
-          setTimeout(() => {
-            navigation.navigate('AppStack_HomePageScreen');
-          }, 2000); // Navigate after toast is visible for 2 seconds
-        } else {
-          Alert.alert('Error', 'Failed to update profile. Please try again.');
-        }
-      })
-      .catch((error) => {
-        console.log({ error });
-        Alert.alert('Error', 'An unexpected error occurred. Please try again.');
-      })
-      .finally(() => {
-        setIsSaving(false);
-      });
+  const handleLogout = () => {
+    Alert.alert('Log Out', 'Are you sure you want to log out?', [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Log Out',
+        style: 'destructive',
+        onPress: async () => {
+          try {
+            await http.post('/auth/logout').catch(() => {});
+          } finally {
+            // Clear token and navigate to auth
+            const AsyncStorage = require('@react-native-async-storage/async-storage').default;
+            await AsyncStorage.removeItem('accessToken');
+            navigation.reset({ index: 0, routes: [{ name: 'AppStack_HomePageScreen' }] });
+          }
+        },
+      },
+    ]);
   };
 
-  const formatBirthday = (date: Date | null): string => {
-    if (!date) return '';
-    const day = date.getDate().toString().padStart(2, '0');
-    const month = (date.getMonth() + 1).toString().padStart(2, '0');
-    const year = date.getFullYear();
-    return `${day}.${month}.${year}`;
-  };
-
-  const bookingQrValue = user.id ? `catch://book/${user.id}` : '';
+  const menuItems: MenuItem[] = [
+    {
+      icon: UserSettingsIcon,
+      label: 'Profile Settings',
+      onPress: () => navigation.navigate('AppStack_ProfileSettingsScreen'),
+    },
+    {
+      icon: ThemeIcon,
+      label: 'Application theme',
+      onPress: () => Alert.alert('Coming soon', 'Theme settings are coming soon.'),
+    },
+    {
+      icon: NotificationsIcon,
+      label: 'Notifications',
+      onPress: () => navigation.navigate('AppStack_NotificationScreen'),
+    },
+    {
+      icon: SecurityIcon,
+      label: 'Account & Security',
+      onPress: () => navigation.navigate('AppStack_SettingsScreen'),
+    },
+    {
+      icon: PayIcon,
+      label: 'Payments',
+      onPress: () => Alert.alert('Coming soon', 'Payment settings are coming soon.'),
+    },
+    {
+      icon: CalendarGearIcon,
+      label: 'Calendar Settings',
+      onPress: () => navigation.navigate('AppStack_CalendarSettingsScreen'),
+    },
+    {
+      icon: BrainIcon,
+      label: 'AI Assistant',
+      onPress: () => Alert.alert('Coming soon', 'AI Assistant is coming soon.'),
+    },
+  ];
 
   return (
-    <View style={tw`flex-1 relative bg-white`}>
-      <Image source={Background} style={tw`absolute w-full h-full`} />
-      <View style={tw`absolute w-full h-full bg-black opacity-5`} />
+    <View style={[tw`flex-1`, { backgroundColor: colors.pageBg }]}>
+      {/* Header */}
+      <View
+        style={[
+          tw`flex-row items-center justify-between`,
+          { marginTop: verticalScale(55), paddingHorizontal: '8%', marginBottom: verticalScale(20) },
+        ]}>
+        <TouchableOpacity onPress={() => navigation.goBack()} activeOpacity={0.7}>
+          <Image source={BackArrow} style={{ width: horizontalScale(24), height: horizontalScale(24) }} resizeMode="contain" />
+        </TouchableOpacity>
+        <Text style={[tw`font-dm font-bold`, { color: colors.ink, fontSize: moderateScale(18.75) }]}>
+          Profile
+        </Text>
+        <TouchableOpacity onPress={() => navigation.navigate('AppStack_QRScannerScreen')} activeOpacity={0.7}>
+          <Image source={QRIcon} style={{ width: horizontalScale(24), height: horizontalScale(24) }} resizeMode="contain" />
+        </TouchableOpacity>
+      </View>
 
-      <KeyboardAvoidingView
+      <ScrollView
         style={tw`flex-1`}
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-        keyboardVerticalOffset={Platform.OS === 'ios' ? 60 : 0}>
-        <ScrollView
-          style={tw`flex-1`}
-          contentContainerStyle={{ flexGrow: 1 }}
-          keyboardShouldPersistTaps="handled"
-          showsVerticalScrollIndicator={false}>
-          <View style={{ marginTop: verticalScale(37.5), paddingHorizontal: '8%' }}>
-            {/* Header with back arrow and settings */}
+        contentContainerStyle={{ paddingHorizontal: '8%', paddingBottom: verticalScale(60) }}
+        showsVerticalScrollIndicator={false}>
+        {/* Avatar + name */}
+        <View style={[tw`items-center`, { marginBottom: verticalScale(28) }]}>
+          <TouchableOpacity
+            activeOpacity={0.8}
+            onPress={() => navigation.navigate('AppStack_ProfileSettingsScreen')}
+            style={{ position: 'relative', marginBottom: verticalScale(12) }}>
             <View
               style={[
-                tw`flex-row justify-between items-center`,
-                { marginBottom: -verticalScale(7.5) },
+                tw`rounded-full overflow-hidden items-center justify-center`,
+                { width: horizontalScale(88), height: horizontalScale(88), backgroundColor: colors.field },
               ]}>
-              <TouchableOpacity onPress={navigateToMainPage} activeOpacity={0.5}>
-                <Image
-                  source={BackArrow}
-                  style={[tw``, { width: horizontalScale(24), height: horizontalScale(24) }]}
-                  resizeMode="contain"
-                />
-              </TouchableOpacity>
-              <TouchableOpacity
-                activeOpacity={0.5}
-                onPress={() => navigation.navigate('AppStack_SettingsScreen')}>
-                <Image
-                  source={Settings}
-                  style={[tw``, { width: horizontalScale(30), height: horizontalScale(30) }]}
-                  resizeMode="contain"
-                />
-              </TouchableOpacity>
+              {(user as any)?.avatar ? (
+                <Image source={{ uri: (user as any).avatar }} style={{ width: '100%', height: '100%' }} />
+              ) : (
+                <Image source={Avatar} style={{ width: horizontalScale(52), height: horizontalScale(52) }} />
+              )}
             </View>
-
-            {/* Profile Picture */}
-            <View style={[tw`items-center`, { marginBottom: verticalScale(30) }]}>
-              <View
-                style={[
-                  tw`rounded-full bg-white items-center justify-center shadow-sm`,
-                  { width: horizontalScale(82.5), height: horizontalScale(82.5) },
-                ]}>
-                <Image
-                  source={Avatar}
-                  style={[tw``, { width: horizontalScale(75), height: horizontalScale(75) }]}
-                  resizeMode="contain"
-                />
-              </View>
-            </View>
-            {bookingQrValue ? (
-              <View
-                style={[
-                  tw`bg-white rounded-3xl items-center`,
-                  {
-                    paddingVertical: verticalScale(18.75),
-                    paddingHorizontal: horizontalScale(15),
-                    marginBottom: verticalScale(22.5),
-                  },
-                ]}>
-                <Text
-                  style={[
-                    tw`font-dm font-bold text-black`,
-                    { fontSize: moderateScale(15), marginBottom: verticalScale(6) },
-                  ]}>
-                  Booking QR
-                </Text>
-                <Text
-                  style={[
-                    tw`font-dm text-grey text-center`,
-                    { fontSize: moderateScale(11.25), marginBottom: verticalScale(12) },
-                  ]}>
-                  Anyone with Catch can scan this code to book time with you directly.
-                </Text>
-                <QRCode
-                  value={bookingQrValue}
-                  size={horizontalScale(135)}
-                  backgroundColor="white"
-                  color="black"
-                />
-              </View>
-            ) : null}
-
-            {/* Scan QR Code Button */}
-            <TouchableOpacity
-              onPress={() => navigation.navigate('AppStack_QRScannerScreen')}
-              activeOpacity={0.7}
+            <View
               style={[
-                tw`bg-black rounded-3xl flex-row items-center justify-center`,
+                tw`absolute rounded-full items-center justify-center`,
                 {
-                  paddingVertical: verticalScale(15),
-                  marginBottom: verticalScale(22.5),
+                  bottom: 2,
+                  right: 2,
+                  width: horizontalScale(22),
+                  height: horizontalScale(22),
+                  backgroundColor: colors.green,
+                  borderWidth: 2,
+                  borderColor: colors.pageBg,
                 },
               ]}>
-              <View
-                style={[
-                  tw`items-center justify-center`,
-                  {
-                    width: horizontalScale(20),
-                    height: horizontalScale(20),
-                    marginRight: horizontalScale(10),
-                  },
-                ]}>
-                <View
-                  style={[
-                    tw`absolute top-0 left-0`,
-                    {
-                      width: horizontalScale(7),
-                      height: horizontalScale(7),
-                      borderTopWidth: 2,
-                      borderLeftWidth: 2,
-                      borderColor: '#A3CB31',
-                    },
-                  ]}
-                />
-                <View
-                  style={[
-                    tw`absolute top-0 right-0`,
-                    {
-                      width: horizontalScale(7),
-                      height: horizontalScale(7),
-                      borderTopWidth: 2,
-                      borderRightWidth: 2,
-                      borderColor: '#A3CB31',
-                    },
-                  ]}
-                />
-                <View
-                  style={[
-                    tw`absolute bottom-0 left-0`,
-                    {
-                      width: horizontalScale(7),
-                      height: horizontalScale(7),
-                      borderBottomWidth: 2,
-                      borderLeftWidth: 2,
-                      borderColor: '#A3CB31',
-                    },
-                  ]}
-                />
-                <View
-                  style={[
-                    tw`absolute bottom-0 right-0`,
-                    {
-                      width: horizontalScale(7),
-                      height: horizontalScale(7),
-                      borderBottomWidth: 2,
-                      borderRightWidth: 2,
-                      borderColor: '#A3CB31',
-                    },
-                  ]}
-                />
-              </View>
-              <Text
-                style={[
-                  tw`text-white font-bold font-dm`,
-                  { fontSize: moderateScale(14) },
-                ]}>
-                Scan QR Code
-              </Text>
-            </TouchableOpacity>
-
-            <View style={tw``}>
-              <Text
-                style={[
-                  tw`text-grey`,
-                  {
-                    fontSize: moderateScale(12),
-                    lineHeight: verticalScale(19),
-                    marginBottom: verticalScale(7.5),
-                  },
-                ]}>
-                Name
-              </Text>
-              <TextInput
-                autoCapitalize="words"
-                autoCorrect={false}
-                style={[
-                  tw`bg-white rounded-full w-full self-center font-dm font-normal font-bold tracking-[0.5px]`,
-                  {
-                    height: verticalScale(51),
-                    paddingHorizontal: horizontalScale(19),
-                    fontSize: moderateScale(13),
-                  },
-                ]}
-                value={name}
-                onChangeText={(t) => {
-                  setName(t);
-                  setNameError('');
-                }}
-                placeholder="Name"
-              />
-              {nameError ? (
-                <Text
-                  style={[
-                    tw`text-red-500`,
-                    {
-                      fontSize: moderateScale(11),
-                      marginBottom: verticalScale(11),
-                      marginTop: verticalScale(11),
-                    },
-                  ]}>
-                  {nameError}
-                </Text>
-              ) : (
-                <View style={{ marginBottom: verticalScale(11), marginTop: verticalScale(11) }} />
-              )}
+              <Text style={{ color: colors.white, fontSize: moderateScale(13), fontWeight: 'bold' }}>+</Text>
             </View>
-            <View style={tw``}>
-              <Text
-                style={[
-                  tw`text-grey`,
-                  {
-                    fontSize: moderateScale(12),
-                    lineHeight: verticalScale(19),
-                    marginBottom: verticalScale(7.5),
-                  },
-                ]}>
-                BIO
-              </Text>
-              <TextInput
-                autoCapitalize="words"
-                autoCorrect={false}
-                style={[
-                  tw`bg-white rounded-full w-full self-center font-dm font-normal font-bold tracking-[0.5px]`,
-                  {
-                    height: verticalScale(51),
-                    paddingHorizontal: horizontalScale(19),
-                    fontSize: moderateScale(13),
-                  },
-                ]}
-                value={bio}
-                onChangeText={setBio}
-                placeholder="Text"
-              />
-              <View style={{ marginBottom: verticalScale(22.5) }}></View>
-            </View>
-            <View style={tw``}>
-              <Text
-                style={[
-                  tw`text-grey`,
-                  {
-                    fontSize: moderateScale(12),
-                    lineHeight: verticalScale(19),
-                    marginBottom: verticalScale(7.5),
-                  },
-                ]}>
-                Birthday
-              </Text>
+          </TouchableOpacity>
 
-              {/* Fake input container to match UI */}
-              <TouchableOpacity
-                onPress={() => setShowBirthdayPicker(true)}
-                activeOpacity={0.7}
-                style={[
-                  tw`bg-white rounded-full w-full justify-center`,
-                  {
-                    height: verticalScale(51),
-                    paddingHorizontal: horizontalScale(19),
-                  },
-                ]}>
-                <Text
-                  style={[
-                    tw`font-dm font-normal tracking-[0.5px] text-black`,
-                    { fontSize: moderateScale(13) },
-                  ]}>
-                  {birthday ? formatBirthday(birthday) : '18.08.1986'}
-                </Text>
-              </TouchableOpacity>
-
-              {showBirthdayPicker && (
-                <DateTimePicker
-                  value={birthday || new Date()}
-                  mode="date"
-                  display="spinner"
-                  onChange={(event, selectedDate) => {
-                    setShowBirthdayPicker(false);
-                    if (selectedDate) {
-                      setBirthday(selectedDate);
-                      setBirthdayError('');
-                    }
-                  }}
-                />
-              )}
-
-              {birthdayError ? (
-                <Text
-                  style={[
-                    tw`text-red-500`,
-                    {
-                      fontSize: moderateScale(11),
-                      marginBottom: verticalScale(11),
-                      marginTop: verticalScale(11),
-                    },
-                  ]}>
-                  {birthdayError}
-                </Text>
-              ) : (
-                <View style={{ marginBottom: verticalScale(11), marginTop: verticalScale(11) }} />
-              )}
-            </View>
-            <View style={tw``}>
-              <Text
-                style={[
-                  tw`text-grey`,
-                  {
-                    fontSize: moderateScale(12),
-                    lineHeight: verticalScale(19),
-                    marginBottom: verticalScale(7.5),
-                  },
-                ]}>
-                Email
-              </Text>
-              <TextInput
-                style={[
-                  tw`bg-white rounded-full w-full self-center font-dm font-normal font-bold tracking-[0.5px]`,
-                  {
-                    height: verticalScale(51),
-                    paddingHorizontal: horizontalScale(19),
-                    fontSize: moderateScale(13),
-                  },
-                ]}
-                value={email}
-                keyboardType="email-address"
-                autoCapitalize="none"
-                autoCorrect={false}
-                onChangeText={(t) => {
-                  setEmail(t);
-                  setEmailError('');
-                }}
-                placeholder="Email"
-              />
-
-              {emailError ? (
-                <Text
-                  style={[
-                    tw`text-red-500`,
-                    {
-                      fontSize: moderateScale(11),
-                      marginBottom: verticalScale(11),
-                      marginTop: verticalScale(11),
-                    },
-                  ]}>
-                  {emailError}
-                </Text>
-              ) : (
-                <View style={{ marginBottom: verticalScale(11), marginTop: verticalScale(11) }} />
-              )}
-            </View>
-            <View style={tw``}>
-              <Text
-                style={[
-                  tw`text-grey`,
-                  {
-                    fontSize: moderateScale(12),
-                    lineHeight: verticalScale(19),
-                    marginBottom: verticalScale(7.5),
-                  },
-                ]}>
-                Confirm Email
-              </Text>
-              <TextInput
-                style={[
-                  tw`bg-white rounded-full w-full self-center font-dm font-normal font-bold tracking-[0.5px]`,
-                  {
-                    height: verticalScale(51),
-                    paddingHorizontal: horizontalScale(19),
-                    fontSize: moderateScale(13),
-                  },
-                ]}
-                value={confirmEmail}
-                keyboardType="email-address"
-                autoCapitalize="none"
-                autoCorrect={false}
-                onChangeText={(t) => {
-                  setConfirmEmail(t);
-                  setConfirmEmailError('');
-                }}
-                placeholder="Confirm Email"
-              />
-
-              {confirmEmailError ? (
-                <Text
-                  style={[
-                    tw`text-red-500`,
-                    {
-                      fontSize: moderateScale(11),
-                      marginBottom: verticalScale(11),
-                      marginTop: verticalScale(11),
-                    },
-                  ]}>
-                  {confirmEmailError}
-                </Text>
-              ) : (
-                <View style={{ marginBottom: verticalScale(11), marginTop: verticalScale(11) }} />
-              )}
+          <View style={tw`flex-row items-center`}>
+            <Text style={[tw`font-dm font-bold`, { color: colors.ink, fontSize: moderateScale(20) }]}>
+              {(user as any)?.name || 'Your Name'}
+            </Text>
+            <View
+              style={[
+                tw`rounded-full items-center justify-center`,
+                { width: horizontalScale(20), height: horizontalScale(20), backgroundColor: '#2D7FF9', marginLeft: horizontalScale(6) },
+              ]}>
+              <Text style={{ color: colors.white, fontSize: moderateScale(10), fontWeight: 'bold' }}>✓</Text>
             </View>
           </View>
+        </View>
 
-          <View style={{ flex: 1 }} />
-
-          <View style={tw`w-full flex-col items-center`}>
-            <TouchableOpacity onPress={navigateToPlanPage} activeOpacity={0.7} disabled={isSaving}>
-              <View
-                style={[
-                  tw`bg-[#A3CB31] rounded-full justify-center items-center shadow-lg ${isSaving ? 'opacity-50' : ''}`,
-                  {
-                    height: verticalScale(56),
-                    width: horizontalScale(225),
-                    marginBottom: verticalScale(37.5),
-                  },
-                ]}>
-                {isSaving ? (
-                  <ActivityIndicator size="small" color="#FFFFFF" />
-                ) : (
-                  <Text style={[tw`text-white font-bold font-dm`, { fontSize: moderateScale(15) }]}>
-                    Save
-                  </Text>
-                )}
-              </View>
+        {/* Menu items */}
+        <View style={{ gap: verticalScale(8) }}>
+          {menuItems.map((item, idx) => (
+            <TouchableOpacity
+              key={idx}
+              activeOpacity={0.7}
+              onPress={item.onPress}
+              style={[
+                tw`flex-row items-center rounded-2xl`,
+                { backgroundColor: colors.card, padding: moderateScale(16) },
+              ]}>
+              <Image source={item.icon} tintColor={colors.ink} style={{ width: horizontalScale(20), height: horizontalScale(20), marginRight: horizontalScale(14) }} resizeMode="contain" />
+              <Text style={[tw`font-dm`, { color: colors.ink, fontSize: moderateScale(15) }]}>{item.label}</Text>
             </TouchableOpacity>
-          </View>
-        </ScrollView>
-      </KeyboardAvoidingView>
+          ))}
+        </View>
 
-      {/* Toast notification */}
-      <Toast
-        message="Profile has been updated successfully"
-        visible={showToast}
-        onHide={() => setShowToast(false)}
-      />
+        <Text
+          style={[
+            tw`text-center font-dm`,
+            { color: colors.greyLight, fontSize: moderateScale(13), marginTop: verticalScale(20) },
+          ]}>
+          Application version {APP_VERSION}
+        </Text>
+
+        <TouchableOpacity
+          onPress={handleLogout}
+          activeOpacity={0.7}
+          style={[tw`flex-row items-center justify-center`, { marginTop: verticalScale(16) }]}>
+          <Image source={LogOutIcon} tintColor={colors.grey} style={{ width: horizontalScale(20), height: horizontalScale(20), marginRight: horizontalScale(8) }} resizeMode="contain" />
+          <Text style={[tw`font-dm`, { color: colors.grey, fontSize: moderateScale(15) }]}>Log Out</Text>
+        </TouchableOpacity>
+      </ScrollView>
+
+      <Toast message="Logged out" visible={showLogoutToast} onHide={() => setShowLogoutToast(false)} />
     </View>
   );
 };
