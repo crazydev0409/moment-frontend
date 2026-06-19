@@ -41,7 +41,7 @@
         "EXPO_PUBLIC_GOOGLE_PLACES_API_KEY": "AIzaSyC4xWLooS8XR9tOC0V8a4SM-mgewmL5TNs"
       },
       "android": {
-        "buildType": "apk",
+        "buildType": "app-bundle",
         "autoIncrement": true
       },
       "ios": {
