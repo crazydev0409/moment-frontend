@@ -10,9 +10,10 @@ import {
 } from 'react-native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 
+import Svg, { Circle, Path } from 'react-native-svg';
 import tw from '~/tailwindcss';
 import { AppStackParamList } from '.';
-import { BackArrow, Avatar } from '~/lib/images';
+import { BackArrow, Avatar, UpcomingIcon, CalendarIcon, LocationIcon } from '~/lib/images';
 import { http } from '~/helpers/http';
 import { horizontalScale, verticalScale, moderateScale } from '~/helpers/responsive';
 import { colors } from '~/lib/theme';
@@ -35,6 +36,13 @@ interface MeetingRequest {
   receiverId: string;
   participants?: Array<{ user?: { avatar?: string | null } | null }>;
 }
+
+const GlobeIcon = ({ size = 13, color = '#6F7780' }: { size?: number; color?: string }) => (
+  <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+    <Circle cx="12" cy="12" r="9" stroke={color} strokeWidth="1.5" />
+    <Path d="M12 3C9.5 6.5 9.5 17.5 12 21M12 3C14.5 6.5 14.5 17.5 12 21M3.5 9h17M3.5 15h17" stroke={color} strokeWidth="1.5" />
+  </Svg>
+);
 
 const AppStack_MeetingHistoryScreen: React.FC<Props> = ({ navigation, route }) => {
   const { contactUserId, contactName } = route.params;
@@ -137,7 +145,7 @@ const AppStack_MeetingHistoryScreen: React.FC<Props> = ({ navigation, route }) =
                 borderColor: colors.card,
               },
             ]}>
-            <Text style={[tw`font-dm font-bold`, { fontSize: moderateScale(9), color: colors.grey }]}>+{extra}</Text>
+            <Text style={[tw`font-associate-bold`, { fontSize: moderateScale(9), color: colors.grey }]}>+{extra}</Text>
           </View>
         )}
       </View>
@@ -156,7 +164,7 @@ const AppStack_MeetingHistoryScreen: React.FC<Props> = ({ navigation, route }) =
           <Image source={BackArrow} style={{ width: horizontalScale(24), height: horizontalScale(24) }} resizeMode="contain" />
         </TouchableOpacity>
         <View style={tw`flex-1 items-center`}>
-          <Text style={[tw`font-dm font-bold`, { color: colors.ink, fontSize: moderateScale(18.75) }]}>
+          <Text style={[tw`font-associate-bold`, { color: colors.ink, fontSize: moderateScale(18.75) }]}>
             Meeting history
           </Text>
         </View>
@@ -175,7 +183,7 @@ const AppStack_MeetingHistoryScreen: React.FC<Props> = ({ navigation, route }) =
           refreshControl={<RefreshControl refreshing={isRefreshing} onRefresh={onRefresh} tintColor={colors.green} />}>
           {pastMeetings.length === 0 ? (
             <View style={{ paddingTop: verticalScale(60), alignItems: 'center' }}>
-              <Text style={[tw`font-dm`, { color: colors.grey, fontSize: moderateScale(14) }]}>
+              <Text style={[tw`font-associate`, { color: colors.grey, fontSize: moderateScale(14) }]}>
                 No past meetings with {contactName}
               </Text>
             </View>
@@ -199,32 +207,29 @@ const AppStack_MeetingHistoryScreen: React.FC<Props> = ({ navigation, route }) =
                   ]}>
                   <Text
                     style={[
-                      tw`font-dm font-bold`,
+                      tw`font-associate-bold`,
                       { color: m.isPaid ? colors.white : colors.greenText, fontSize: moderateScale(12) },
                     ]}>
                     {m.isPaid ? formatPrice(m.priceCents, m.currency) : 'Free'}
                   </Text>
                 </View>
 
-                <Text style={[tw`font-dm font-bold`, { color: colors.ink, fontSize: moderateScale(17) }]}>
+                <Text style={[tw`font-associate-bold`, { color: colors.ink, fontSize: moderateScale(17) }]}>
                   {m.title}
                 </Text>
 
-                <View style={{ marginTop: verticalScale(8) }}>
-                  <Text style={[tw`font-dm`, { color: colors.grey, fontSize: moderateScale(12.5) }]}>
-                    🕐 {formatTimeRange(m.startTime, m.endTime)}
-                  </Text>
-                  <Text style={[tw`font-dm`, { color: colors.grey, fontSize: moderateScale(12.5) }]}>
-                    📅 {formatDate(m.startTime)}
-                  </Text>
-                  <Text style={[tw`font-dm`, { color: colors.grey, fontSize: moderateScale(12.5) }]}>
-                    🌐 {m.locationType === 'in_person' ? 'In-person' : 'Remote'}
-                  </Text>
-                  {m.locationLabel && (
-                    <Text style={[tw`font-dm`, { color: colors.grey, fontSize: moderateScale(12.5) }]}>
-                      📍 {m.locationLabel}
-                    </Text>
-                  )}
+                <View style={{ marginTop: verticalScale(8), gap: verticalScale(4) }}>
+                  {[
+                    { icon: <Image source={UpcomingIcon} style={{ width: horizontalScale(13), height: horizontalScale(13) }} tintColor={colors.grey} />, label: formatTimeRange(m.startTime, m.endTime) },
+                    { icon: <Image source={CalendarIcon} style={{ width: horizontalScale(13), height: horizontalScale(13) }} tintColor={colors.grey} />, label: formatDate(m.startTime) },
+                    { icon: <GlobeIcon size={horizontalScale(13)} color={colors.grey} />, label: m.locationType === 'in_person' ? 'In-person' : 'Remote' },
+                    ...(m.locationLabel ? [{ icon: <Image source={LocationIcon} style={{ width: horizontalScale(13), height: horizontalScale(13) }} tintColor={colors.grey} />, label: m.locationLabel }] : []),
+                  ].map((row, i) => (
+                    <View key={i} style={{ flexDirection: 'row', alignItems: 'center', gap: horizontalScale(6) }}>
+                      {row.icon}
+                      <Text style={[tw`font-associate`, { color: colors.grey, fontSize: moderateScale(12.5) }]}>{row.label}</Text>
+                    </View>
+                  ))}
                 </View>
 
                 <View style={{ marginTop: verticalScale(10) }}>

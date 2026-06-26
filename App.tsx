@@ -32,6 +32,13 @@ SplashScreen.preventAutoHideAsync(); // Keep native splash visible until app is 
 export default function App() {
   useDeviceContext(tw);
   const [fontsLoaded, fontError] = useFonts({
+    AssociateSansRegular: require('./assets/fonts/AssociateSansRegular.otf'),
+    AssociateSansBold: require('./assets/fonts/AssociateSansBold.otf'),
+    AssociateSansMedium: require('./assets/fonts/AssociateSansMedium.otf'),
+    AssociateSansLight: require('./assets/fonts/AssociateSansLight.otf'),
+    AssociateSansExtralight: require('./assets/fonts/AssociateSansExtralight.otf'),
+    AssociateSansRegularItalic: require('./assets/fonts/AssociateSansRegularItalic.otf'),
+    AssociateSansBoldItalic: require('./assets/fonts/AssociateSansBoldItalic.otf'),
     Inter_400Regular,
     Inter_700Bold,
   });

@@ -8,6 +8,7 @@ import {
   ScrollView,
   Alert,
   ActivityIndicator,
+  Modal,
 } from 'react-native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -20,6 +21,7 @@ import { useAtom } from 'jotai';
 import { userAtom } from '../../store';
 import { navigationRef } from '~/index';
 import { horizontalScale, verticalScale, moderateScale } from '~/helpers/responsive';
+import { colors } from '~/lib/theme';
 
 type Props = NativeStackScreenProps<AppStackParamList, 'AppStack_SettingsScreen'>;
 
@@ -31,6 +33,8 @@ const AppStack_SettingsScreen: React.FC<Props> = ({ navigation, route }) => {
   const [mailNotifications, setMailNotifications] = useState(true);
   const [isLoggingOut, setIsLoggingOut] = useState(false);
   const [isDeletingAccount, setIsDeletingAccount] = useState(false);
+  const [showLogoutModal, setShowLogoutModal] = useState(false);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [, setUser] = useAtom(userAtom);
 
   const resetUserAtom = () => {
@@ -68,146 +72,60 @@ const AppStack_SettingsScreen: React.FC<Props> = ({ navigation, route }) => {
     }
   };
 
-  const handleLogout = async () => {
-    Alert.alert('Logout', 'Are you sure you want to logout?', [
-      {
-        text: 'Cancel',
-        style: 'cancel',
-      },
-      {
-        text: 'Logout',
-        style: 'destructive',
-        onPress: async () => {
-          setIsLoggingOut(true);
-          try {
-            // Clear tokens from storage
-            await AsyncStorage.removeItem('accessToken');
-            await AsyncStorage.removeItem('refreshToken');
-
-            // Clear authorization header
-            delete http.defaults.headers.common['Authorization'];
-
-            // Disconnect socket
-            disconnectSocket();
-
-            // Clear user atom
-            resetUserAtom();
-
-            // Navigate to AuthStack - use reset to clear navigation stack
-            if (navigationRef.isReady()) {
-              navigationRef.reset({
-                index: 0,
-                routes: [{ name: 'AuthStack' }],
-              });
-            } else {
-              // If not ready, wait a bit and try again
-              setTimeout(() => {
-                if (navigationRef.isReady()) {
-                  navigationRef.reset({
-                    index: 0,
-                    routes: [{ name: 'AuthStack' }],
-                  });
-                }
-              }, 100);
-            }
-          } catch (error) {
-            console.error('Error during logout:', error);
-            // Even if there's an error, try to navigate to auth
-            resetUserAtom();
-            if (navigationRef.isReady()) {
-              navigationRef.reset({
-                index: 0,
-                routes: [{ name: 'AuthStack' }],
-              });
-            }
-          } finally {
-            setIsLoggingOut(false);
+  const doLogout = async () => {
+    setShowLogoutModal(false);
+    setIsLoggingOut(true);
+    try {
+      await AsyncStorage.removeItem('accessToken');
+      await AsyncStorage.removeItem('refreshToken');
+      delete http.defaults.headers.common['Authorization'];
+      disconnectSocket();
+      resetUserAtom();
+      if (navigationRef.isReady()) {
+        navigationRef.reset({ index: 0, routes: [{ name: 'AuthStack' }] });
+      } else {
+        setTimeout(() => {
+          if (navigationRef.isReady()) {
+            navigationRef.reset({ index: 0, routes: [{ name: 'AuthStack' }] });
           }
-        },
-      },
-    ]);
+        }, 100);
+      }
+    } catch (error) {
+      console.error('Error during logout:', error);
+      resetUserAtom();
+      if (navigationRef.isReady()) {
+        navigationRef.reset({ index: 0, routes: [{ name: 'AuthStack' }] });
+      }
+    } finally {
+      setIsLoggingOut(false);
+    }
   };
 
-  const handleDeleteAccount = async () => {
-    Alert.alert(
-      'Delete Account',
-      'Are you sure you want to delete your account? This action cannot be undone and all your data will be permanently deleted.',
-      [
-        {
-          text: 'Cancel',
-          style: 'cancel',
-        },
-        {
-          text: 'Delete',
-          style: 'destructive',
-          onPress: async () => {
-            // Second confirmation
-            Alert.alert(
-              'Final Confirmation',
-              'This will permanently delete your account and all associated data. Are you absolutely sure?',
-              [
-                {
-                  text: 'Cancel',
-                  style: 'cancel',
-                },
-                {
-                  text: 'Delete Account',
-                  style: 'destructive',
-                  onPress: async () => {
-                    setIsDeletingAccount(true);
-                    try {
-                      // Call delete account API
-                      await http.delete('/users/account');
-
-                      // Clear tokens from storage
-                      await AsyncStorage.removeItem('accessToken');
-                      await AsyncStorage.removeItem('refreshToken');
-
-                      // Clear authorization header
-                      delete http.defaults.headers.common['Authorization'];
-
-                      // Disconnect socket
-                      disconnectSocket();
-
-                      // Clear user atom
-                      resetUserAtom();
-
-                      // Navigate to AuthStack - use reset to clear navigation stack
-                      if (navigationRef.isReady()) {
-                        navigationRef.reset({
-                          index: 0,
-                          routes: [{ name: 'AuthStack' }],
-                        });
-                      } else {
-                        // If not ready, wait a bit and try again
-                        setTimeout(() => {
-                          if (navigationRef.isReady()) {
-                            navigationRef.reset({
-                              index: 0,
-                              routes: [{ name: 'AuthStack' }],
-                            });
-                          }
-                        }, 100);
-                      }
-                    } catch (error: any) {
-                      console.error('Error deleting account:', error);
-                      Alert.alert(
-                        'Error',
-                        error.response?.data?.error ||
-                          'Failed to delete account. Please try again.',
-                        [{ text: 'OK' }]
-                      );
-                    } finally {
-                      setIsDeletingAccount(false);
-                    }
-                  },
-                },
-              ]
-            );
-          },
-        },
-      ]
-    );
+  const doDeleteAccount = async () => {
+    setShowDeleteModal(false);
+    setIsDeletingAccount(true);
+    try {
+      await http.delete('/users/account');
+      await AsyncStorage.removeItem('accessToken');
+      await AsyncStorage.removeItem('refreshToken');
+      delete http.defaults.headers.common['Authorization'];
+      disconnectSocket();
+      resetUserAtom();
+      if (navigationRef.isReady()) {
+        navigationRef.reset({ index: 0, routes: [{ name: 'AuthStack' }] });
+      } else {
+        setTimeout(() => {
+          if (navigationRef.isReady()) {
+            navigationRef.reset({ index: 0, routes: [{ name: 'AuthStack' }] });
+          }
+        }, 100);
+      }
+    } catch (error: any) {
+      console.error('Error deleting account:', error);
+      Alert.alert('Error', error.response?.data?.error || 'Failed to delete account. Please try again.');
+    } finally {
+      setIsDeletingAccount(false);
+    }
   };
 
   return (
@@ -238,7 +156,7 @@ const AppStack_SettingsScreen: React.FC<Props> = ({ navigation, route }) => {
             </TouchableOpacity>
             <Text
               style={[
-                tw`font-bold font-dm text-black flex-1 text-center`,
+                tw`font-associate-bold text-black flex-1 text-center`,
                 { fontSize: moderateScale(22.5) },
               ]}>
               Settings
@@ -249,13 +167,12 @@ const AppStack_SettingsScreen: React.FC<Props> = ({ navigation, route }) => {
           <View style={{ marginBottom: verticalScale(22.5) }}>
             <Text
               style={[
-                tw`font-bold font-dm text-black`,
+                tw`font-associate-bold text-black`,
                 { fontSize: moderateScale(16.875), marginBottom: verticalScale(11.25) },
               ]}>
               Application theme
             </Text>
             <View style={tw`bg-white rounded-2xl overflow-hidden`}>
-              {/* Light */}
               <TouchableOpacity
                 style={[
                   tw`flex-row items-center justify-between border-b border-gray-100`,
@@ -263,7 +180,7 @@ const AppStack_SettingsScreen: React.FC<Props> = ({ navigation, route }) => {
                 ]}
                 activeOpacity={0.7}
                 onPress={() => handleThemeChange('light')}>
-                <Text style={[tw`font-dm text-black`, { fontSize: moderateScale(15) }]}>Light</Text>
+                <Text style={[tw`font-associate text-black`, { fontSize: moderateScale(15) }]}>Light</Text>
                 <Switch
                   value={lightTheme}
                   onValueChange={() => handleThemeChange('light')}
@@ -273,7 +190,6 @@ const AppStack_SettingsScreen: React.FC<Props> = ({ navigation, route }) => {
                 />
               </TouchableOpacity>
 
-              {/* Dark */}
               <TouchableOpacity
                 style={[
                   tw`flex-row items-center justify-between border-b border-gray-100`,
@@ -281,7 +197,7 @@ const AppStack_SettingsScreen: React.FC<Props> = ({ navigation, route }) => {
                 ]}
                 activeOpacity={0.7}
                 onPress={() => handleThemeChange('dark')}>
-                <Text style={[tw`font-dm text-black`, { fontSize: moderateScale(15) }]}>Dark</Text>
+                <Text style={[tw`font-associate text-black`, { fontSize: moderateScale(15) }]}>Dark</Text>
                 <Switch
                   value={darkTheme}
                   onValueChange={() => handleThemeChange('dark')}
@@ -291,7 +207,6 @@ const AppStack_SettingsScreen: React.FC<Props> = ({ navigation, route }) => {
                 />
               </TouchableOpacity>
 
-              {/* Automatically */}
               <TouchableOpacity
                 style={[
                   tw`flex-row items-center justify-between`,
@@ -299,7 +214,7 @@ const AppStack_SettingsScreen: React.FC<Props> = ({ navigation, route }) => {
                 ]}
                 activeOpacity={0.7}
                 onPress={() => handleThemeChange('auto')}>
-                <Text style={[tw`font-dm text-black`, { fontSize: moderateScale(15) }]}>
+                <Text style={[tw`font-associate text-black`, { fontSize: moderateScale(15) }]}>
                   Automatically
                 </Text>
                 <Switch
@@ -317,13 +232,12 @@ const AppStack_SettingsScreen: React.FC<Props> = ({ navigation, route }) => {
           <View style={{ marginBottom: verticalScale(22.5) }}>
             <Text
               style={[
-                tw`font-bold font-dm text-black`,
+                tw`font-associate-bold text-black`,
                 { fontSize: moderateScale(16.875), marginBottom: verticalScale(11.25) },
               ]}>
               Notifications
             </Text>
             <View style={tw`bg-white rounded-2xl overflow-hidden`}>
-              {/* Notifications in the system */}
               <TouchableOpacity
                 style={[
                   tw`flex-row items-center justify-between border-b border-gray-100`,
@@ -331,7 +245,7 @@ const AppStack_SettingsScreen: React.FC<Props> = ({ navigation, route }) => {
                 ]}
                 activeOpacity={0.7}
                 onPress={() => setSystemNotifications(!systemNotifications)}>
-                <Text style={[tw`font-dm text-black`, { fontSize: moderateScale(15) }]}>
+                <Text style={[tw`font-associate text-black`, { fontSize: moderateScale(15) }]}>
                   Notifications in the system
                 </Text>
                 <Switch
@@ -343,7 +257,6 @@ const AppStack_SettingsScreen: React.FC<Props> = ({ navigation, route }) => {
                 />
               </TouchableOpacity>
 
-              {/* Notifications by mail */}
               <TouchableOpacity
                 style={[
                   tw`flex-row items-center justify-between`,
@@ -351,7 +264,7 @@ const AppStack_SettingsScreen: React.FC<Props> = ({ navigation, route }) => {
                 ]}
                 activeOpacity={0.7}
                 onPress={() => setMailNotifications(!mailNotifications)}>
-                <Text style={[tw`font-dm text-black`, { fontSize: moderateScale(15) }]}>
+                <Text style={[tw`font-associate text-black`, { fontSize: moderateScale(15) }]}>
                   Notifications by mail
                 </Text>
                 <Switch
@@ -367,24 +280,24 @@ const AppStack_SettingsScreen: React.FC<Props> = ({ navigation, route }) => {
 
           {/* Application Version */}
           <View style={[tw`items-center`, { marginTop: verticalScale(15) }]}>
-            <Text style={[tw`font-dm text-grey`, { fontSize: moderateScale(13.125) }]}>
+            <Text style={[tw`font-associate text-grey`, { fontSize: moderateScale(13.125) }]}>
               Application version 1.86
             </Text>
           </View>
 
-          {/* Logout Section */}
+          {/* Logout */}
           <View style={{ marginTop: verticalScale(30) }}>
             <TouchableOpacity
               style={tw`bg-white rounded-2xl overflow-hidden`}
               activeOpacity={0.7}
-              onPress={handleLogout}
+              onPress={() => setShowLogoutModal(true)}
               disabled={isLoggingOut || isDeletingAccount}>
               <View
                 style={[
                   tw`flex-row items-center justify-between`,
                   { paddingHorizontal: horizontalScale(18.75), paddingVertical: verticalScale(15) },
                 ]}>
-                <Text style={[tw`font-dm text-black`, { fontSize: moderateScale(15) }]}>
+                <Text style={[tw`font-associate text-black`, { fontSize: moderateScale(15) }]}>
                   Logout
                 </Text>
                 {isLoggingOut ? <ActivityIndicator size="small" color="#000000" /> : null}
@@ -392,19 +305,19 @@ const AppStack_SettingsScreen: React.FC<Props> = ({ navigation, route }) => {
             </TouchableOpacity>
           </View>
 
-          {/* Delete Account Section */}
+          {/* Delete Account */}
           <View style={{ marginTop: verticalScale(15), marginBottom: verticalScale(30) }}>
             <TouchableOpacity
               style={tw`bg-white rounded-2xl overflow-hidden border border-red-500`}
               activeOpacity={0.7}
-              onPress={handleDeleteAccount}
+              onPress={() => setShowDeleteModal(true)}
               disabled={isLoggingOut || isDeletingAccount}>
               <View
                 style={[
                   tw`flex-row items-center justify-between`,
                   { paddingHorizontal: horizontalScale(18.75), paddingVertical: verticalScale(15) },
                 ]}>
-                <Text style={[tw`font-dm text-red-500`, { fontSize: moderateScale(15) }]}>
+                <Text style={[tw`font-associate text-red-500`, { fontSize: moderateScale(15) }]}>
                   Delete Account
                 </Text>
                 {isDeletingAccount ? <ActivityIndicator size="small" color="#EF4444" /> : null}
@@ -414,6 +327,115 @@ const AppStack_SettingsScreen: React.FC<Props> = ({ navigation, route }) => {
         </View>
       </ScrollView>
 
+      {/* Log out modal */}
+      <Modal visible={showLogoutModal} transparent animationType="fade">
+        <View style={[tw`flex-1 items-center justify-center`, { backgroundColor: 'rgba(0,0,0,0.45)' }]}>
+          <View
+            style={[
+              tw`rounded-3xl`,
+              {
+                backgroundColor: colors.card,
+                padding: moderateScale(24),
+                marginHorizontal: '8%',
+                width: '84%',
+              },
+            ]}>
+            <Text
+              style={[
+                tw`font-associate-bold text-center`,
+                { color: colors.ink, fontSize: moderateScale(20), marginBottom: verticalScale(8) },
+              ]}>
+              Log out?
+            </Text>
+            <Text
+              style={[
+                tw`font-associate text-center`,
+                { color: colors.grey, fontSize: moderateScale(14), marginBottom: verticalScale(24) },
+              ]}>
+              You'll need to sign in again to access your account.
+            </Text>
+            <View style={[tw`flex-row`, { gap: horizontalScale(12) }]}>
+              <TouchableOpacity
+                onPress={() => setShowLogoutModal(false)}
+                activeOpacity={0.7}
+                style={[
+                  tw`flex-1 rounded-full items-center`,
+                  { borderWidth: 1.5, borderColor: colors.border, paddingVertical: verticalScale(14) },
+                ]}>
+                <Text style={[tw`font-associate-bold`, { color: colors.ink, fontSize: moderateScale(15) }]}>
+                  Cancel
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                onPress={doLogout}
+                activeOpacity={0.7}
+                style={[
+                  tw`flex-1 rounded-full items-center`,
+                  { backgroundColor: colors.ink, paddingVertical: verticalScale(14) },
+                ]}>
+                <Text style={[tw`font-associate-bold`, { color: colors.white, fontSize: moderateScale(15) }]}>
+                  Log Out
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Delete account modal */}
+      <Modal visible={showDeleteModal} transparent animationType="fade">
+        <View style={[tw`flex-1 items-center justify-center`, { backgroundColor: 'rgba(0,0,0,0.45)' }]}>
+          <View
+            style={[
+              tw`rounded-3xl`,
+              {
+                backgroundColor: colors.card,
+                padding: moderateScale(24),
+                marginHorizontal: '8%',
+                width: '84%',
+              },
+            ]}>
+            <Text
+              style={[
+                tw`font-associate-bold text-center`,
+                { color: colors.ink, fontSize: moderateScale(20), marginBottom: verticalScale(8) },
+              ]}>
+              Delete account?
+            </Text>
+            <Text
+              style={[
+                tw`font-associate text-center`,
+                { color: colors.grey, fontSize: moderateScale(14), marginBottom: verticalScale(24) },
+              ]}>
+              This action cannot be undone. All your data, hooks, and meeting history will be permanently deleted.
+            </Text>
+            <View style={[tw`flex-row`, { gap: horizontalScale(12) }]}>
+              <TouchableOpacity
+                onPress={() => setShowDeleteModal(false)}
+                activeOpacity={0.7}
+                style={[
+                  tw`flex-1 rounded-full items-center`,
+                  { borderWidth: 1.5, borderColor: colors.green, paddingVertical: verticalScale(14) },
+                ]}>
+                <Text style={[tw`font-associate-bold`, { color: colors.green, fontSize: moderateScale(15) }]}>
+                  Cancel
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                onPress={doDeleteAccount}
+                activeOpacity={0.7}
+                style={[
+                  tw`flex-1 rounded-full items-center`,
+                  { backgroundColor: '#4A4A4A', paddingVertical: verticalScale(14) },
+                ]}>
+                <Text style={[tw`font-associate-bold`, { color: colors.white, fontSize: moderateScale(15) }]}>
+                  Delete
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 };

@@ -235,7 +235,7 @@ const AppStack_CalendarSettingsScreen: React.FC<Props> = ({ navigation }) => {
           <Image source={BackArrow} style={{ width: h(24), height: h(24) }} resizeMode="contain" />
         </TouchableOpacity>
         <View style={tw`flex-1 items-center`}>
-          <Text style={[tw`font-dm font-bold`, { color: colors.ink, fontSize: ms(18.75) }]}>
+          <Text style={[tw`font-associate-bold`, { color: colors.ink, fontSize: ms(18.75) }]}>
             Calendar Settings
           </Text>
         </View>
@@ -253,7 +253,7 @@ const AppStack_CalendarSettingsScreen: React.FC<Props> = ({ navigation }) => {
           showsVerticalScrollIndicator={false}>
 
           {/* Synced Calendar */}
-          <Text style={[tw`font-dm font-bold`, { color: colors.ink, fontSize: ms(16), marginBottom: v(12) }]}>
+          <Text style={[tw`font-associate-bold`, { color: colors.ink, fontSize: ms(16), marginBottom: v(12) }]}>
             Synced Calendar
           </Text>
           <View
@@ -273,16 +273,16 @@ const AppStack_CalendarSettingsScreen: React.FC<Props> = ({ navigation }) => {
               ]}>
               <HashIcon />
             </View>
-            <Text style={[tw`font-dm font-bold flex-1`, { color: colors.ink, fontSize: ms(15) }]}>
+            <Text style={[tw`font-associate-bold flex-1`, { color: colors.ink, fontSize: ms(15) }]}>
               Catch Calendar
             </Text>
-            <Text style={[tw`font-dm`, { color: colors.grey, fontSize: ms(13) }]}>
+            <Text style={[tw`font-associate`, { color: colors.grey, fontSize: ms(13) }]}>
               Always up to date
             </Text>
           </View>
 
           {/* Other Calendars */}
-          <Text style={[tw`font-dm font-bold`, { color: colors.ink, fontSize: ms(16), marginBottom: v(12) }]}>
+          <Text style={[tw`font-associate-bold`, { color: colors.ink, fontSize: ms(16), marginBottom: v(12) }]}>
             Other Calendars
           </Text>
           <View style={{ gap: v(10) }}>
@@ -305,11 +305,11 @@ const AppStack_CalendarSettingsScreen: React.FC<Props> = ({ navigation }) => {
                     <ProviderIcon provider={provider} />
                   </View>
                   <View style={tw`flex-1`}>
-                    <Text style={[tw`font-dm font-bold`, { color: colors.ink, fontSize: ms(15) }]}>
+                    <Text style={[tw`font-associate-bold`, { color: colors.ink, fontSize: ms(15) }]}>
                       {providerLabels[provider]}
                     </Text>
                     {isConnected && (
-                      <Text style={[tw`font-dm`, { color: colors.grey, fontSize: ms(12), marginTop: 2 }]}>
+                      <Text style={[tw`font-associate`, { color: colors.grey, fontSize: ms(12), marginTop: 2 }]}>
                         {formatSyncTime(integration?.lastSyncedAt)}
                       </Text>
                     )}
@@ -326,18 +326,18 @@ const AppStack_CalendarSettingsScreen: React.FC<Props> = ({ navigation }) => {
                         {isSyncing ? (
                           <ActivityIndicator size="small" color={colors.green} />
                         ) : (
-                          <Text style={[tw`font-dm`, { color: colors.green, fontSize: ms(13) }]}>↻ Sync</Text>
+                          <Text style={[tw`font-associate`, { color: colors.green, fontSize: ms(13) }]}>↻ Sync</Text>
                         )}
                       </TouchableOpacity>
                       <TouchableOpacity onPress={() => disconnectProvider(provider)} activeOpacity={0.7}>
-                        <Text style={[tw`font-dm font-bold`, { color: colors.grey, fontSize: ms(13) }]}>
+                        <Text style={[tw`font-associate-bold`, { color: colors.grey, fontSize: ms(13) }]}>
                           Connected
                         </Text>
                       </TouchableOpacity>
                     </View>
                   ) : (
                     <TouchableOpacity onPress={() => connectProvider(provider)} activeOpacity={0.7}>
-                      <Text style={[tw`font-dm font-bold`, { color: colors.green, fontSize: ms(14) }]}>
+                      <Text style={[tw`font-associate-bold`, { color: colors.green, fontSize: ms(14) }]}>
                         Connect
                       </Text>
                     </TouchableOpacity>
@@ -365,10 +365,10 @@ const AppStack_CalendarSettingsScreen: React.FC<Props> = ({ navigation }) => {
               padding: h(24),
               paddingBottom: insets.bottom + v(24),
             }}>
-            <Text style={[tw`font-dm font-bold`, { color: colors.ink, fontSize: ms(18), marginBottom: v(6) }]}>
+            <Text style={[tw`font-associate-bold`, { color: colors.ink, fontSize: ms(18), marginBottom: v(6) }]}>
               Connect Apple Calendar
             </Text>
-            <Text style={[tw`font-dm`, { color: colors.grey, fontSize: ms(13), marginBottom: v(20) }]}>
+            <Text style={[tw`font-associate`, { color: colors.grey, fontSize: ms(13), marginBottom: v(20) }]}>
               Use an app-specific password from appleid.apple.com
             </Text>
             <TextInput
@@ -377,7 +377,7 @@ const AppStack_CalendarSettingsScreen: React.FC<Props> = ({ navigation }) => {
                 borderRadius: 12,
                 paddingHorizontal: h(14),
                 paddingVertical: v(12),
-                fontFamily: 'DMSans',
+                fontFamily: 'AssociateSansRegular',
                 fontSize: ms(14),
                 color: colors.ink,
                 marginBottom: v(10),
@@ -395,7 +395,7 @@ const AppStack_CalendarSettingsScreen: React.FC<Props> = ({ navigation }) => {
                 borderRadius: 12,
                 paddingHorizontal: h(14),
                 paddingVertical: v(12),
-                fontFamily: 'DMSans',
+                fontFamily: 'AssociateSansRegular',
                 fontSize: ms(14),
                 color: colors.ink,
                 marginBottom: v(20),
@@ -419,7 +419,7 @@ const AppStack_CalendarSettingsScreen: React.FC<Props> = ({ navigation }) => {
                   alignItems: 'center',
                   marginRight: h(10),
                 }}>
-                <Text style={[tw`font-dm font-bold`, { color: colors.green, fontSize: ms(15) }]}>Cancel</Text>
+                <Text style={[tw`font-associate-bold`, { color: colors.green, fontSize: ms(15) }]}>Cancel</Text>
               </TouchableOpacity>
               <TouchableOpacity
                 onPress={handleIcloudConnect}
@@ -436,7 +436,7 @@ const AppStack_CalendarSettingsScreen: React.FC<Props> = ({ navigation }) => {
                 {connecting ? (
                   <ActivityIndicator color="#fff" />
                 ) : (
-                  <Text style={[tw`font-dm font-bold`, { color: '#fff', fontSize: ms(15) }]}>Connect</Text>
+                  <Text style={[tw`font-associate-bold`, { color: '#fff', fontSize: ms(15) }]}>Connect</Text>
                 )}
               </TouchableOpacity>
             </View>

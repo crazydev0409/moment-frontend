@@ -24,11 +24,13 @@ import {
   HomeIcon,
   CalendarIcon,
   MeshIcon,
+  HookIcon,
   PlusIcon,
   CrossIcon,
   SearchIcon,
   Avatar,
   TwoPeople,
+  ChevronIcon,
 } from '~/lib/images';
 import { AppStackParamList } from '~/navigation/AppStack';
 import tw from '~/tailwindcss';
@@ -87,8 +89,8 @@ const BottomNavigationBar: React.FC<BottomNavigationBarProps> = ({
     verticalScale(150)
   );
   const screenWidth = Dimensions.get('window').width;
-  const navGap = horizontalScale(7.5);
-  const addButtonSize = horizontalScale(71.25);
+  const navGap = horizontalScale(6);
+  const addButtonSize = horizontalScale(57);
   const showHomeOnboarding = selectedTab === 'home' && homeOnboardingStep !== null;
   const showOnboardingAddMenu =
     showHomeOnboarding &&
@@ -96,6 +98,15 @@ const BottomNavigationBar: React.FC<BottomNavigationBarProps> = ({
     homeOnboardingStep >= 2 &&
     !showContactModal &&
     !isTransitioning;
+
+  useEffect(() => {
+    const t = setTimeout(() => {
+      addButtonRef.current?.measureInWindow((x, y, width, height) => {
+        if (width > 0) setAddButtonFrame({ x, y, width, height });
+      });
+    }, 150);
+    return () => clearTimeout(t);
+  }, [insets.bottom]);
 
   useEffect(() => {
     let mounted = true;
@@ -160,7 +171,7 @@ const BottomNavigationBar: React.FC<BottomNavigationBarProps> = ({
     if (onBusinessPress) {
       onBusinessPress();
     } else {
-      navigation.navigate('AppStack_ComingSoonScreen');
+      navigation.navigate('AppStack_MeshScreen');
     }
   };
 
@@ -441,7 +452,7 @@ const BottomNavigationBar: React.FC<BottomNavigationBarProps> = ({
         <View style={{ flex: 1, paddingRight: preview ? horizontalScale(14) : 0 }}>
           <Text
             style={[
-              tw`font-dm`,
+              tw`font-associate`,
               {
                 color: ONBOARDING_INK,
                 fontSize: moderateScale(21),
@@ -453,7 +464,7 @@ const BottomNavigationBar: React.FC<BottomNavigationBarProps> = ({
           </Text>
           <Text
             style={[
-              tw`font-dm`,
+              tw`font-associate`,
               {
                 color: ONBOARDING_MUTED,
                 fontSize: moderateScale(16),
@@ -465,7 +476,7 @@ const BottomNavigationBar: React.FC<BottomNavigationBarProps> = ({
           <TouchableOpacity activeOpacity={0.8} onPress={handleHomeOnboardingNext}>
             <Text
               style={[
-                tw`font-bold font-dm`,
+                tw`font-associate-bold`,
                 {
                   color: ONBOARDING_GREEN,
                   fontSize: moderateScale(17),
@@ -522,8 +533,8 @@ const BottomNavigationBar: React.FC<BottomNavigationBarProps> = ({
             tw`flex-row items-center rounded-full overflow-hidden`,
             {
               backgroundColor: '#1C1D26',
-              gap: horizontalScale(7.5),
-              padding: verticalScale(9.375),
+              gap: horizontalScale(6),
+              padding: verticalScale(7.5),
             },
           ]}>
           {([
@@ -541,12 +552,12 @@ const BottomNavigationBar: React.FC<BottomNavigationBarProps> = ({
                 borderRadius: 9999,
                 alignItems: 'center',
                 justifyContent: 'center',
-                padding: horizontalScale(15),
+                padding: horizontalScale(12),
               }}>
               <Image
                 source={icon}
                 tintColor="#FFFFFF"
-                style={{ width: horizontalScale(22.5), height: horizontalScale(22.5) }}
+                style={{ width: horizontalScale(18), height: horizontalScale(18) }}
                 resizeMode="contain"
               />
             </TouchableOpacity>
@@ -567,7 +578,7 @@ const BottomNavigationBar: React.FC<BottomNavigationBarProps> = ({
           <Image
             source={PlusIcon}
             tintColor="#FFFFFF"
-            style={{ width: horizontalScale(22.5), height: horizontalScale(22.5) }}
+            style={{ width: horizontalScale(18), height: horizontalScale(18) }}
             resizeMode="contain"
           />
         </TouchableOpacity>
@@ -658,9 +669,9 @@ const BottomNavigationBar: React.FC<BottomNavigationBarProps> = ({
                         marginRight: horizontalScale(10),
                       },
                     ]}>
-                    <Text style={[tw`text-black font-dm`, { fontSize: moderateScale(24) }]}>→</Text>
+                    <Image source={ChevronIcon} style={{ width: horizontalScale(22), height: horizontalScale(22) }} tintColor="#000000" />
                   </View>
-                  <Text style={[tw`text-black font-dm`, { fontSize: moderateScale(17) }]}>
+                  <Text style={[tw`text-black font-associate`, { fontSize: moderateScale(17) }]}>
                     Send a Catch
                   </Text>
                 </TouchableOpacity>
@@ -686,9 +697,9 @@ const BottomNavigationBar: React.FC<BottomNavigationBarProps> = ({
                         marginRight: horizontalScale(10),
                       },
                     ]}>
-                    <Text style={[tw`text-black font-dm`, { fontSize: moderateScale(20) }]}>♩</Text>
+                    <Image source={HookIcon} tintColor="#171927" style={{ width: horizontalScale(20), height: horizontalScale(20) }} resizeMode="contain" />
                   </View>
-                  <Text style={[tw`text-black font-dm`, { fontSize: moderateScale(17) }]}>
+                  <Text style={[tw`text-black font-associate`, { fontSize: moderateScale(17) }]}>
                     My Hooks
                   </Text>
                 </TouchableOpacity>
@@ -721,7 +732,7 @@ const BottomNavigationBar: React.FC<BottomNavigationBarProps> = ({
                       resizeMode="contain"
                     />
                   </View>
-                  <Text style={[tw`text-black font-dm`, { fontSize: moderateScale(17) }]}>
+                  <Text style={[tw`text-black font-associate`, { fontSize: moderateScale(17) }]}>
                     Manage availability
                   </Text>
                 </TouchableOpacity>
@@ -792,7 +803,7 @@ const BottomNavigationBar: React.FC<BottomNavigationBarProps> = ({
                 <Image
                   source={CrossIcon}
                   tintColor="#FFFFFF"
-                  style={{ width: horizontalScale(22.5), height: horizontalScale(22.5) }}
+                  style={{ width: horizontalScale(18), height: horizontalScale(18) }}
                   resizeMode="contain"
                 />
               </TouchableOpacity>
@@ -837,7 +848,7 @@ const BottomNavigationBar: React.FC<BottomNavigationBarProps> = ({
             />
             <Text
               style={[
-                tw`font-bold font-dm text-black`,
+                tw`font-associate-bold text-black`,
                 { fontSize: moderateScale(28), marginBottom: verticalScale(18) },
               ]}>
               Select catch type
@@ -876,15 +887,15 @@ const BottomNavigationBar: React.FC<BottomNavigationBarProps> = ({
                   />
                 </View>
                 <View style={tw`flex-1`}>
-                  <Text style={[tw`font-dm text-black`, { fontSize: moderateScale(22) }]}>
+                  <Text style={[tw`font-associate text-black`, { fontSize: moderateScale(22) }]}>
                     {item.title}
                   </Text>
                   <Text
-                    style={[tw`font-dm text-grey`, { fontSize: moderateScale(16), marginTop: 2 }]}>
+                    style={[tw`font-associate text-grey`, { fontSize: moderateScale(16), marginTop: 2 }]}>
                     {item.subtitle}
                   </Text>
                 </View>
-                <Text style={[tw`font-dm text-gray-400`, { fontSize: moderateScale(24) }]}>›</Text>
+                <Text style={[tw`font-associate text-gray-400`, { fontSize: moderateScale(24) }]}>›</Text>
               </TouchableOpacity>
             ))}
           </View>
@@ -955,14 +966,14 @@ const BottomNavigationBar: React.FC<BottomNavigationBarProps> = ({
                         ]}>
                         <Text
                           style={[
-                            tw`text-black font-bold font-dm`,
+                            tw`text-black font-associate-bold`,
                             { fontSize: moderateScale(18.75) },
                           ]}>
                           Select Contact
                         </Text>
                         <TouchableOpacity onPress={handleCloseContactModal} activeOpacity={0.7}>
                           <Text
-                            style={[tw`text-[#A3CB31] font-dm`, { fontSize: moderateScale(15) }]}>
+                            style={[tw`text-[#A3CB31] font-associate`, { fontSize: moderateScale(15) }]}>
                             Cancel
                           </Text>
                         </TouchableOpacity>
@@ -988,7 +999,7 @@ const BottomNavigationBar: React.FC<BottomNavigationBarProps> = ({
                           }}
                         />
                         <TextInput
-                          style={tw`flex-1 text-black font-dm`}
+                          style={tw`flex-1 text-black font-associate`}
                           placeholder="Search contacts"
                           placeholderTextColor="#999"
                           value={contactSearchText}
@@ -1006,84 +1017,82 @@ const BottomNavigationBar: React.FC<BottomNavigationBarProps> = ({
                         showsVerticalScrollIndicator={false}
                         keyboardShouldPersistTaps="handled">
                         {filteredContacts.length > 0 ? (
-                          filteredContacts.map((contact) => {
-                            const isDisabled = !contact.contactUser?.id;
-                            return (
+                          (() => {
+                            const registered = filteredContacts.filter((c) => !!c.contactUser?.id);
+                            const unregistered = filteredContacts.filter((c) => !c.contactUser?.id);
+                            const renderRow = (contact: any, isDisabled: boolean) => (
                               <TouchableOpacity
                                 key={contact.id}
                                 style={[
                                   tw`flex-row items-center border-b border-gray-100`,
                                   { paddingVertical: verticalScale(15) },
-                                  isDisabled && tw`opacity-50`,
                                 ]}
                                 activeOpacity={isDisabled ? 1 : 0.7}
                                 onPress={() => !isDisabled && handleContactSelect(contact)}
                                 disabled={isDisabled}>
                                 <View
                                   style={[
-                                    tw`rounded-full bg-gray-200 items-center justify-center overflow-hidden`,
+                                    tw`rounded-full items-center justify-center overflow-hidden`,
                                     {
                                       width: horizontalScale(45),
                                       height: horizontalScale(45),
                                       marginRight: horizontalScale(15),
+                                      backgroundColor: isDisabled ? '#EAEEF2' : '#E0E4E8',
                                     },
                                   ]}>
                                   {contact.contactUser?.avatar ? (
                                     <Image
                                       source={{ uri: contact.contactUser.avatar }}
-                                      style={{
-                                        width: horizontalScale(45),
-                                        height: horizontalScale(45),
-                                        borderRadius: 9999,
-                                      }}
+                                      style={{ width: horizontalScale(45), height: horizontalScale(45), borderRadius: 9999 }}
                                     />
                                   ) : (
                                     <Image
                                       source={Avatar}
-                                      style={{
-                                        width: horizontalScale(30),
-                                        height: horizontalScale(30),
-                                      }}
+                                      style={{ width: horizontalScale(30), height: horizontalScale(30) }}
                                     />
                                   )}
                                 </View>
                                 <View style={tw`flex-1`}>
                                   <Text
                                     style={[
-                                      tw`text-black font-bold font-dm`,
-                                      { fontSize: moderateScale(15) },
+                                      tw`font-associate-bold`,
+                                      { fontSize: moderateScale(15), color: isDisabled ? '#9AA3AC' : '#1C1D26' },
                                     ]}>
                                     {contact.displayName}
                                   </Text>
                                   {contact.contactPhone && (
-                                    <Text
-                                      style={[
-                                        tw`text-grey font-dm`,
-                                        { fontSize: moderateScale(13.125) },
-                                      ]}>
+                                    <Text style={[tw`text-grey font-associate`, { fontSize: moderateScale(13) }]}>
                                       {contact.contactPhone}
                                     </Text>
                                   )}
-                                  {isDisabled && (
-                                    <Text
-                                      style={[
-                                        tw`text-grey font-dm`,
-                                        {
-                                          fontSize: moderateScale(11.25),
-                                          marginTop: verticalScale(3.75),
-                                        },
-                                      ]}>
-                                      Not registered
-                                    </Text>
-                                  )}
                                 </View>
+                                {isDisabled && (
+                                  <View
+                                    style={{
+                                      borderWidth: 1,
+                                      borderColor: '#D8DEE4',
+                                      borderRadius: 999,
+                                      paddingHorizontal: horizontalScale(10),
+                                      paddingVertical: verticalScale(4),
+                                    }}>
+                                    <Text style={[tw`font-associate-bold`, { color: '#9AA3AC', fontSize: moderateScale(11.5) }]}>
+                                      Invite
+                                    </Text>
+                                  </View>
+                                )}
                               </TouchableOpacity>
                             );
-                          })
+                            return (
+                              <>
+                                {registered.map((c) => renderRow(c, false))}
+                                {unregistered.map((c) => renderRow(c, true))}
+                              </>
+                            );
+                          })()
                         ) : (
                           <View
                             style={{ paddingVertical: verticalScale(37.5), alignItems: 'center' }}>
-                            <Text style={[tw`text-grey font-dm`, { fontSize: moderateScale(15) }]}>
+                            <Text style={[tw`text-grey font-associate`, { fontSize: moderateScale(15) }]}>
                               No contacts found
                             </Text>
                           </View>

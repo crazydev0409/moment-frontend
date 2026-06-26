@@ -7,6 +7,7 @@ import AppStack_AvailableTimesScreen from './AppStack_AvailableTimesScreen';
 import AppStack_CalendarScreen from './AppStack_CalendarScreen';
 import AppStack_CalendarSettingsScreen from './AppStack_CalendarSettingsScreen';
 import AppStack_ComingSoonScreen from './AppStack_ComingSoonScreen';
+import AppStack_MeshScreen from './AppStack_MeshScreen';
 import AppStack_ContactScreen from './AppStack_ContactScreen';
 import AppStack_ContactProfileScreen from './AppStack_ContactProfileScreen';
 
@@ -22,6 +23,12 @@ import AppStack_QRScannerScreen from './AppStack_QRScannerScreen';
 import AppStack_SearchScreen from './AppStack_SearchScreen';
 import AppStack_SendCatchScreen from './AppStack_SendCatchScreen';
 import AppStack_SettingsScreen from './AppStack_SettingsScreen';
+import AppStack_ApplicationThemeScreen from './AppStack_ApplicationThemeScreen';
+import AppStack_NotificationSettingsScreen from './AppStack_NotificationSettingsScreen';
+import AppStack_AccountSecurityScreen from './AppStack_AccountSecurityScreen';
+import AppStack_PaymentsScreen from './AppStack_PaymentsScreen';
+import AppStack_AIAssistantScreen from './AppStack_AIAssistantScreen';
+import AppStack_PayoutDetailsScreen from './AppStack_PayoutDetailsScreen';
 
 import BottomNavigationBar from '~/components/BottomNavigationBar';
 import tw from '~/tailwindcss';
@@ -31,6 +38,7 @@ export type AppStackParamList = {
     toast?: {
       title: string;
       subtitle: string;
+      calendarDate?: string; // YYYY-MM-DD — when tapped navigates to this date in CalendarScreen
     };
   } | undefined;
   AppStack_ProfileScreen: undefined;
@@ -60,6 +68,7 @@ export type AppStackParamList = {
     contactName: string;
   };
   AppStack_ComingSoonScreen: undefined;
+  AppStack_MeshScreen: undefined;
   AppStack_SearchScreen: undefined;
   AppStack_NotificationScreen: undefined;
   AppStack_NotificationDetailScreen: {
@@ -77,7 +86,14 @@ export type AppStackParamList = {
   } | undefined;
   AppStack_HookEditorScreen: {
     hookId?: string;
+    source?: string;
   } | undefined;
+  AppStack_ApplicationThemeScreen: undefined;
+  AppStack_NotificationSettingsScreen: undefined;
+  AppStack_AccountSecurityScreen: undefined;
+  AppStack_PaymentsScreen: undefined;
+  AppStack_AIAssistantScreen: undefined;
+  AppStack_PayoutDetailsScreen: undefined;
 };
 
 interface Contact {
@@ -135,6 +151,15 @@ const AppStackNavigator: React.FC = () => {
         )}
       </Stack.Screen>
 
+      <Stack.Screen name="AppStack_MeshScreen">
+        {(props: any) => (
+          <View style={tw`flex-1`}>
+            <AppStack_MeshScreen {...props} />
+            <BottomNavigationBar selectedTab="business" />
+          </View>
+        )}
+      </Stack.Screen>
+
       <Stack.Screen name="AppStack_ProfileScreen" component={AppStack_ProfileScreen} />
       <Stack.Screen name="AppStack_ProfileSettingsScreen" component={AppStack_ProfileSettingsScreen} />
       <Stack.Screen name="AppStack_SettingsScreen" component={AppStack_SettingsScreen} />
@@ -150,6 +175,12 @@ const AppStackNavigator: React.FC = () => {
       <Stack.Screen name="AppStack_ContactProfileScreen" component={AppStack_ContactProfileScreen} />
       <Stack.Screen name="AppStack_AvailableTimesScreen" component={AppStack_AvailableTimesScreen} />
       <Stack.Screen name="AppStack_MeetingHistoryScreen" component={AppStack_MeetingHistoryScreen} />
+      <Stack.Screen name="AppStack_ApplicationThemeScreen" component={AppStack_ApplicationThemeScreen} />
+      <Stack.Screen name="AppStack_NotificationSettingsScreen" component={AppStack_NotificationSettingsScreen} />
+      <Stack.Screen name="AppStack_AccountSecurityScreen" component={AppStack_AccountSecurityScreen} />
+      <Stack.Screen name="AppStack_PaymentsScreen" component={AppStack_PaymentsScreen} />
+      <Stack.Screen name="AppStack_AIAssistantScreen" component={AppStack_AIAssistantScreen} />
+      <Stack.Screen name="AppStack_PayoutDetailsScreen" component={AppStack_PayoutDetailsScreen} />
     </Stack.Navigator>
   );
 };

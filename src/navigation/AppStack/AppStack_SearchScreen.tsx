@@ -257,7 +257,10 @@ const AppStack_SearchScreen: React.FC<Props> = ({ navigation }) => {
     const year = meetingDate.getFullYear();
     const month = String(meetingDate.getMonth() + 1).padStart(2, '0');
     const day = String(meetingDate.getDate()).padStart(2, '0');
-    navigation.navigate('AppStack_CalendarScreen', { date: `${year}-${month}-${day}` });
+    navigation.navigate('AppStack_CalendarScreen', {
+      date: `${year}-${month}-${day}`,
+      momentRequestId: meeting.id,
+    });
   };
 
   const filteredMeetings = useMemo(() => {

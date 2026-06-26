@@ -13,6 +13,7 @@ import {
   ActivityIndicator,
   StyleSheet,
   Animated,
+  Dimensions,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Svg, { Circle, Path } from 'react-native-svg';
@@ -359,8 +360,9 @@ const AppStack_HomePageScreen: React.FC<Props> = ({ navigation, route }) => {
   const [insightSlide, setInsightSlide] = useState<'traffic' | 'ride'>('traffic');
 
   // Toast state
-  const [toast, setToast] = useState<{ title: string; subtitle: string } | null>(null);
+  const [toast, setToast] = useState<{ title: string; subtitle: string; calendarDate?: string } | null>(null);
   const toastAnim = useRef(new Animated.Value(-100)).current;
+  const dateScrollRef = useRef<ScrollView>(null);
 
   useEffect(() => {
     const toastData = route.params?.toast;
@@ -432,6 +434,16 @@ const AppStack_HomePageScreen: React.FC<Props> = ({ navigation, route }) => {
 
     setDates(weekDates);
     setSelectedDate(today);
+
+    // Scroll so today's pill is centered in the rail
+    const pillWidth = horizontalScale(52);
+    const gap = horizontalScale(12);
+    const pillStep = pillWidth + gap;
+    const railViewWidth = Dimensions.get('window').width - 2 * horizontalScale(16);
+    const scrollX = Math.max(0, daysFromMonday * pillStep - (railViewWidth / 2 - pillWidth / 2));
+    setTimeout(() => {
+      dateScrollRef.current?.scrollTo({ x: scrollX, animated: true });
+    }, 100);
   }, []);
 
   useEffect(() => {
@@ -808,18 +820,16 @@ const AppStack_HomePageScreen: React.FC<Props> = ({ navigation, route }) => {
     });
   };
 
-  // Get next upcoming meeting
+  // Get first confirmed meeting for the selected date
   const getUpcomingMeeting = () => {
     if (!allMeetings || !Array.isArray(allMeetings)) return null;
-    const now = new Date();
-    const upcoming = allMeetings
+    const meetings = allMeetings
       .filter((meeting) => {
         const meetingDate = new Date(meeting.startTime);
-        return isAfter(meetingDate, now) && meeting.status === 'approved';
+        return isSameDay(meetingDate, selectedDate) && meeting.status === 'approved';
       })
       .sort((a, b) => new Date(a.startTime).getTime() - new Date(b.startTime).getTime());
-
-    return upcoming.length > 0 ? upcoming[0] : null;
+    return meetings.length > 0 ? meetings[0] : null;
   };
 
   const filteredMeetings = getFilteredMeetings();
@@ -828,10 +838,9 @@ const AppStack_HomePageScreen: React.FC<Props> = ({ navigation, route }) => {
     () => allMeetings.filter((meeting) => isSameDay(new Date(meeting.startTime), selectedDate)),
     [allMeetings, selectedDate]
   );
-  const hasSelectedDateSchedule = selectedDateMeetings.some((meeting) => {
-    const status = meeting.status?.toLowerCase();
-    return status === 'approved' || status === 'pending';
-  });
+  const hasSelectedDateSchedule = selectedDateMeetings.some(
+    (meeting) => meeting.status?.toLowerCase() === 'approved'
+  );
 
   // Deterministic progress value (0.25–1): same seed → same value on all devices
   const progressValue = useMemo(() => {
@@ -894,7 +903,10 @@ const AppStack_HomePageScreen: React.FC<Props> = ({ navigation, route }) => {
     const year = targetDate.getFullYear();
     const month = String(targetDate.getMonth() + 1).padStart(2, '0');
     const day = String(targetDate.getDate()).padStart(2, '0');
-    navigation.navigate('AppStack_CalendarScreen', { date: `${year}-${month}-${day}` });
+    navigation.navigate('AppStack_CalendarScreen', {
+      date: `${year}-${month}-${day}`,
+      ...(meeting?.id ? { momentRequestId: meeting.id } : {}),
+    });
   };
 
   const getLocalAvatar = (phoneNumber?: string) => {
@@ -917,21 +929,30 @@ const AppStack_HomePageScreen: React.FC<Props> = ({ navigation, route }) => {
               transform: [{ translateY: toastAnim }],
             },
           ]}>
-          <View style={styles.toastIcon}>
-            <Svg width={h(22)} height={h(22)} viewBox="0 0 24 24" fill="none">
-              <Path
-                d="M5 13l4 4L19 7"
-                stroke={COLORS.white}
-                strokeWidth="3"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              />
-            </Svg>
-          </View>
-          <View style={styles.toastCopy}>
-            <Text style={styles.toastTitle}>{toast.title}</Text>
-            <Text style={styles.toastSubtitle}>{toast.subtitle}</Text>
-          </View>
+          <TouchableOpacity
+            activeOpacity={0.85}
+            style={{ flex: 1, flexDirection: 'row', alignItems: 'center' }}
+            onPress={() => {
+              if (toast.calendarDate) {
+                navigation.navigate('AppStack_CalendarScreen', { date: toast.calendarDate });
+              }
+            }}>
+            <View style={styles.toastIcon}>
+              <Svg width={h(22)} height={h(22)} viewBox="0 0 24 24" fill="none">
+                <Path
+                  d="M5 13l4 4L19 7"
+                  stroke={COLORS.white}
+                  strokeWidth="3"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+              </Svg>
+            </View>
+            <View style={styles.toastCopy}>
+              <Text style={styles.toastTitle}>{toast.title}</Text>
+              <Text style={styles.toastSubtitle}>{toast.subtitle}</Text>
+            </View>
+          </TouchableOpacity>
         </Animated.View>
       )}
       <ScrollView
@@ -968,6 +989,7 @@ const AppStack_HomePageScreen: React.FC<Props> = ({ navigation, route }) => {
         </View>
 
         <ScrollView
+          ref={dateScrollRef}
           horizontal
           showsHorizontalScrollIndicator={false}
           contentContainerStyle={styles.dateRail}>
@@ -1003,7 +1025,15 @@ const AppStack_HomePageScreen: React.FC<Props> = ({ navigation, route }) => {
             <TouchableOpacity
               activeOpacity={0.85}
               style={styles.scheduleButton}
-              onPress={() => navigateToMeetingDate()}>
+              onPress={() => {
+                const y = selectedDate.getFullYear();
+                const m = String(selectedDate.getMonth() + 1).padStart(2, '0');
+                const d = String(selectedDate.getDate()).padStart(2, '0');
+                navigation.navigate('AppStack_SendCatchScreen', {
+                  mode: 'one',
+                  initialDate: `${y}-${m}-${d}`,
+                });
+              }}>
               <Text style={styles.scheduleButtonText}>Schedule Meeting</Text>
             </TouchableOpacity>
           </View>

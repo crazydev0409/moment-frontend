@@ -16,7 +16,7 @@ import { useFocusEffect } from '@react-navigation/native';
 
 import tw from '~/tailwindcss';
 import { AppStackParamList } from '.';
-import { BackArrow, Background, Avatar, EditIcon } from '~/lib/images';
+import { BackArrow, Background, Avatar, EditIcon, HookIcon, ChevronIcon, CalendarIcon, UpcomingIcon, LocationIcon } from '~/lib/images';
 import { http } from '~/helpers/http';
 import { horizontalScale, moderateScale, verticalScale } from '~/helpers/responsive';
 import Toast from '~/components/Toast';
@@ -136,7 +136,7 @@ const AppStack_MyHooksScreen: React.FC<Props> = ({ navigation, route }) => {
         tw`rounded-full`,
         { backgroundColor: bg, paddingHorizontal: horizontalScale(10), paddingVertical: verticalScale(4) },
       ]}>
-      <Text style={[tw`font-dm font-bold`, { color: fg, fontSize: moderateScale(11) }]}>{label}</Text>
+      <Text style={[tw`font-associate-bold`, { color: fg, fontSize: moderateScale(11) }]}>{label}</Text>
     </View>
   );
 
@@ -174,21 +174,20 @@ const AppStack_MyHooksScreen: React.FC<Props> = ({ navigation, route }) => {
               tw`rounded-full items-center justify-center`,
               { width: horizontalScale(32), height: horizontalScale(32), marginLeft: -horizontalScale(8), backgroundColor: colors.field, borderWidth: 2, borderColor: colors.card },
             ]}>
-            <Text style={[tw`font-dm font-bold`, { fontSize: moderateScale(10), color: colors.grey }]}>+{extra}</Text>
+            <Text style={[tw`font-associate-bold`, { fontSize: moderateScale(10), color: colors.grey }]}>+{extra}</Text>
           </View>
         )}
       </View>
     );
   };
 
-  const DetailRow = ({ label, value }: { label: string; value: string }) => (
+  const IconDetailRow = ({ icon, label, value }: { icon: number; label: string; value: string }) => (
     <View style={[tw`flex-row items-center justify-between`, { paddingVertical: verticalScale(5) }]}>
-      <Text style={[tw`font-dm`, { color: colors.grey, fontSize: moderateScale(12.5) }]}>{label}</Text>
-      <Text
-        numberOfLines={1}
-        style={[tw`font-dm font-bold`, { color: colors.ink, fontSize: moderateScale(12.5), maxWidth: '62%' }]}>
-        {value}
-      </Text>
+      <View style={[tw`flex-row items-center`, { gap: horizontalScale(6), flex: 1 }]}>
+        <Image source={icon} style={{ width: horizontalScale(13), height: horizontalScale(13) }} tintColor={colors.grey} resizeMode="contain" />
+        <Text style={[tw`font-associate`, { color: colors.grey, fontSize: moderateScale(12.5) }]}>{label}</Text>
+      </View>
+      <Text numberOfLines={1} style={[tw`font-associate-bold`, { color: colors.ink, fontSize: moderateScale(12.5), maxWidth: '55%' }]}>{value}</Text>
     </View>
   );
 
@@ -207,7 +206,7 @@ const AppStack_MyHooksScreen: React.FC<Props> = ({ navigation, route }) => {
         {/* Title + edit + badges */}
         <View style={tw`flex-row items-start justify-between`}>
           <View style={[tw`flex-row items-center flex-1`, { marginRight: horizontalScale(8) }]}>
-            <Text numberOfLines={1} style={[tw`font-dm font-bold`, { color: colors.ink, fontSize: moderateScale(16) }]}>
+            <Text numberOfLines={1} style={[tw`font-associate-bold`, { color: colors.ink, fontSize: moderateScale(16) }]}>
               {hook.icon ? `${hook.icon} ` : ''}{hook.title}
             </Text>
             {hook.isOwner && (
@@ -228,7 +227,7 @@ const AppStack_MyHooksScreen: React.FC<Props> = ({ navigation, route }) => {
         </View>
 
         {isOpen && !!hook.description && (
-          <Text style={[tw`font-dm`, { color: colors.grey, fontSize: moderateScale(12.5), marginTop: verticalScale(8) }]}>
+          <Text style={[tw`font-associate`, { color: colors.grey, fontSize: moderateScale(12.5), marginTop: verticalScale(8) }]}>
             {hook.description}
           </Text>
         )}
@@ -237,16 +236,16 @@ const AppStack_MyHooksScreen: React.FC<Props> = ({ navigation, route }) => {
         <View style={{ marginTop: verticalScale(10) }}>
           {isOpen ? (
             <>
-              <DetailRow label="Availability" value={summarizeAvailability(hook.availabilitySlots)} />
-              <DetailRow label="Format" value={hook.locationType === 'in_person' ? 'In-person' : 'Remote'} />
-              {hook.locationType === 'in_person' && (
-                <DetailRow label="Location" value={hook.locationLabel || 'Set location'} />
-              )}
-              <DetailRow label="Duration" value={formatDuration(hook.durationMinutes)} />
-              {hook.capacity != null && <DetailRow label="Capacity" value={`Up to ${hook.capacity} people`} />}
+              <IconDetailRow icon={CalendarIcon} label="Availability" value={summarizeAvailability(hook.availabilitySlots)} />
+              <IconDetailRow icon={LocationIcon} label="Location" value={hook.locationType === 'in_person' ? 'In-person' : 'Remote'} />
+              {hook.locationType === 'in_person' && hook.locationLabel ? (
+                <IconDetailRow icon={LocationIcon} label="Address" value={hook.locationLabel} />
+              ) : null}
+              <IconDetailRow icon={UpcomingIcon} label="Duration" value={formatDuration(hook.durationMinutes)} />
+              {hook.capacity != null && <IconDetailRow icon={UpcomingIcon} label="Capacity" value={`Up to ${hook.capacity} people`} />}
             </>
           ) : (
-            <Text style={[tw`font-dm`, { color: colors.grey, fontSize: moderateScale(12.5) }]}>
+            <Text style={[tw`font-associate`, { color: colors.grey, fontSize: moderateScale(12.5) }]}>
               {summarizeAvailability(hook.availabilitySlots)} · {formatDuration(hook.durationMinutes)}
               {hook.locationType === 'in_person' && hook.locationLabel ? ` · ${hook.locationLabel}` : ''}
             </Text>
@@ -258,7 +257,7 @@ const AppStack_MyHooksScreen: React.FC<Props> = ({ navigation, route }) => {
         {/* Mesh toggle (business owners only) */}
         {hook.isOwner && accountType === 'business' && (
           <View style={[tw`flex-row items-center justify-between`, { marginTop: verticalScale(12) }]}>
-            <Text style={[tw`font-dm`, { color: colors.ink, fontSize: moderateScale(13) }]}>Publish to Mesh</Text>
+            <Text style={[tw`font-associate`, { color: colors.ink, fontSize: moderateScale(13) }]}>Publish to Mesh</Text>
             <Switch
               value={hook.publishedToMesh}
               onValueChange={(v) => handleToggleMesh(hook, v)}
@@ -267,22 +266,37 @@ const AppStack_MyHooksScreen: React.FC<Props> = ({ navigation, route }) => {
           </View>
         )}
 
-        {/* Footer: expander + owner menu */}
+        {/* Footer: expander + reserve/menu */}
         <View style={[tw`flex-row items-center justify-between`, { marginTop: verticalScale(12) }]}>
-          <TouchableOpacity onPress={() => toggleExpand(hook.id)} activeOpacity={0.7}>
-            <Text style={[tw`font-dm font-bold`, { color: colors.grey, fontSize: moderateScale(12.5) }]}>
-              {isOpen ? 'Less details ⌃' : 'More details ⌄'}
+          <TouchableOpacity
+            onPress={() => toggleExpand(hook.id)}
+            activeOpacity={0.7}
+            style={{ flexDirection: 'row', alignItems: 'center', gap: horizontalScale(4) }}>
+            <Text style={[tw`font-associate-bold`, { color: colors.grey, fontSize: moderateScale(12.5) }]}>
+              {isOpen ? 'Less details' : 'More details'}
             </Text>
+            <Image
+              source={ChevronIcon}
+              style={{
+                width: horizontalScale(12),
+                height: horizontalScale(12),
+                transform: [{ rotate: isOpen ? '270deg' : '90deg' }],
+              }}
+              tintColor={colors.grey}
+            />
           </TouchableOpacity>
-          {!hook.isOwner ? (
-            <Text style={[tw`font-dm`, { color: colors.grey, fontSize: moderateScale(11.5) }]}>
+          {isOpen ? (
+            <TouchableOpacity
+              activeOpacity={0.85}
+              onPress={() => navigation.navigate('AppStack_SendCatchScreen', { mode: 'one' })}
+              style={[tw`rounded-full items-center justify-center`, { backgroundColor: colors.green, paddingHorizontal: horizontalScale(20), paddingVertical: verticalScale(8) }]}>
+              <Text style={[tw`font-associate-bold`, { color: colors.white, fontSize: moderateScale(13) }]}>Reserve</Text>
+            </TouchableOpacity>
+          ) : !hook.isOwner ? (
+            <Text style={[tw`font-associate`, { color: colors.grey, fontSize: moderateScale(11.5) }]}>
               Shared by {hook.owner?.name || 'a contact'}
             </Text>
-          ) : (
-            <TouchableOpacity onPress={() => openHookMenu(hook)} activeOpacity={0.7} style={{ paddingHorizontal: horizontalScale(6) }}>
-              <Text style={[tw`font-dm`, { color: colors.grey, fontSize: moderateScale(20) }]}>⋯</Text>
-            </TouchableOpacity>
-          )}
+          ) : null}
         </View>
       </View>
     );
@@ -303,7 +317,7 @@ const AppStack_MyHooksScreen: React.FC<Props> = ({ navigation, route }) => {
           <Image source={BackArrow} style={{ width: horizontalScale(24), height: horizontalScale(24) }} resizeMode="contain" />
         </TouchableOpacity>
         <View style={tw`flex-1 items-center`}>
-          <Text style={[tw`font-dm font-bold`, { color: colors.ink, fontSize: moderateScale(18.75) }]}>My Hooks</Text>
+          <Text style={[tw`font-associate-bold`, { color: colors.ink, fontSize: moderateScale(18.75) }]}>My Hooks</Text>
         </View>
         <View style={{ width: horizontalScale(24) }} />
       </View>
@@ -324,15 +338,19 @@ const AppStack_MyHooksScreen: React.FC<Props> = ({ navigation, route }) => {
                     marginRight: horizontalScale(8),
                     paddingHorizontal: horizontalScale(16),
                     paddingVertical: verticalScale(8),
-                    backgroundColor: colors.card,
+                    backgroundColor: active ? colors.green : colors.card,
                     borderWidth: 1.5,
                     borderColor: active ? colors.green : colors.border,
+                    gap: horizontalScale(4),
                   },
                 ]}>
+                {key === 'all' && (
+                  <Image source={HookIcon} style={{ width: horizontalScale(14), height: horizontalScale(14) }} tintColor={active ? colors.white : colors.grey} />
+                )}
                 <Text
                   style={[
-                    tw`font-dm font-bold`,
-                    { fontSize: moderateScale(12.5), color: active ? colors.green : colors.grey },
+                    tw`font-associate-bold`,
+                    { fontSize: moderateScale(12.5), color: active ? colors.white : colors.grey },
                   ]}>
                   {label}
                 </Text>
@@ -353,9 +371,9 @@ const AppStack_MyHooksScreen: React.FC<Props> = ({ navigation, route }) => {
               tw`rounded-full items-center justify-center`,
               { backgroundColor: colors.greenTint, width: horizontalScale(120), height: horizontalScale(120), marginBottom: verticalScale(18) },
             ]}>
-            <Text style={{ fontSize: moderateScale(52) }}>🪝</Text>
+            <Image source={HookIcon} style={{ width: horizontalScale(56), height: horizontalScale(56) }} tintColor={colors.greenText} />
           </View>
-          <Text style={[tw`font-dm`, { color: colors.grey, fontSize: moderateScale(16) }]}>No hooks yet</Text>
+          <Text style={[tw`font-associate`, { color: colors.grey, fontSize: moderateScale(16) }]}>No hooks yet</Text>
         </View>
       ) : (
         <ScrollView
@@ -383,7 +401,7 @@ const AppStack_MyHooksScreen: React.FC<Props> = ({ navigation, route }) => {
           onPress={() => navigation.navigate('AppStack_HookEditorScreen', {})}
           activeOpacity={0.85}
           style={[tw`rounded-full items-center`, { backgroundColor: colors.green, paddingVertical: verticalScale(15) }]}>
-          <Text style={[tw`font-dm font-bold`, { color: colors.white, fontSize: moderateScale(16) }]}>Create new hook</Text>
+          <Text style={[tw`font-associate-bold`, { color: colors.white, fontSize: moderateScale(16) }]}>{hooks.length > 0 ? 'Create new hook' : 'Create hook'}</Text>
         </TouchableOpacity>
       </View>
 

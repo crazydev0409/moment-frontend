@@ -82,7 +82,7 @@ const AppStack_ProfileSettingsScreen: React.FC<Props> = ({ navigation }) => {
   const FieldLabel = ({ text }: { text: string }) => (
     <Text
       style={[
-        tw`font-dm`,
+        tw`font-associate`,
         { color: colors.grey, fontSize: moderateScale(13), marginBottom: verticalScale(6) },
       ]}>
       {text}
@@ -94,7 +94,7 @@ const AppStack_ProfileSettingsScreen: React.FC<Props> = ({ navigation }) => {
     borderRadius: 14,
     paddingHorizontal: horizontalScale(16),
     paddingVertical: verticalScale(14),
-    fontFamily: 'DMSans',
+    fontFamily: 'AssociateSansRegular',
     fontSize: moderateScale(14),
     color: colors.ink,
     marginBottom: verticalScale(18),
@@ -116,7 +116,7 @@ const AppStack_ProfileSettingsScreen: React.FC<Props> = ({ navigation }) => {
             <Image source={BackArrow} style={{ width: horizontalScale(24), height: horizontalScale(24) }} resizeMode="contain" />
           </TouchableOpacity>
           <View style={tw`flex-1 items-center`}>
-            <Text style={[tw`font-dm font-bold`, { color: colors.ink, fontSize: moderateScale(18.75) }]}>
+            <Text style={[tw`font-associate-bold`, { color: colors.ink, fontSize: moderateScale(18.75) }]}>
               Profile Settings
             </Text>
           </View>
@@ -155,7 +155,7 @@ const AppStack_ProfileSettingsScreen: React.FC<Props> = ({ navigation }) => {
             onPress={() => setShowBirthdayPicker(true)}
             activeOpacity={0.7}
             style={[inputStyle, { justifyContent: 'center' }]}>
-            <Text style={{ color: birthday ? colors.ink : colors.placeholder, fontSize: moderateScale(14), fontFamily: 'DMSans' }}>
+            <Text style={{ color: birthday ? colors.ink : colors.placeholder, fontSize: moderateScale(14), fontFamily: 'AssociateSansRegular' }}>
               {birthday ? formatBirthday(birthday) : 'MM/DD/YY'}
             </Text>
           </TouchableOpacity>
@@ -173,8 +173,16 @@ const AppStack_ProfileSettingsScreen: React.FC<Props> = ({ navigation }) => {
 
           <View style={[tw`flex-row items-center justify-between`, { marginBottom: verticalScale(6) }]}>
             <FieldLabel text="Your email" />
-            <TouchableOpacity activeOpacity={0.7}>
-              <Text style={[tw`font-dm`, { color: colors.ink, fontSize: moderateScale(13) }]}>Change</Text>
+            <TouchableOpacity
+              activeOpacity={0.7}
+              onPress={() =>
+                Alert.alert(
+                  'Change Email',
+                  'Changing your email address requires verification. Please contact support or use the web portal.',
+                  [{ text: 'OK' }],
+                )
+              }>
+              <Text style={[tw`font-associate`, { color: colors.ink, fontSize: moderateScale(13) }]}>Change</Text>
             </TouchableOpacity>
           </View>
           <TextInput
@@ -211,7 +219,7 @@ const AppStack_ProfileSettingsScreen: React.FC<Props> = ({ navigation }) => {
             {isSaving ? (
               <ActivityIndicator color={colors.white} />
             ) : (
-              <Text style={[tw`font-dm font-bold`, { color: colors.white, fontSize: moderateScale(16) }]}>Save</Text>
+              <Text style={[tw`font-associate-bold`, { color: colors.white, fontSize: moderateScale(16) }]}>Save</Text>
             )}
           </TouchableOpacity>
         </View>

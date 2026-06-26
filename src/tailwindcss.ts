@@ -6,7 +6,12 @@ export const theme = {
     extend: {
       fontFamily: {
         'abril': 'AbrilFatface-Regular',
-        'dm': 'DMSans'
+        'dm': 'DMSans',
+        'associate': 'AssociateSansRegular',
+        'associate-bold': 'AssociateSansBold',
+        'associate-medium': 'AssociateSansMedium',
+        'associate-light': 'AssociateSansLight',
+        'associate-italic': 'AssociateSansRegularItalic',
       },
     }
   }

@@ -1,7 +1,8 @@
 import React, { useCallback, useState } from 'react';
 import {
-  Alert,
+  ActivityIndicator,
   Image,
+  Modal,
   ScrollView,
   Text,
   TouchableOpacity,
@@ -9,6 +10,7 @@ import {
 } from 'react-native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { useFocusEffect } from '@react-navigation/native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useAtom } from 'jotai';
 
 import tw from '~/tailwindcss';
@@ -22,15 +24,17 @@ import {
   NotificationsIcon,
   SecurityIcon,
   PayIcon,
-  CalendarGearIcon,
+  CalendarIcon,
   BrainIcon,
   LogOutIcon,
+  CheckIcon,
 } from '~/lib/images';
 import { http } from '~/helpers/http';
+import { disconnectSocket } from '~/services/socketService';
+import { navigationRef } from '~/index';
 import { horizontalScale, verticalScale, moderateScale } from '~/helpers/responsive';
 import { colors } from '~/lib/theme';
 import { userAtom } from '../../store';
-import Toast from '~/components/Toast';
 
 type Props = NativeStackScreenProps<AppStackParamList, 'AppStack_ProfileScreen'>;
 
@@ -44,7 +48,23 @@ const APP_VERSION = '1.86';
 
 const AppStack_ProfileScreen: React.FC<Props> = ({ navigation }) => {
   const [user, setUser] = useAtom(userAtom);
-  const [showLogoutToast, setShowLogoutToast] = useState(false);
+  const [showLogoutModal, setShowLogoutModal] = useState(false);
+  const [isLoggingOut, setIsLoggingOut] = useState(false);
+
+  const resetUserAtom = () => {
+    setUser({
+      id: '',
+      name: '',
+      email: '',
+      phoneNumber: '',
+      avatar: '',
+      timezone: 'UTC',
+      birthday: '',
+      bio: '',
+      meetingTypes: [],
+      verified: false,
+    });
+  };
 
   const fetchProfile = useCallback(async () => {
     try {
@@ -55,24 +75,33 @@ const AppStack_ProfileScreen: React.FC<Props> = ({ navigation }) => {
 
   useFocusEffect(useCallback(() => { fetchProfile(); }, [fetchProfile]));
 
-  const handleLogout = () => {
-    Alert.alert('Log Out', 'Are you sure you want to log out?', [
-      { text: 'Cancel', style: 'cancel' },
-      {
-        text: 'Log Out',
-        style: 'destructive',
-        onPress: async () => {
-          try {
-            await http.post('/auth/logout').catch(() => {});
-          } finally {
-            // Clear token and navigate to auth
-            const AsyncStorage = require('@react-native-async-storage/async-storage').default;
-            await AsyncStorage.removeItem('accessToken');
-            navigation.reset({ index: 0, routes: [{ name: 'AppStack_HomePageScreen' }] });
+  const doLogout = async () => {
+    setShowLogoutModal(false);
+    setIsLoggingOut(true);
+    try {
+      await http.post('/auth/logout').catch(() => {});
+      await AsyncStorage.removeItem('accessToken');
+      await AsyncStorage.removeItem('refreshToken');
+      delete http.defaults.headers.common['Authorization'];
+      disconnectSocket();
+      resetUserAtom();
+      if (navigationRef.isReady()) {
+        navigationRef.reset({ index: 0, routes: [{ name: 'AuthStack' }] });
+      } else {
+        setTimeout(() => {
+          if (navigationRef.isReady()) {
+            navigationRef.reset({ index: 0, routes: [{ name: 'AuthStack' }] });
           }
-        },
-      },
-    ]);
+        }, 100);
+      }
+    } catch {
+      resetUserAtom();
+      if (navigationRef.isReady()) {
+        navigationRef.reset({ index: 0, routes: [{ name: 'AuthStack' }] });
+      }
+    } finally {
+      setIsLoggingOut(false);
+    }
   };
 
   const menuItems: MenuItem[] = [
@@ -84,32 +113,32 @@ const AppStack_ProfileScreen: React.FC<Props> = ({ navigation }) => {
     {
       icon: ThemeIcon,
       label: 'Application theme',
-      onPress: () => Alert.alert('Coming soon', 'Theme settings are coming soon.'),
+      onPress: () => navigation.navigate('AppStack_ApplicationThemeScreen'),
     },
     {
       icon: NotificationsIcon,
       label: 'Notifications',
-      onPress: () => navigation.navigate('AppStack_NotificationScreen'),
+      onPress: () => navigation.navigate('AppStack_NotificationSettingsScreen'),
     },
     {
       icon: SecurityIcon,
       label: 'Account & Security',
-      onPress: () => navigation.navigate('AppStack_SettingsScreen'),
+      onPress: () => navigation.navigate('AppStack_AccountSecurityScreen'),
     },
     {
       icon: PayIcon,
       label: 'Payments',
-      onPress: () => Alert.alert('Coming soon', 'Payment settings are coming soon.'),
+      onPress: () => navigation.navigate('AppStack_PaymentsScreen'),
     },
     {
-      icon: CalendarGearIcon,
+      icon: CalendarIcon,
       label: 'Calendar Settings',
       onPress: () => navigation.navigate('AppStack_CalendarSettingsScreen'),
     },
     {
       icon: BrainIcon,
       label: 'AI Assistant',
-      onPress: () => Alert.alert('Coming soon', 'AI Assistant is coming soon.'),
+      onPress: () => navigation.navigate('AppStack_AIAssistantScreen'),
     },
   ];
 
@@ -124,7 +153,7 @@ const AppStack_ProfileScreen: React.FC<Props> = ({ navigation }) => {
         <TouchableOpacity onPress={() => navigation.goBack()} activeOpacity={0.7}>
           <Image source={BackArrow} style={{ width: horizontalScale(24), height: horizontalScale(24) }} resizeMode="contain" />
         </TouchableOpacity>
-        <Text style={[tw`font-dm font-bold`, { color: colors.ink, fontSize: moderateScale(18.75) }]}>
+        <Text style={[tw`font-associate-bold`, { color: colors.ink, fontSize: moderateScale(18.75) }]}>
           Profile
         </Text>
         <TouchableOpacity onPress={() => navigation.navigate('AppStack_QRScannerScreen')} activeOpacity={0.7}>
@@ -171,7 +200,7 @@ const AppStack_ProfileScreen: React.FC<Props> = ({ navigation }) => {
           </TouchableOpacity>
 
           <View style={tw`flex-row items-center`}>
-            <Text style={[tw`font-dm font-bold`, { color: colors.ink, fontSize: moderateScale(20) }]}>
+            <Text style={[tw`font-associate-bold`, { color: colors.ink, fontSize: moderateScale(20) }]}>
               {(user as any)?.name || 'Your Name'}
             </Text>
             <View
@@ -179,7 +208,7 @@ const AppStack_ProfileScreen: React.FC<Props> = ({ navigation }) => {
                 tw`rounded-full items-center justify-center`,
                 { width: horizontalScale(20), height: horizontalScale(20), backgroundColor: '#2D7FF9', marginLeft: horizontalScale(6) },
               ]}>
-              <Text style={{ color: colors.white, fontSize: moderateScale(10), fontWeight: 'bold' }}>✓</Text>
+              <Image source={CheckIcon} style={{ width: horizontalScale(10), height: horizontalScale(10) }} tintColor={colors.white} />
             </View>
           </View>
         </View>
@@ -196,29 +225,91 @@ const AppStack_ProfileScreen: React.FC<Props> = ({ navigation }) => {
                 { backgroundColor: colors.card, padding: moderateScale(16) },
               ]}>
               <Image source={item.icon} tintColor={colors.ink} style={{ width: horizontalScale(20), height: horizontalScale(20), marginRight: horizontalScale(14) }} resizeMode="contain" />
-              <Text style={[tw`font-dm`, { color: colors.ink, fontSize: moderateScale(15) }]}>{item.label}</Text>
+              <Text style={[tw`font-associate`, { color: colors.ink, fontSize: moderateScale(15) }]}>{item.label}</Text>
             </TouchableOpacity>
           ))}
         </View>
 
         <Text
           style={[
-            tw`text-center font-dm`,
+            tw`text-center font-associate`,
             { color: colors.greyLight, fontSize: moderateScale(13), marginTop: verticalScale(20) },
           ]}>
           Application version {APP_VERSION}
         </Text>
 
         <TouchableOpacity
-          onPress={handleLogout}
+          onPress={() => setShowLogoutModal(true)}
           activeOpacity={0.7}
           style={[tw`flex-row items-center justify-center`, { marginTop: verticalScale(16) }]}>
           <Image source={LogOutIcon} tintColor={colors.grey} style={{ width: horizontalScale(20), height: horizontalScale(20), marginRight: horizontalScale(8) }} resizeMode="contain" />
-          <Text style={[tw`font-dm`, { color: colors.grey, fontSize: moderateScale(15) }]}>Log Out</Text>
+          <Text style={[tw`font-associate`, { color: colors.grey, fontSize: moderateScale(15) }]}>Log Out</Text>
         </TouchableOpacity>
       </ScrollView>
 
-      <Toast message="Logged out" visible={showLogoutToast} onHide={() => setShowLogoutToast(false)} />
+      {/* Log out confirmation modal */}
+      <Modal visible={showLogoutModal} transparent animationType="fade">
+        <View style={[tw`flex-1 items-center justify-center`, { backgroundColor: 'rgba(0,0,0,0.45)' }]}>
+          <View
+            style={[
+              tw`rounded-3xl`,
+              {
+                backgroundColor: colors.card,
+                padding: moderateScale(24),
+                marginHorizontal: '8%',
+                width: '84%',
+              },
+            ]}>
+            <Text
+              style={[
+                tw`font-associate-bold text-center`,
+                { color: colors.ink, fontSize: moderateScale(20), marginBottom: verticalScale(8) },
+              ]}>
+              Log out?
+            </Text>
+            <Text
+              style={[
+                tw`font-associate text-center`,
+                { color: colors.grey, fontSize: moderateScale(14), marginBottom: verticalScale(24) },
+              ]}>
+              You'll need to sign in again to access your account.
+            </Text>
+            <View style={[tw`flex-row`, { gap: horizontalScale(12) }]}>
+              <TouchableOpacity
+                onPress={() => setShowLogoutModal(false)}
+                activeOpacity={0.7}
+                style={[
+                  tw`flex-1 rounded-full items-center`,
+                  {
+                    borderWidth: 1.5,
+                    borderColor: colors.border,
+                    paddingVertical: verticalScale(14),
+                  },
+                ]}>
+                <Text style={[tw`font-associate-bold`, { color: colors.ink, fontSize: moderateScale(15) }]}>
+                  Cancel
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                onPress={doLogout}
+                activeOpacity={0.7}
+                disabled={isLoggingOut}
+                style={[
+                  tw`flex-1 rounded-full items-center`,
+                  { backgroundColor: colors.ink, paddingVertical: verticalScale(14), opacity: isLoggingOut ? 0.6 : 1 },
+                ]}>
+                {isLoggingOut ? (
+                  <ActivityIndicator size="small" color={colors.white} />
+                ) : (
+                  <Text style={[tw`font-associate-bold`, { color: colors.white, fontSize: moderateScale(15) }]}>
+                    Log Out
+                  </Text>
+                )}
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 };

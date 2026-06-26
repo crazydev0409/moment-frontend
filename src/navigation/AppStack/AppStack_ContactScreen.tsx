@@ -18,7 +18,7 @@ import * as Contacts from 'expo-contacts';
 
 import tw from '~/tailwindcss';
 import { AppStackParamList } from '.';
-import { Avatar } from '~/lib/images';
+import { Avatar, NotificationsIcon, SearchIcon, HookIcon, UserIcon, CheckIcon, BrainIcon } from '~/lib/images';
 import { http } from '~/helpers/http';
 import { horizontalScale, verticalScale, moderateScale } from '~/helpers/responsive';
 import { colors } from '~/lib/theme';
@@ -31,7 +31,7 @@ interface BackendContact {
   displayName: string;
   contactPhone?: string;
   autoConfirm?: boolean;
-  contactUser?: { id: string; name: string; avatar?: string | null } | null;
+  contactUser?: { id: string; name: string; avatar?: string | null; accountType?: string | null } | null;
   contactUserId?: string | null;
 }
 
@@ -48,7 +48,7 @@ const AppStack_ContactScreen: React.FC<Props> = ({ navigation }) => {
   const [searchText, setSearchText] = useState('');
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
-  const [notifCount] = useState(0);
+  const [notifCount, setNotifCount] = useState(0);
 
   const loadContacts = useCallback(async (showSpinner = true) => {
     try {
@@ -118,6 +118,12 @@ const AppStack_ContactScreen: React.FC<Props> = ({ navigation }) => {
       });
 
       setContacts(formatted);
+
+      try {
+        const notifRes = await http.get('/users/notifications');
+        const notifs = notifRes.data.notifications || [];
+        setNotifCount(notifs.filter((n: any) => !n.isRead).length);
+      } catch {}
     } catch (err) {
       console.error('loadContacts error:', err);
       Alert.alert('Error', 'Failed to load contacts.');
@@ -168,7 +174,7 @@ const AppStack_ContactScreen: React.FC<Props> = ({ navigation }) => {
           backgroundColor: colors.greenTint,
         },
       ]}>
-      <Text style={{ fontSize: moderateScale(18), color: colors.greenText }}>🪝</Text>
+      <Image source={HookIcon} style={{ width: horizontalScale(20), height: horizontalScale(20) }} tintColor={colors.greenText} />
     </View>
   );
 
@@ -184,7 +190,7 @@ const AppStack_ContactScreen: React.FC<Props> = ({ navigation }) => {
             tw`flex-row items-center justify-between`,
             { marginTop: verticalScale(58), paddingHorizontal: '8%', marginBottom: verticalScale(18) },
           ]}>
-          <Text style={[tw`font-dm font-bold`, { color: colors.ink, fontSize: moderateScale(28) }]}>
+          <Text style={[tw`font-associate-bold`, { color: colors.ink, fontSize: moderateScale(28) }]}>
             Contacts
           </Text>
           <TouchableOpacity
@@ -200,7 +206,11 @@ const AppStack_ContactScreen: React.FC<Props> = ({ navigation }) => {
                   backgroundColor: colors.card,
                 },
               ]}>
-              <Text style={{ fontSize: moderateScale(22) }}>🔔</Text>
+              <Image
+                  source={NotificationsIcon}
+                  style={{ width: horizontalScale(22), height: horizontalScale(22) }}
+                  tintColor={colors.ink}
+                />
             </View>
             {notifCount > 0 && (
               <View
@@ -215,7 +225,7 @@ const AppStack_ContactScreen: React.FC<Props> = ({ navigation }) => {
                   },
                 ]}>
                 <Text
-                  style={[tw`font-dm font-bold`, { color: colors.white, fontSize: moderateScale(10) }]}>
+                  style={[tw`font-associate-bold`, { color: colors.white, fontSize: moderateScale(10) }]}>
                   {notifCount}
                 </Text>
               </View>
@@ -243,22 +253,21 @@ const AppStack_ContactScreen: React.FC<Props> = ({ navigation }) => {
               },
             ]}>
             <TextInput
-              style={[tw`flex-1 font-dm`, { color: colors.ink, fontSize: moderateScale(14) }]}
+              style={[tw`flex-1 font-associate`, { color: colors.ink, fontSize: moderateScale(14) }]}
               placeholder="Search contacts"
               placeholderTextColor={colors.placeholder}
               value={searchText}
               onChangeText={setSearchText}
             />
-            <Text style={{ fontSize: moderateScale(18), color: colors.grey }}>🔍</Text>
+            <Image source={SearchIcon} style={{ width: horizontalScale(18), height: horizontalScale(18) }} tintColor={colors.grey} />
           </View>
 
           {/* Invite CTA */}
           <TouchableOpacity
             activeOpacity={0.7}
             style={[tw`flex-row items-center`, { marginBottom: verticalScale(16) }]}>
-            <Text style={[tw`font-dm font-bold`, { color: colors.greenText, fontSize: moderateScale(15) }]}>
-              👤+ Invite
-            </Text>
+            <Image source={UserIcon} style={{ width: horizontalScale(16), height: horizontalScale(16), marginRight: horizontalScale(6) }} tintColor={colors.greenText} />
+            <Text style={[tw`font-associate-bold`, { color: colors.greenText, fontSize: moderateScale(15) }]}>Invite</Text>
           </TouchableOpacity>
 
           {/* Contacts list */}
@@ -269,78 +278,100 @@ const AppStack_ContactScreen: React.FC<Props> = ({ navigation }) => {
           ) : filtered.length === 0 ? (
             <Text
               style={[
-                tw`text-center font-dm`,
+                tw`text-center font-associate`,
                 { color: colors.grey, paddingVertical: verticalScale(40), fontSize: moderateScale(14) },
               ]}>
               {searchText ? 'No contacts found' : 'No contacts yet'}
             </Text>
           ) : (
-            filtered.map((contact) => (
-              <TouchableOpacity
-                key={contact.id}
-                activeOpacity={0.7}
-                onPress={() => handleContactPress(contact)}
-                style={[
-                  tw`flex-row items-center rounded-2xl`,
-                  {
-                    backgroundColor: colors.card,
-                    padding: horizontalScale(14),
-                    marginBottom: verticalScale(10),
-                  },
-                ]}>
-                {/* Avatar with verified badge */}
-                <View style={{ position: 'relative', marginRight: horizontalScale(14) }}>
-                  <View
-                    style={[
-                      tw`rounded-full overflow-hidden items-center justify-center`,
-                      { width: horizontalScale(52), height: horizontalScale(52), backgroundColor: colors.field },
-                    ]}>
-                    {contact.imageUri ? (
-                      <Image
-                        source={{ uri: contact.imageUri }}
-                        style={{ width: horizontalScale(52), height: horizontalScale(52) }}
-                      />
-                    ) : (
-                      <Image source={Avatar} style={{ width: horizontalScale(32), height: horizontalScale(32) }} />
-                    )}
-                  </View>
-                  {contact.isRegistered && (
+            (() => {
+              const registered = filtered.filter((c) => c.isRegistered);
+              const unregistered = filtered.filter((c) => !c.isRegistered);
+              const renderCard = (contact: DisplayContact) => (
+                <TouchableOpacity
+                  key={contact.id}
+                  activeOpacity={contact.isRegistered ? 0.7 : 1}
+                  onPress={() => contact.isRegistered && handleContactPress(contact)}
+                  style={[
+                    tw`flex-row items-center rounded-2xl`,
+                    {
+                      backgroundColor: contact.isRegistered ? colors.card : colors.field,
+                      padding: horizontalScale(14),
+                      marginBottom: verticalScale(10),
+                    },
+                  ]}>
+                  {/* Avatar */}
+                  <View style={{ position: 'relative', marginRight: horizontalScale(14) }}>
                     <View
                       style={[
-                        tw`absolute rounded-full items-center justify-center`,
+                        tw`rounded-full overflow-hidden items-center justify-center`,
                         {
-                          bottom: 0,
-                          right: 0,
-                          width: horizontalScale(18),
-                          height: horizontalScale(18),
-                          backgroundColor: '#2D7FF9',
-                          borderWidth: 1.5,
-                          borderColor: colors.card,
+                          width: horizontalScale(52),
+                          height: horizontalScale(52),
+                          backgroundColor: contact.isRegistered ? colors.field : colors.border,
                         },
                       ]}>
-                      <Text style={{ color: colors.white, fontSize: moderateScale(9), fontWeight: 'bold' }}>✓</Text>
+                      {contact.imageUri ? (
+                        <Image
+                          source={{ uri: contact.imageUri }}
+                          style={{ width: horizontalScale(52), height: horizontalScale(52) }}
+                        />
+                      ) : (
+                        <Image
+                          source={Avatar}
+                          style={{ width: horizontalScale(32), height: horizontalScale(32) }}
+                          tintColor={contact.isRegistered ? undefined : colors.greyLight}
+                        />
+                      )}
                     </View>
+                    {contact.isRegistered && (
+                      <View
+                        style={[
+                          tw`absolute rounded-full items-center justify-center`,
+                          {
+                            bottom: 0,
+                            right: 0,
+                            width: horizontalScale(18),
+                            height: horizontalScale(18),
+                            backgroundColor: contact.backend.contactUser?.accountType === 'agent' ? colors.ink : '#2D7FF9',
+                            borderWidth: 1.5,
+                            borderColor: colors.card,
+                          },
+                        ]}>
+                        <Image
+                          source={contact.backend.contactUser?.accountType === 'agent' ? BrainIcon : CheckIcon}
+                          style={{ width: horizontalScale(9), height: horizontalScale(9) }}
+                          tintColor={colors.white}
+                        />
+                      </View>
+                    )}
+                  </View>
+
+                  {/* Name */}
+                  <Text
+                    numberOfLines={1}
+                    style={[
+                      tw`flex-1 font-associate-bold`,
+                      { color: contact.isRegistered ? colors.ink : colors.greyLight, fontSize: moderateScale(15) },
+                    ]}>
+                    {contact.name}
+                  </Text>
+
+                  {/* Action */}
+                  {contact.isRegistered && (
+                    <TouchableOpacity onPress={() => handleHookIconPress(contact)} activeOpacity={0.7}>
+                      <HookCircleIcon />
+                    </TouchableOpacity>
                   )}
-                </View>
-
-                {/* Name */}
-                <Text
-                  numberOfLines={1}
-                  style={[
-                    tw`flex-1 font-dm font-bold`,
-                    { color: contact.isRegistered ? colors.ink : colors.grey, fontSize: moderateScale(15) },
-                  ]}>
-                  {contact.name}
-                </Text>
-
-                {/* Hook icon */}
-                {contact.isRegistered && (
-                  <TouchableOpacity onPress={() => handleHookIconPress(contact)} activeOpacity={0.7}>
-                    <HookCircleIcon />
-                  </TouchableOpacity>
-                )}
-              </TouchableOpacity>
-            ))
+                </TouchableOpacity>
+              );
+              return (
+                <>
+                  {registered.map(renderCard)}
+                  {unregistered.map(renderCard)}
+                </>
+              );
+            })()
           )}
         </ScrollView>
       </KeyboardAvoidingView>

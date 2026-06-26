@@ -11,8 +11,10 @@ import MapView, { Marker } from 'react-native-maps';
 import { useAtom } from 'jotai';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
+  Animated,
   ActivityIndicator,
   Alert,
+  Dimensions,
   Image,
   KeyboardAvoidingView,
   Modal,
@@ -32,7 +34,8 @@ import { AppStackParamList } from '.';
 
 import { http } from '~/helpers/http';
 import { horizontalScale, moderateScale, verticalScale } from '~/helpers/responsive';
-import { Avatar, NotificationsIcon, GoogleCalendarIcon, OutlookIcon, HookIcon } from '~/lib/images';
+import { AvailabilitySchedule } from '~/helpers/calendarAvailability';
+import { Avatar, NotificationsIcon, GoogleCalendarIcon, OutlookIcon, HookIcon, CheckIcon } from '~/lib/images';
 import { getDeviceId } from '~/services/deviceService';
 import { setupSocketEventListeners, getSocket, initializeSocket } from '~/services/socketService';
 import { userAtom } from '~/store';
@@ -253,6 +256,37 @@ const MiniIcon = ({
   </Svg>
 );
 
+/** Returns absolutely-positioned band specs for all unavailable periods in a day. */
+function getUnavailableBands(
+  availability: AvailabilitySchedule | null,
+  weekday: number,
+): { top: number; height: number }[] {
+  if (!availability) return [];
+  const daySlots = availability.slots
+    .filter((s) => s.weekday === weekday)
+    .sort((a, b) => a.startMinutes - b.startMinutes);
+
+  const unavailable: { startMinutes: number; endMinutes: number }[] = [];
+  let cursor = 0;
+  for (const slot of daySlots) {
+    if (slot.startMinutes > cursor) {
+      unavailable.push({ startMinutes: cursor, endMinutes: slot.startMinutes });
+    }
+    cursor = Math.max(cursor, slot.endMinutes);
+  }
+  if (cursor < 24 * 60) {
+    unavailable.push({ startMinutes: cursor, endMinutes: 24 * 60 });
+  }
+
+  return unavailable.map(({ startMinutes, endMinutes }) => {
+    // Align with the same coordinate system as events: top = v(10) + (min/60)*v(80)
+    // For the very first band (midnight), extend to the top of the container.
+    const top = startMinutes === 0 ? 0 : v(10) + (startMinutes / 60) * v(80);
+    const bottom = v(10) + (endMinutes / 60) * v(80);
+    return { top, height: bottom - top };
+  });
+}
+
 const AppStack_CalendarScreen: React.FC<Props> = ({ navigation, route }) => {
   const insets = useSafeAreaInsets();
   const [user] = useAtom(userAtom);
@@ -300,8 +334,60 @@ const AppStack_CalendarScreen: React.FC<Props> = ({ navigation, route }) => {
   );
   const [mapCoords, setMapCoords] = useState<{ latitude: number; longitude: number } | null>(null);
   const [geocoding, setGeocoding] = useState(false);
+  const [currentTime, setCurrentTime] = useState(() => new Date());
+  const [unreadNotifCount, setUnreadNotifCount] = useState(0);
+  const [myAvailability, setMyAvailability] = useState<AvailabilitySchedule | null>(null);
 
   const handledMomentRequestIdRef = useRef<string | null>(null);
+  const timelineScrollRef = useRef<ScrollView>(null);
+  const slideAnim = useRef(new Animated.Value(0)).current;
+  const navigateDayRef = useRef<(dir: number) => void>(() => {});
+
+  // Keep navigateDayRef current every render so the PanResponder closure always sees fresh state.
+  navigateDayRef.current = (direction: number) => {
+    const w = Dimensions.get('window').width;
+    Animated.timing(slideAnim, {
+      toValue: -direction * w,
+      duration: 220,
+      useNativeDriver: false,
+    }).start(() => {
+      setSelectedDate((prev) => {
+        const next = new Date(prev);
+        next.setDate(next.getDate() + direction);
+        return next;
+      });
+      slideAnim.setValue(direction * w);
+      Animated.timing(slideAnim, {
+        toValue: 0,
+        duration: 220,
+        useNativeDriver: false,
+      }).start();
+    });
+  };
+
+  const agendaPanResponder = useRef(
+    PanResponder.create({
+      onStartShouldSetPanResponder: () => false,
+      onMoveShouldSetPanResponder: (_, gs) =>
+        Math.abs(gs.dx) > 12 && Math.abs(gs.dx) > Math.abs(gs.dy) * 1.5,
+      onPanResponderMove: (_, gs) => {
+        slideAnim.setValue(gs.dx);
+      },
+      onPanResponderRelease: (_, gs) => {
+        const w = Dimensions.get('window').width;
+        if (gs.dx < -(w * 0.2) || gs.vx < -0.4) {
+          navigateDayRef.current(1);
+        } else if (gs.dx > w * 0.2 || gs.vx > 0.4) {
+          navigateDayRef.current(-1);
+        } else {
+          Animated.spring(slideAnim, { toValue: 0, useNativeDriver: false, bounciness: 6 }).start();
+        }
+      },
+      onPanResponderTerminate: () => {
+        slideAnim.setValue(0);
+      },
+    })
+  ).current;
 
   const geocodeLocation = useCallback(async (locationName: string) => {
     if (!locationName.trim()) { setMapCoords(null); return; }
@@ -317,6 +403,25 @@ const AppStack_CalendarScreen: React.FC<Props> = ({ navigation, route }) => {
       setGeocoding(false);
     }
   }, []);
+
+  useEffect(() => {
+    const tick = setInterval(() => setCurrentTime(new Date()), 60_000);
+    return () => clearInterval(tick);
+  }, []);
+
+  useEffect(() => {
+    if (loading || viewMode !== 'agenda') return;
+    if (routeMomentRequestId) return; // meeting deep-link — let that effect scroll instead
+    if (!isSameDay(selectedDate, new Date())) return;
+    const now = new Date();
+    const minutes = now.getHours() * 60 + now.getMinutes();
+    const top = v(10) + (minutes / 60) * v(80);
+    const scrollY = Math.max(0, top - v(160));
+    const t = setTimeout(() => {
+      timelineScrollRef.current?.scrollTo({ y: scrollY, animated: false });
+    }, 500);
+    return () => clearTimeout(t);
+  }, [selectedDate, loading, viewMode, routeMomentRequestId]);
 
   const monthViewBase = useMemo(() => {
     const now = new Date();
@@ -342,13 +447,18 @@ const AppStack_CalendarScreen: React.FC<Props> = ({ navigation, route }) => {
   const loadCalendarData = useCallback(async () => {
     try {
       setLoading(true);
-      const [integrationsResponse, receivedResponse, sentResponse, contactsResponse] =
+      const [integrationsResponse, receivedResponse, sentResponse, contactsResponse, availabilityResponse] =
         await Promise.all([
           http.get('/users/calendar-integrations'),
           http.get('/users/moment-requests/received'),
           http.get('/users/moment-requests/sent'),
           http.get('/users/contacts'),
+          http.get('/users/availability'),
         ]);
+
+      if (availabilityResponse.data) {
+        setMyAvailability(availabilityResponse.data);
+      }
 
       const loadedIntegrations = integrationsResponse.data.integrations || [];
       const received = Array.isArray(receivedResponse.data.requests)
@@ -484,8 +594,15 @@ const AppStack_CalendarScreen: React.FC<Props> = ({ navigation, route }) => {
       const matchingEvent = events.find((e) => e.id === routeMomentRequestId);
       if (matchingEvent) {
         handledMomentRequestIdRef.current = routeMomentRequestId;
+        const eventDate = new Date(matchingEvent.startTime);
+        setSelectedDate(eventDate);
         setSelectedEvent(matchingEvent);
         setSheet('details');
+        const eventMinutes = eventDate.getHours() * 60 + eventDate.getMinutes();
+        const scrollY = Math.max(0, v(10) + (eventMinutes / 60) * v(80) - v(160));
+        setTimeout(() => {
+          timelineScrollRef.current?.scrollTo({ y: scrollY, animated: false });
+        }, 500);
       }
     }
   }, [routeMomentRequestId, events]);
@@ -493,6 +610,10 @@ const AppStack_CalendarScreen: React.FC<Props> = ({ navigation, route }) => {
   useFocusEffect(
     useCallback(() => {
       loadCalendarData();
+      http.get('/users/notifications').then((res) => {
+        const notifs = res.data.notifications || [];
+        setUnreadNotifCount(notifs.filter((n: any) => !n.isRead).length);
+      }).catch(() => {});
     }, [loadCalendarData])
   );
 
@@ -739,7 +860,7 @@ const AppStack_CalendarScreen: React.FC<Props> = ({ navigation, route }) => {
         );
       }
       setSelectedEvent(updatedEvent);
-      setSheet('edit');
+      setSheet(null);
       showSuccessToast(
         'Meeting rescheduled successfully',
         `${formatToastDate(rescheduleTime)}, ${formatTime(rescheduleTime)} • ${getLocationText(updatedEvent)}`
@@ -766,6 +887,7 @@ const AppStack_CalendarScreen: React.FC<Props> = ({ navigation, route }) => {
           title="Calendar"
           onBell={() => navigation.navigate('AppStack_NotificationScreen')}
           insetsTop={insets.top}
+          badgeCount={unreadNotifCount}
         />
         <View style={styles.loadingWrap}>
           <ActivityIndicator color={COLORS.green} size="large" />
@@ -781,6 +903,7 @@ const AppStack_CalendarScreen: React.FC<Props> = ({ navigation, route }) => {
           title="Calendar"
           onBell={() => navigation.navigate('AppStack_NotificationScreen')}
           insetsTop={insets.top}
+          badgeCount={unreadNotifCount}
         />
         <View style={styles.connectEmpty}>
           <View style={styles.connectIconCircle}>
@@ -851,8 +974,38 @@ const AppStack_CalendarScreen: React.FC<Props> = ({ navigation, route }) => {
           <Text style={styles.monthTitle}>{formatMonthRange(viewMode === 'month' ? monthViewBase : selectedDate)}</Text>
           <Text style={styles.monthChevron}>{viewMode === 'agenda' ? '▼' : '▲'}</Text>
         </TouchableOpacity>
-        <TouchableOpacity onPress={() => navigation.navigate('AppStack_NotificationScreen')}>
-          <Image source={NotificationsIcon} style={styles.notificationIcon} />
+        <TouchableOpacity
+          onPress={() => navigation.navigate('AppStack_NotificationScreen')}
+          style={{ position: 'relative' }}>
+          <View
+            style={{
+              width: h(40),
+              height: h(40),
+              borderRadius: h(20),
+              backgroundColor: COLORS.white,
+              alignItems: 'center',
+              justifyContent: 'center',
+            }}>
+            <Image source={NotificationsIcon} style={styles.notificationIcon} />
+          </View>
+          {unreadNotifCount > 0 && (
+            <View
+              style={{
+                position: 'absolute',
+                top: -2,
+                right: -2,
+                width: h(16),
+                height: h(16),
+                borderRadius: h(8),
+                backgroundColor: COLORS.green,
+                alignItems: 'center',
+                justifyContent: 'center',
+              }}>
+              <Text style={{ color: COLORS.white, fontSize: ms(9), fontFamily: 'AssociateSansBold' }}>
+                {unreadNotifCount > 9 ? '9+' : unreadNotifCount}
+              </Text>
+            </View>
+          )}
         </TouchableOpacity>
       </View>
 
@@ -863,9 +1016,9 @@ const AppStack_CalendarScreen: React.FC<Props> = ({ navigation, route }) => {
       {renderLocationSheet()}
       {renderInviteesSheet()}
       {renderIcloudModal()}
-      {renderSuccessToast()}
       {renderDeleteDialog()}
       {renderRemoveInviteeDialog()}
+      {renderSuccessToast()}
     </View>
   );
 
@@ -929,9 +1082,9 @@ const AppStack_CalendarScreen: React.FC<Props> = ({ navigation, route }) => {
   function renderSuccessToast() {
     if (!successToast) return null;
     return (
-      <View style={[styles.successToast, { top: Math.max(insets.top + v(18), v(34)) }]}>
+      <View style={[styles.successToast, { bottom: Math.max(insets.bottom + v(16), v(24)) }]}>
         <View style={styles.successIcon}>
-          <Text style={styles.successIconText}>✓</Text>
+          <Image source={CheckIcon} style={{ width: v(22), height: v(22) }} tintColor={COLORS.white} />
         </View>
         <View style={styles.successTextWrap}>
           <Text style={styles.successTitle}>{successToast.title}</Text>
@@ -942,50 +1095,96 @@ const AppStack_CalendarScreen: React.FC<Props> = ({ navigation, route }) => {
   }
 
   function renderAgendaView() {
+    const isToday = isSameDay(selectedDate, new Date());
+    const nowMinutes = currentTime.getHours() * 60 + currentTime.getMinutes();
+    const nowTop = v(10) + (nowMinutes / 60) * v(80);
+    const unavailBands = getUnavailableBands(myAvailability, selectedDate.getDay());
+
     return (
-      <View style={styles.content}>
+      <View style={styles.content} {...agendaPanResponder.panHandlers}>
         <WeekRail selectedDate={selectedDate} onSelect={setSelectedDate} />
-        <ScrollView contentContainerStyle={{ paddingBottom: v(140) }}>
+        <Animated.View style={{ flex: 1, transform: [{ translateX: slideAnim }] }}>
+        <ScrollView ref={timelineScrollRef} contentContainerStyle={{ paddingBottom: v(140) }}>
         <View style={styles.timeline}>
+          {/* Unavailable bands — rendered first so they sit behind everything */}
+          {unavailBands.map((band, idx) => (
+            <View
+              key={`unavail-${idx}`}
+              pointerEvents="none"
+              style={[styles.unavailBand, { top: band.top, height: band.height }]}
+            />
+          ))}
           {Array.from({ length: 24 }, (_, i) => i).map((hour) => (
             <View key={hour} style={styles.timelineRow}>
               <Text style={styles.hourText}>{formatHour(hour)}</Text>
               <View style={styles.hourLine} />
             </View>
           ))}
-          {selectedDayEvents.map((event) => (
-            <TouchableOpacity
-              key={event.id}
-              activeOpacity={0.85}
-              style={[
-                styles.eventBlock,
-                getEventPosition(event),
-                event.sourceType === 'external' && styles.externalEventBlock,
-              ]}
-              onPress={() => openEventDetails(event)}>
-              <Text style={styles.eventTitle}>{cleanTitle(event.title)}</Text>
-              <Text style={styles.eventTime}>
-                {formatTime(new Date(event.startTime))} - {formatTime(new Date(event.endTime))}
-              </Text>
-              <Text style={styles.eventPrice}>{getPriceLabel(event)}</Text>
-              <View style={styles.eventProvider}>
-                <ProviderIcon
-                  provider={
-                    event.source === 'catch'
-                      ? 'catch'
-                      : event.source === 'microsoft'
-                        ? 'microsoft'
-                        : event.source === 'icloud'
-                          ? 'icloud'
-                          : 'google'
-                  }
-                  size={20}
-                />
-              </View>
-            </TouchableOpacity>
-          ))}
+          {isToday && (
+            <View pointerEvents="none" style={[styles.currentTimeLine, { top: nowTop }]}>
+              <View style={styles.currentTimeDot} />
+              <View style={styles.currentTimeBar} />
+            </View>
+          )}
+          {selectedDayEvents.map((event) => {
+            const durationMins = getDurationMinutes(event);
+            // < 20 min (e.g. 15 min): single-row title + price, micro font
+            const isTiny = durationMins < 20;
+            // 20–29 min: two compact rows (title + price), no time/icon
+            const isCompact = !isTiny && durationMins < 30;
+            const priceLabel = getPriceLabel(event);
+            const providerKey =
+              event.source === 'catch' ? 'catch'
+              : event.source === 'microsoft' ? 'microsoft'
+              : event.source === 'icloud' ? 'icloud'
+              : 'google';
+            return (
+              <TouchableOpacity
+                key={event.id}
+                activeOpacity={0.85}
+                style={[
+                  styles.eventBlock,
+                  getEventPosition(event),
+                  event.sourceType === 'external' && styles.externalEventBlock,
+                  isTiny && styles.eventBlockTiny,
+                  isCompact && styles.eventBlockCompact,
+                ]}
+                onPress={() => openEventDetails(event)}>
+                {isTiny ? (
+                  // Single horizontal row: agenda · cost
+                  <View style={styles.eventTinyRow}>
+                    <Text style={styles.eventTinyTitle} numberOfLines={1}>
+                      {cleanTitle(event.title)}
+                    </Text>
+                    <Text style={styles.eventTinyPrice}>{priceLabel}</Text>
+                  </View>
+                ) : isCompact ? (
+                  // Two compact rows: title then price
+                  <>
+                    <Text style={styles.eventCompactTitle} numberOfLines={1}>
+                      {cleanTitle(event.title)}
+                    </Text>
+                    <Text style={styles.eventCompactPrice}>{priceLabel}</Text>
+                  </>
+                ) : (
+                  // Full layout
+                  <>
+                    <Text style={styles.eventTitle}>{cleanTitle(event.title)}</Text>
+                    <Text style={styles.eventTime}>
+                      {formatTime(new Date(event.startTime))} - {formatTime(new Date(event.endTime))}
+                    </Text>
+                    <Text style={styles.eventPrice}>{priceLabel}</Text>
+                    <View style={styles.eventProvider}>
+                      <ProviderIcon provider={providerKey} size={20} />
+                    </View>
+                  </>
+                )}
+              </TouchableOpacity>
+            );
+          })}
         </View>
         </ScrollView>
+        </Animated.View>
       </View>
     );
   }
@@ -1136,7 +1335,6 @@ const AppStack_CalendarScreen: React.FC<Props> = ({ navigation, route }) => {
           <BlurView intensity={10} tint="dark" style={styles.backdrop}>
             <View style={styles.dim} />
           </BlurView>
-          {renderSuccessToast()}
           <TouchableOpacity style={{ flex: 1 }} activeOpacity={1} onPress={() => setSheet('details')} />
           <ScrollView
             style={styles.editSheet}
@@ -1203,9 +1401,9 @@ const AppStack_CalendarScreen: React.FC<Props> = ({ navigation, route }) => {
     if (sheet !== 'time' || !selectedEvent) return null;
     const duration = getDurationMinutes(selectedEvent);
 
-    const pickSlot = (hour: number, half: number) => {
+    const pickSlot = (slotMinutes: number) => {
       const d = new Date(selectedDate);
-      d.setHours(hour, half === 0 ? 0 : 30, 0, 0);
+      d.setHours(Math.floor(slotMinutes / 60), slotMinutes % 60, 0, 0);
       setRescheduleTime(d);
     };
 
@@ -1217,6 +1415,14 @@ const AppStack_CalendarScreen: React.FC<Props> = ({ navigation, route }) => {
           <WeekRail selectedDate={selectedDate} onSelect={(d) => { setSelectedDate(d); setRescheduleTime(null); }} compact />
           <ScrollView style={{ flex: 1 }} contentContainerStyle={{ paddingBottom: v(220) }}>
           <View style={styles.timeline}>
+            {/* Unavailable bands */}
+            {getUnavailableBands(myAvailability, selectedDate.getDay()).map((band, idx) => (
+              <View
+                key={`unavail-${idx}`}
+                pointerEvents="none"
+                style={[styles.unavailBand, { top: band.top, height: band.height }]}
+              />
+            ))}
             {/* Hour row lines */}
             {Array.from({ length: 24 }, (_, i) => i).map((hour) => (
               <View key={hour} style={styles.timelineRow}>
@@ -1225,55 +1431,105 @@ const AppStack_CalendarScreen: React.FC<Props> = ({ navigation, route }) => {
               </View>
             ))}
 
-            {/* Tappable half-hour slots — behind event blocks */}
-            {Array.from({ length: 24 }, (_, hour) =>
-              [0, 1].map((half) => {
-                const slotMinutes = hour * 60 + half * 30;
-                const top = v(10) + (slotMinutes / 60) * v(80);
-                return (
-                  <TouchableOpacity
-                    key={`slot-${hour}-${half}`}
-                    activeOpacity={0.15}
-                    style={{ position: 'absolute', left: h(65), right: 0, top, height: v(40) }}
-                    onPress={() => pickSlot(hour, half)}
-                  />
-                );
-              })
-            )}
+            {/* Tappable 15-min slots — behind event blocks */}
+            {Array.from({ length: 96 }, (_, i) => {
+              const slotMinutes = i * 15;
+              const top = v(10) + (slotMinutes / 60) * v(80);
+              return (
+                <TouchableOpacity
+                  key={`slot-${i}`}
+                  activeOpacity={0.15}
+                  style={{ position: 'absolute', left: h(65), right: 0, top, height: v(20) }}
+                  onPress={() => pickSlot(slotMinutes)}
+                />
+              );
+            })}
 
             {/* Existing events */}
             {selectedDayEvents
               .filter((e) => isSameDay(new Date(e.startTime), selectedDate))
-              .map((event) => (
-                <TouchableOpacity
-                  key={event.id}
-                  activeOpacity={0.85}
-                  style={[
-                    styles.eventBlock,
-                    getEventPosition(event),
-                    { backgroundColor: COLORS.green, borderColor: COLORS.green },
-                  ]}
-                  onPress={() => setRescheduleTime(new Date(event.startTime))}>
-                  <Text style={styles.rescheduleBlockTitle}>{cleanTitle(event.title)}</Text>
-                  <Text style={styles.rescheduleBlockTime}>
-                    {formatTime(new Date(event.startTime))} - {formatTime(new Date(event.endTime))}
-                  </Text>
-                  <Text style={[styles.eventPrice, { color: COLORS.white }]}>{getPriceLabel(event)}</Text>
-                </TouchableOpacity>
-              ))}
+              .map((event) => {
+                const evDuration = getDurationMinutes(event);
+                const evIsTiny = evDuration < 20;
+                const evIsCompact = !evIsTiny && evDuration < 30;
+                const priceLabel = getPriceLabel(event);
+                return (
+                  <TouchableOpacity
+                    key={event.id}
+                    activeOpacity={0.85}
+                    style={[
+                      styles.eventBlock,
+                      evIsTiny && styles.eventBlockTiny,
+                      evIsCompact && styles.eventBlockCompact,
+                      getEventPosition(event),
+                      { backgroundColor: COLORS.green, borderColor: COLORS.green },
+                    ]}
+                    onPress={() => setRescheduleTime(new Date(event.startTime))}>
+                    {evIsTiny ? (
+                      <View style={styles.eventTinyRow}>
+                        <Text style={[styles.eventTinyTitle, { color: COLORS.white }]} numberOfLines={1}>
+                          {cleanTitle(event.title)}
+                        </Text>
+                        <Text style={[styles.eventTinyPrice, { color: COLORS.white }]}>{priceLabel}</Text>
+                      </View>
+                    ) : evIsCompact ? (
+                      <>
+                        <Text style={[styles.eventCompactTitle, { color: COLORS.white }]} numberOfLines={1}>
+                          {cleanTitle(event.title)}
+                        </Text>
+                        <Text style={[styles.eventCompactPrice, { color: COLORS.white }]}>{priceLabel}</Text>
+                      </>
+                    ) : (
+                      <>
+                        <Text style={styles.rescheduleBlockTitle}>{cleanTitle(event.title)}</Text>
+                        <Text style={styles.rescheduleBlockTime}>
+                          {formatTime(new Date(event.startTime))} - {formatTime(new Date(event.endTime))}
+                        </Text>
+                        <Text style={[styles.eventPrice, { color: COLORS.white }]}>{priceLabel}</Text>
+                      </>
+                    )}
+                  </TouchableOpacity>
+                );
+              })}
 
             {/* Selected reschedule block */}
             {rescheduleTime ? (() => {
               const endTime = new Date(rescheduleTime.getTime() + duration * 60 * 1000);
               const pos = getEventPosition({ startTime: rescheduleTime.toISOString(), endTime: endTime.toISOString() } as CalendarItem);
+              const rIsTiny = duration < 20;
+              const rIsCompact = !rIsTiny && duration < 30;
+              const priceLabel = getPriceLabel(selectedEvent);
               return (
                 <View
-                  style={[styles.eventBlock, { top: pos.top, height: pos.height, backgroundColor: COLORS.green, borderColor: COLORS.green }]}>
-                  <Text style={styles.rescheduleBlockTitle}>{cleanTitle(selectedEvent.title)}</Text>
-                  <Text style={styles.rescheduleBlockTime}>
-                    {formatTime(rescheduleTime)} - {formatTime(endTime)}
-                  </Text>
-                  <Text style={[styles.eventPrice, { color: COLORS.white }]}>{getPriceLabel(selectedEvent)}</Text>
+                  style={[
+                    styles.eventBlock,
+                    rIsTiny && styles.eventBlockTiny,
+                    rIsCompact && styles.eventBlockCompact,
+                    { top: pos.top, height: pos.height, backgroundColor: COLORS.green, borderColor: COLORS.green },
+                  ]}>
+                  {rIsTiny ? (
+                    <View style={styles.eventTinyRow}>
+                      <Text style={[styles.eventTinyTitle, { color: COLORS.white }]} numberOfLines={1}>
+                        {cleanTitle(selectedEvent.title)}
+                      </Text>
+                      <Text style={[styles.eventTinyPrice, { color: COLORS.white }]}>{priceLabel}</Text>
+                    </View>
+                  ) : rIsCompact ? (
+                    <>
+                      <Text style={[styles.eventCompactTitle, { color: COLORS.white }]} numberOfLines={1}>
+                        {cleanTitle(selectedEvent.title)}
+                      </Text>
+                      <Text style={[styles.eventCompactPrice, { color: COLORS.white }]}>{priceLabel}</Text>
+                    </>
+                  ) : (
+                    <>
+                      <Text style={styles.rescheduleBlockTitle}>{cleanTitle(selectedEvent.title)}</Text>
+                      <Text style={styles.rescheduleBlockTime}>
+                        {formatTime(rescheduleTime)} - {formatTime(endTime)}
+                      </Text>
+                      <Text style={[styles.eventPrice, { color: COLORS.white }]}>{priceLabel}</Text>
+                    </>
+                  )}
                 </View>
               );
             })() : null}
@@ -1340,7 +1596,7 @@ const AppStack_CalendarScreen: React.FC<Props> = ({ navigation, route }) => {
             region={defaultRegion}
             showsUserLocation={false}>
             {mapCoords && (
-              <Marker coordinate={mapCoords} title={editLocation} />
+              <Marker coordinate={mapCoords} />
             )}
           </MapView>
           {editLocation ? (
@@ -1497,15 +1753,45 @@ const Header = ({
   title,
   onBell,
   insetsTop,
+  badgeCount = 0,
 }: {
   title: string;
   onBell: () => void;
   insetsTop: number;
+  badgeCount?: number;
 }) => (
   <View style={[styles.header, { paddingTop: Math.max(insetsTop + v(28), v(58)) }]}>
     <Text style={styles.headerTitle}>{title}</Text>
-    <TouchableOpacity onPress={onBell}>
-      <Image source={NotificationsIcon} style={styles.notificationIcon} />
+    <TouchableOpacity onPress={onBell} style={{ position: 'relative' }}>
+      <View
+        style={{
+          width: h(40),
+          height: h(40),
+          borderRadius: h(20),
+          backgroundColor: COLORS.white,
+          alignItems: 'center',
+          justifyContent: 'center',
+        }}>
+        <Image source={NotificationsIcon} style={styles.notificationIcon} />
+      </View>
+      {badgeCount > 0 && (
+        <View
+          style={{
+            position: 'absolute',
+            top: -2,
+            right: -2,
+            width: h(16),
+            height: h(16),
+            borderRadius: h(8),
+            backgroundColor: COLORS.green,
+            alignItems: 'center',
+            justifyContent: 'center',
+          }}>
+          <Text style={{ color: COLORS.white, fontSize: ms(9), fontFamily: 'AssociateSansBold' }}>
+            {badgeCount > 9 ? '9+' : badgeCount}
+          </Text>
+        </View>
+      )}
     </TouchableOpacity>
   </View>
 );
@@ -1730,7 +2016,7 @@ const PersonBubble = ({
     <Image source={person.avatar ? { uri: person.avatar } : Avatar} style={styles.personAvatar} />
     {selectable ? (
       <View style={styles.personCheck}>
-        <Text style={styles.personCheckText}>✓</Text>
+        <Image source={CheckIcon} style={{ width: ms(11), height: ms(11) }} tintColor={COLORS.white} />
       </View>
     ) : null}
     {removable ? (
@@ -1850,7 +2136,8 @@ function getEventPosition(event: CalendarItem) {
   const start = new Date(event.startTime);
   const minutes = start.getHours() * 60 + start.getMinutes();
   const top = v(10) + (minutes / 60) * v(80);
-  const height = Math.max(v(40), (getDurationMinutes(event) / 60) * v(80));
+  // 15 min = v(20) — matches the minimum getDurationMinutes returns
+  const height = Math.max(v(20), (getDurationMinutes(event) / 60) * v(80));
   return { top, height };
 }
 
@@ -2008,6 +2295,13 @@ const styles = StyleSheet.create({
   timelineRow: { height: v(80), flexDirection: 'row', alignItems: 'flex-start' },
   hourText: { color: COLORS.ink, fontFamily: 'Inter_400Regular', fontSize: ms(13), width: h(65) },
   hourLine: { flex: 1, height: 1, backgroundColor: COLORS.line, marginTop: v(10) },
+  unavailBand: {
+    position: 'absolute',
+    left: h(65),
+    right: 0,
+    backgroundColor: '#F0F2F6',
+    opacity: 0.75,
+  },
   eventBlock: {
     position: 'absolute',
     left: h(72),
@@ -2017,6 +2311,36 @@ const styles = StyleSheet.create({
     borderColor: '#D8EE9B',
     backgroundColor: COLORS.lightGreen,
     padding: h(10),
+    overflow: 'hidden',
+  },
+  // Tiny block: 15 min — single row, micro text
+  eventBlockTiny: { paddingVertical: v(3), paddingHorizontal: h(5) },
+  eventTinyRow: { flexDirection: 'row', alignItems: 'center', flex: 1 },
+  eventTinyTitle: {
+    color: '#759719',
+    fontFamily: 'Inter_700Bold',
+    fontSize: ms(10),
+    flex: 1,
+  },
+  eventTinyPrice: {
+    color: '#759719',
+    fontFamily: 'Inter_700Bold',
+    fontSize: ms(10),
+    flexShrink: 0,
+    marginLeft: h(4),
+  },
+  // Compact block: 20–29 min — two rows, small text
+  eventBlockCompact: { paddingVertical: v(4), paddingHorizontal: h(6) },
+  eventCompactTitle: {
+    color: '#759719',
+    fontFamily: 'Inter_700Bold',
+    fontSize: ms(12),
+    marginBottom: v(1),
+  },
+  eventCompactPrice: {
+    color: '#759719',
+    fontFamily: 'Inter_700Bold',
+    fontSize: ms(11),
   },
   externalEventBlock: { backgroundColor: '#F8FDEB' },
   eventTitle: {
@@ -2656,6 +2980,27 @@ rescheduleBlockTitle: { color: COLORS.white, fontFamily: 'Inter_700Bold', fontSi
   },
   cancelText: { color: COLORS.green, fontFamily: 'Inter_700Bold', fontSize: ms(17) },
   removeText: { color: COLORS.white, fontFamily: 'Inter_700Bold', fontSize: ms(17) },
+  currentTimeLine: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    flexDirection: 'row',
+    alignItems: 'center',
+    zIndex: 5,
+  },
+  currentTimeDot: {
+    width: h(11),
+    height: h(11),
+    borderRadius: h(5.5),
+    backgroundColor: '#E53935',
+    marginLeft: h(60),
+  },
+  currentTimeBar: {
+    flex: 1,
+    height: 2,
+    backgroundColor: '#E53935',
+    marginLeft: h(1),
+  },
 });
 
 export default AppStack_CalendarScreen;

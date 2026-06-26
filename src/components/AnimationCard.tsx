@@ -78,11 +78,11 @@ const AnimationCard: React.FC<Props> = ({
             height: height1,
           }}>
           <Text
-            style={[tw`mb-0 font-dm text-black font-bold`, { marginLeft: horizontalScale(22.5), fontSize: moderateScale(13.125), height: verticalScale(16.875) }]}>
+            style={[tw`mb-0 font-associate-bold text-black`, { marginLeft: horizontalScale(22.5), fontSize: moderateScale(13.125), height: verticalScale(16.875) }]}>
             {smallTitle}
           </Text>
           <Text
-            style={[tw`mb-0 font-dm text-black font-bold`, { marginRight: horizontalScale(22.5), fontSize: moderateScale(13.125), height: verticalScale(16.875) }]}>
+            style={[tw`mb-0 font-associate-bold text-black`, { marginRight: horizontalScale(22.5), fontSize: moderateScale(13.125), height: verticalScale(16.875) }]}>
             {value}
           </Text>
         </Animated.View>

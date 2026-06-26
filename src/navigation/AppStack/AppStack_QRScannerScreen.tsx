@@ -75,11 +75,11 @@ const AppStack_QRScannerScreen: React.FC<Props> = ({ navigation }) => {
       ]}>
       <View style={tw`flex-row items-center justify-between`}>
         <TouchableOpacity onPress={() => navigation.goBack()} activeOpacity={0.7}>
-          <Text style={[tw`font-dm`, { color: activeTab === 'scan' ? colors.white : colors.grey, fontSize: moderateScale(15) }]}>
+          <Text style={[tw`font-associate`, { color: activeTab === 'scan' ? colors.white : colors.grey, fontSize: moderateScale(15) }]}>
             Close
           </Text>
         </TouchableOpacity>
-        <Text style={[tw`font-dm font-bold`, { color: activeTab === 'scan' ? colors.white : colors.ink, fontSize: moderateScale(17) }]}>
+        <Text style={[tw`font-associate-bold`, { color: activeTab === 'scan' ? colors.white : colors.ink, fontSize: moderateScale(17) }]}>
           Connect with QR
         </Text>
         <View style={{ width: horizontalScale(40) }} />
@@ -87,7 +87,7 @@ const AppStack_QRScannerScreen: React.FC<Props> = ({ navigation }) => {
       {activeTab === 'scan' && (
         <Text
           style={[
-            tw`text-center font-dm`,
+            tw`text-center font-associate`,
             { color: colors.greyLight, fontSize: moderateScale(13), marginTop: verticalScale(4) },
           ]}>
           Scan someone's code or show your own to connect instantly
@@ -122,7 +122,7 @@ const AppStack_QRScannerScreen: React.FC<Props> = ({ navigation }) => {
             ]}>
             <Text
               style={[
-                tw`font-dm font-bold`,
+                tw`font-associate-bold`,
                 {
                   fontSize: moderateScale(14),
                   color: active
@@ -150,10 +150,10 @@ const AppStack_QRScannerScreen: React.FC<Props> = ({ navigation }) => {
     if (!permission.granted) {
       return (
         <View style={[tw`flex-1 bg-black items-center justify-center`, { paddingHorizontal: '8%' }]}>
-          <Text style={[tw`text-white font-bold font-dm text-center`, { fontSize: moderateScale(20), marginBottom: verticalScale(12) }]}>
+          <Text style={[tw`text-white font-associate-bold text-center`, { fontSize: moderateScale(20), marginBottom: verticalScale(12) }]}>
             Camera Access Needed
           </Text>
-          <Text style={[tw`text-gray-400 font-dm text-center`, { fontSize: moderateScale(14), marginBottom: verticalScale(30) }]}>
+          <Text style={[tw`text-gray-400 font-associate text-center`, { fontSize: moderateScale(14), marginBottom: verticalScale(30) }]}>
             To scan booking QR codes, Catch needs access to your camera.
           </Text>
           {permission.canAskAgain ? (
@@ -161,15 +161,15 @@ const AppStack_QRScannerScreen: React.FC<Props> = ({ navigation }) => {
               onPress={requestPermission}
               activeOpacity={0.7}
               style={[tw`rounded-full items-center`, { backgroundColor: colors.green, paddingHorizontal: horizontalScale(30), paddingVertical: verticalScale(14) }]}>
-              <Text style={[tw`text-white font-bold font-dm`, { fontSize: moderateScale(15) }]}>Grant Permission</Text>
+              <Text style={[tw`text-white font-associate-bold`, { fontSize: moderateScale(15) }]}>Grant Permission</Text>
             </TouchableOpacity>
           ) : (
             <TouchableOpacity onPress={() => Linking.openSettings()} activeOpacity={0.7} style={[tw`rounded-full items-center`, { backgroundColor: colors.green, paddingHorizontal: horizontalScale(30), paddingVertical: verticalScale(14) }]}>
-              <Text style={[tw`text-white font-bold font-dm`, { fontSize: moderateScale(15) }]}>Open Settings</Text>
+              <Text style={[tw`text-white font-associate-bold`, { fontSize: moderateScale(15) }]}>Open Settings</Text>
             </TouchableOpacity>
           )}
           <TouchableOpacity onPress={() => setActiveTab('my_code')} activeOpacity={0.7} style={{ marginTop: verticalScale(20) }}>
-            <Text style={[tw`text-gray-400 font-dm`, { fontSize: moderateScale(14) }]}>Show My Code instead</Text>
+            <Text style={[tw`text-gray-400 font-associate`, { fontSize: moderateScale(14) }]}>Show My Code instead</Text>
           </TouchableOpacity>
         </View>
       );
@@ -224,7 +224,7 @@ const AppStack_QRScannerScreen: React.FC<Props> = ({ navigation }) => {
         {renderHeader()}
 
         {/* Toggle */}
-        <View style={[tw`absolute left-0 right-0`, { bottom: insets.bottom + verticalScale(40) }]}>
+        <View style={[tw`absolute left-0 right-0`, { top: insets.top + verticalScale(80) }]}>
           {renderToggle(true)}
         </View>
       </View>
@@ -234,13 +234,35 @@ const AppStack_QRScannerScreen: React.FC<Props> = ({ navigation }) => {
   // ── My Code tab ───────────────────────────────────────────────────────────
   return (
     <View style={[tw`flex-1`, { backgroundColor: colors.card }]}>
-      {renderHeader()}
+      {/* Inline header with subtitle */}
+      <View style={{ paddingTop: insets.top + verticalScale(10), paddingHorizontal: '8%' }}>
+        <View style={tw`flex-row items-center justify-between`}>
+          <TouchableOpacity onPress={() => navigation.goBack()} activeOpacity={0.7}>
+            <Text style={[tw`font-associate`, { color: colors.grey, fontSize: moderateScale(15) }]}>
+              Close
+            </Text>
+          </TouchableOpacity>
+          <Text style={[tw`font-associate-bold`, { color: colors.ink, fontSize: moderateScale(17) }]}>
+            Connect with QR
+          </Text>
+          <View style={{ width: horizontalScale(40) }} />
+        </View>
+        <Text
+          style={[
+            tw`font-associate text-center`,
+            { color: colors.grey, fontSize: moderateScale(13), marginTop: verticalScale(4) },
+          ]}>
+          Share your booking link or scan codes to connect
+        </Text>
+      </View>
 
-      <View
-        style={[
-          tw`flex-1 items-center justify-center`,
-          { paddingTop: insets.top + verticalScale(100) },
-        ]}>
+      {/* Toggle below header */}
+      <View style={{ marginTop: verticalScale(16), marginBottom: verticalScale(8) }}>
+        {renderToggle(false)}
+      </View>
+
+      {/* QR code */}
+      <View style={tw`flex-1 items-center justify-center`}>
         <View
           style={[
             tw`rounded-3xl items-center justify-center`,
@@ -263,14 +285,11 @@ const AppStack_QRScannerScreen: React.FC<Props> = ({ navigation }) => {
             />
           ) : (
             <View style={{ width: horizontalScale(220), height: horizontalScale(220), alignItems: 'center', justifyContent: 'center' }}>
-              <Text style={[tw`font-dm`, { color: colors.grey, fontSize: moderateScale(14) }]}>Sign in to see your code</Text>
+              <Text style={[tw`font-associate`, { color: colors.grey, fontSize: moderateScale(14) }]}>Sign in to see your code</Text>
             </View>
           )}
         </View>
       </View>
-
-      {/* Toggle */}
-      <View style={{ marginBottom: verticalScale(16) }}>{renderToggle(false)}</View>
 
       {/* Share / Copy link CTAs */}
       <View
@@ -286,7 +305,7 @@ const AppStack_QRScannerScreen: React.FC<Props> = ({ navigation }) => {
           onPress={handleShare}
           activeOpacity={0.85}
           style={[tw`rounded-full items-center`, { backgroundColor: colors.green, paddingVertical: verticalScale(15) }]}>
-          <Text style={[tw`font-dm font-bold`, { color: colors.white, fontSize: moderateScale(16) }]}>Share</Text>
+          <Text style={[tw`font-associate-bold`, { color: colors.white, fontSize: moderateScale(16) }]}>Share</Text>
         </TouchableOpacity>
         <TouchableOpacity
           onPress={handleCopyLink}
@@ -299,7 +318,7 @@ const AppStack_QRScannerScreen: React.FC<Props> = ({ navigation }) => {
               paddingVertical: verticalScale(14),
             },
           ]}>
-          <Text style={[tw`font-dm font-bold`, { color: colors.green, fontSize: moderateScale(16) }]}>Copy Link</Text>
+          <Text style={[tw`font-associate-bold`, { color: colors.green, fontSize: moderateScale(16) }]}>Copy Link</Text>
         </TouchableOpacity>
       </View>
 

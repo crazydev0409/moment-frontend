@@ -63,7 +63,7 @@ const AppStack_AvailableTimesScreen: React.FC<Props> = ({ navigation, route }) =
   });
   const [selectedSlot, setSelectedSlot] = useState<TimeSlot | null>(null);
   const [isBooking, setIsBooking] = useState(false);
-  const [toast, setToast] = useState<string | null>(null);
+  const [toast, setToast] = useState<{ message: string; subtitle?: string } | null>(null);
 
   const days = useMemo(() => generateDays(14), []);
 
@@ -116,7 +116,7 @@ const AppStack_AvailableTimesScreen: React.FC<Props> = ({ navigation, route }) =
         hookId: hook.id,
       });
       setSelectedSlot(null);
-      setToast('Request sent successfully');
+      setToast({ message: 'Request sent successfully', subtitle: 'Waiting for confirmation' });
     } catch (err: any) {
       Alert.alert('Error', err?.response?.data?.error || 'Could not send request.');
     } finally {
@@ -145,7 +145,7 @@ const AppStack_AvailableTimesScreen: React.FC<Props> = ({ navigation, route }) =
             { height: HOUR_HEIGHT, borderTopWidth: 1, borderTopColor: colors.border },
           ]}>
           <View style={{ width: horizontalScale(60) }}>
-            <Text style={[tw`font-dm`, { color: colors.grey, fontSize: moderateScale(11.5), paddingTop: verticalScale(4), paddingLeft: horizontalScale(4) }]}>
+            <Text style={[tw`font-associate`, { color: colors.grey, fontSize: moderateScale(11.5), paddingTop: verticalScale(4), paddingLeft: horizontalScale(4) }]}>
               {`${h % 12 || 12}:00 ${h >= 12 ? 'pm' : 'am'}`}
             </Text>
           </View>
@@ -179,14 +179,14 @@ const AppStack_AvailableTimesScreen: React.FC<Props> = ({ navigation, route }) =
               },
             ]}>
             <View style={tw`flex-row items-center justify-between`}>
-              <Text style={[tw`font-dm font-bold`, { color: textColor, fontSize: moderateScale(13) }]} numberOfLines={1}>
+              <Text style={[tw`font-associate-bold`, { color: textColor, fontSize: moderateScale(13) }]} numberOfLines={1}>
                 {slot.hook.title}
               </Text>
-              <Text style={[tw`font-dm font-bold`, { color: textColor, fontSize: moderateScale(13) }]}>
+              <Text style={[tw`font-associate-bold`, { color: textColor, fontSize: moderateScale(13) }]}>
                 {isPaid ? formatPrice(slot.hook.priceCents, slot.hook.currency) : 'Free'}
               </Text>
             </View>
-            <Text style={[tw`font-dm`, { color: textColor, fontSize: moderateScale(11.5) }]}>
+            <Text style={[tw`font-associate`, { color: textColor, fontSize: moderateScale(11.5) }]}>
               {formatMinutes(slot.startMinutes)} – {formatMinutes(slot.endMinutes)}
             </Text>
           </TouchableOpacity>
@@ -208,7 +208,7 @@ const AppStack_AvailableTimesScreen: React.FC<Props> = ({ navigation, route }) =
         </TouchableOpacity>
         <Text
           style={[
-            tw`flex-1 font-dm font-bold text-center`,
+            tw`flex-1 font-associate-bold text-center`,
             { color: colors.ink, fontSize: moderateScale(17), marginHorizontal: horizontalScale(8) },
           ]}
           numberOfLines={1}>
@@ -242,7 +242,7 @@ const AppStack_AvailableTimesScreen: React.FC<Props> = ({ navigation, route }) =
               ]}>
               <Text
                 style={[
-                  tw`font-dm`,
+                  tw`font-associate`,
                   {
                     color: isSelected ? colors.white : colors.grey,
                     fontSize: moderateScale(12),
@@ -253,7 +253,7 @@ const AppStack_AvailableTimesScreen: React.FC<Props> = ({ navigation, route }) =
               </Text>
               <Text
                 style={[
-                  tw`font-dm font-bold`,
+                  tw`font-associate-bold`,
                   { color: isSelected ? colors.white : isToday ? colors.green : colors.ink, fontSize: moderateScale(18) },
                 ]}>
                 {day.getDate()}
@@ -274,7 +274,7 @@ const AppStack_AvailableTimesScreen: React.FC<Props> = ({ navigation, route }) =
           showsVerticalScrollIndicator={false}>
           {slotsForDay.length === 0 ? (
             <View style={{ paddingTop: verticalScale(60), alignItems: 'center' }}>
-              <Text style={[tw`font-dm`, { color: colors.grey, fontSize: moderateScale(14) }]}>
+              <Text style={[tw`font-associate`, { color: colors.grey, fontSize: moderateScale(14) }]}>
                 No available slots on this day
               </Text>
             </View>
@@ -302,10 +302,10 @@ const AppStack_AvailableTimesScreen: React.FC<Props> = ({ navigation, route }) =
           {selectedSlot.hook.isPaid ? (
             <View style={[tw`flex-row items-center justify-between`, { marginBottom: verticalScale(14) }]}>
               <View>
-                <Text style={[tw`font-dm`, { color: colors.grey, fontSize: moderateScale(13) }]}>
+                <Text style={[tw`font-associate`, { color: colors.grey, fontSize: moderateScale(13) }]}>
                   Pay {contactName}
                 </Text>
-                <Text style={[tw`font-dm font-bold`, { color: colors.ink, fontSize: moderateScale(24) }]}>
+                <Text style={[tw`font-associate-bold`, { color: colors.ink, fontSize: moderateScale(24) }]}>
                   {formatPrice(selectedSlot.hook.priceCents, selectedSlot.hook.currency)}
                 </Text>
               </View>
@@ -323,7 +323,7 @@ const AppStack_AvailableTimesScreen: React.FC<Props> = ({ navigation, route }) =
             {isBooking ? (
               <ActivityIndicator color={colors.white} />
             ) : (
-              <Text style={[tw`font-dm font-bold`, { color: colors.white, fontSize: moderateScale(16) }]}>
+              <Text style={[tw`font-associate-bold`, { color: colors.white, fontSize: moderateScale(16) }]}>
                 {selectedSlot.hook.isPaid ? `Book · ${formatDuration(selectedSlot.hook.durationMinutes)}` : 'Send request'}
               </Text>
             )}
@@ -331,7 +331,7 @@ const AppStack_AvailableTimesScreen: React.FC<Props> = ({ navigation, route }) =
         </View>
       )}
 
-      <Toast message={toast || ''} visible={!!toast} onHide={() => { setToast(null); navigation.goBack(); }} />
+      <Toast message={toast?.message || ''} subtitle={toast?.subtitle} visible={!!toast} onHide={() => { setToast(null); navigation.goBack(); }} />
     </View>
   );
 };

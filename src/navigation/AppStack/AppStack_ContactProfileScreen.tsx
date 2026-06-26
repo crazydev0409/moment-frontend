@@ -1,8 +1,11 @@
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useRef, useState } from 'react';
 import {
+  Animated,
   ActivityIndicator,
   Alert,
+  Dimensions,
   Image,
+  PanResponder,
   RefreshControl,
   ScrollView,
   Switch,
@@ -12,14 +15,163 @@ import {
 } from 'react-native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { useFocusEffect } from '@react-navigation/native';
+import Svg, { Circle, Path } from 'react-native-svg';
 
 import tw from '~/tailwindcss';
 import { AppStackParamList } from '.';
-import { BackArrow, Avatar } from '~/lib/images';
+import { BackArrow, Avatar, RescheduleIcon, UpcomingIcon, CalendarIcon, LocationIcon, HookIcon, TrashIcon, ChevronIcon, CheckIcon, BrainIcon } from '~/lib/images';
 import { http } from '~/helpers/http';
-import { horizontalScale, verticalScale, moderateScale } from '~/helpers/responsive';
-import { colors, accessBadge, priceBadge } from '~/lib/theme';
+import { horizontalScale as h, verticalScale as v, moderateScale as ms } from '~/helpers/responsive';
+const horizontalScale = h, verticalScale = v, moderateScale = ms;
+import { colors, accessBadge } from '~/lib/theme';
 import { Hook, formatDuration, formatPrice } from '~/helpers/hooks';
+
+const GlobeIcon = ({ size = 13, color = colors.grey }: { size?: number; color?: string }) => (
+  <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+    <Circle cx="12" cy="12" r="9" stroke={color} strokeWidth="1.5" />
+    <Path d="M12 3C9.5 6.5 9.5 17.5 12 21M12 3C14.5 6.5 14.5 17.5 12 21M3.5 9h17M3.5 15h17" stroke={color} strokeWidth="1.5" />
+  </Svg>
+);
+
+const MetaRow = ({ icon, label, globe }: { icon?: number; label: string; globe?: boolean }) => (
+  <View style={{ flexDirection: 'row', alignItems: 'center', gap: h(6) }}>
+    {globe ? (
+      <GlobeIcon size={h(13)} color={colors.grey} />
+    ) : icon ? (
+      <Image source={icon} style={{ width: h(13), height: h(13) }} tintColor={colors.grey} />
+    ) : null}
+    <Text style={{ fontFamily: 'AssociateSansRegular', color: colors.grey, fontSize: ms(12) }}>{label}</Text>
+  </View>
+);
+
+const ACTION_WIDTH = h(80);
+// Closed = card visible, actions off-screen. Translatex of the whole row:
+//   closed:           -ACTION_WIDTH  (card fills the container)
+//   reschedule open:   0             (row shifted right, reschedule bar visible)
+//   cancel open:      -ACTION_WIDTH*2 (row shifted left, cancel bar visible)
+const POS_CLOSED = -ACTION_WIDTH;
+const POS_RESCHEDULE = 0;
+const POS_CANCEL = -ACTION_WIDTH * 2;
+const SNAP_THRESHOLD = ACTION_WIDTH * 0.35;
+
+const SwipeableRow: React.FC<{
+  onReschedule: () => void;
+  onCancel: () => void;
+  children: React.ReactNode;
+}> = ({ onReschedule, onCancel, children }) => {
+  // Measure the container so the card occupies exactly the right width in the row
+  const [cardWidth, setCardWidth] = useState(
+    Math.round(Dimensions.get('window').width * 0.84),
+  );
+  const translateX = useRef(new Animated.Value(POS_CLOSED)).current;
+  const posRef = useRef(POS_CLOSED);
+
+  const snapTo = (toValue: number, callback?: () => void) => {
+    Animated.spring(translateX, {
+      toValue,
+      useNativeDriver: true,
+      overshootClamping: true,
+      tension: 80,
+      friction: 10,
+    }).start(() => {
+      posRef.current = toValue;
+      callback?.();
+    });
+  };
+
+  const panResponder = useRef(
+    PanResponder.create({
+      onMoveShouldSetPanResponder: (_, g) =>
+        Math.abs(g.dx) > 8 && Math.abs(g.dx) > Math.abs(g.dy) * 1.5,
+      onPanResponderGrant: () => {
+        translateX.setOffset(posRef.current);
+        translateX.setValue(0);
+      },
+      onPanResponderMove: (_, g) => {
+        const min = POS_CANCEL - posRef.current;
+        const max = POS_RESCHEDULE - posRef.current;
+        translateX.setValue(Math.max(min, Math.min(max, g.dx)));
+      },
+      onPanResponderRelease: (_, g) => {
+        translateX.flattenOffset();
+        const finalX = Math.max(POS_CANCEL, Math.min(POS_RESCHEDULE, posRef.current + g.dx));
+        if (finalX > POS_CLOSED + SNAP_THRESHOLD || g.vx > 0.5) {
+          snapTo(POS_RESCHEDULE);
+        } else if (finalX < POS_CLOSED - SNAP_THRESHOLD || g.vx < -0.5) {
+          snapTo(POS_CANCEL);
+        } else {
+          snapTo(POS_CLOSED);
+        }
+      },
+      onPanResponderTerminate: () => {
+        translateX.flattenOffset();
+        snapTo(POS_CLOSED);
+      },
+    }),
+  ).current;
+
+  const handleReschedule = () => snapTo(POS_CLOSED, onReschedule);
+  const handleCancel = () => snapTo(POS_CLOSED, onCancel);
+
+  return (
+    <View
+      style={{ marginBottom: v(12), overflow: 'hidden' }}
+      onLayout={(e) => setCardWidth(e.nativeEvent.layout.width)}>
+      {/* Single animated row: [Reschedule | Card | Cancel] — all three slide together */}
+      <Animated.View
+        style={{
+          flexDirection: 'row',
+          width: cardWidth + ACTION_WIDTH * 2,
+          transform: [{ translateX }],
+        }}
+        {...panResponder.panHandlers}>
+
+        {/* Left: Reschedule — gap on right side */}
+        <View style={{ width: ACTION_WIDTH, paddingRight: h(8) }}>
+          <TouchableOpacity
+            onPress={handleReschedule}
+            activeOpacity={0.75}
+            style={{
+              flex: 1,
+              alignItems: 'center',
+              justifyContent: 'center',
+              backgroundColor: colors.white,
+              borderRadius: h(24),
+            }}>
+            <Image source={RescheduleIcon} style={{ width: h(22), height: h(22) }} tintColor={colors.grey} />
+            <Text style={{ fontFamily: 'AssociateSansRegular', color: colors.grey, fontSize: ms(11), marginTop: v(4) }}>
+              Reschedule
+            </Text>
+          </TouchableOpacity>
+        </View>
+
+        {/* Center: the card itself — rounded corners on all sides */}
+        <View style={{ width: cardWidth }}>
+          {children}
+        </View>
+
+        {/* Right: Cancel — gap on left side */}
+        <View style={{ width: ACTION_WIDTH, paddingLeft: h(8) }}>
+          <TouchableOpacity
+            onPress={handleCancel}
+            activeOpacity={0.75}
+            style={{
+              flex: 1,
+              alignItems: 'center',
+              justifyContent: 'center',
+              backgroundColor: colors.white,
+              borderRadius: h(24),
+            }}>
+            <Image source={TrashIcon} style={{ width: h(20), height: h(20) }} tintColor={colors.danger} />
+            <Text style={{ fontFamily: 'AssociateSansRegular', color: colors.danger, fontSize: ms(11), marginTop: v(4) }}>
+              Cancel
+            </Text>
+          </TouchableOpacity>
+        </View>
+      </Animated.View>
+    </View>
+  );
+};
 
 type Props = NativeStackScreenProps<AppStackParamList, 'AppStack_ContactProfileScreen'>;
 
@@ -36,6 +188,7 @@ interface MeetingRequest {
   isPaid?: boolean;
   priceCents?: number | null;
   currency?: string;
+  confidenceScore?: number | null;
   participants?: Array<{ user?: { avatar?: string | null } | null }>;
 }
 
@@ -43,7 +196,7 @@ interface ContactDetail {
   id: string;
   displayName: string;
   autoConfirm: boolean;
-  contactUser?: { id: string; name?: string | null; avatar?: string | null; bio?: string | null } | null;
+  contactUser?: { id: string; name?: string | null; avatar?: string | null; bio?: string | null; accountType?: string | null } | null;
   contactUserId?: string | null;
 }
 
@@ -117,6 +270,24 @@ const AppStack_ContactProfileScreen: React.FC<Props> = ({ navigation, route }) =
   useFocusEffect(useCallback(() => { load(); }, [load]));
 
   const onRefresh = useCallback(() => { setIsRefreshing(true); load(false); }, [load]);
+
+  const handleCancelMeeting = (meetingId: string) => {
+    Alert.alert('Cancel meeting', 'Are you sure you want to cancel this meeting?', [
+      { text: 'No', style: 'cancel' },
+      {
+        text: 'Yes, cancel',
+        style: 'destructive',
+        onPress: async () => {
+          try {
+            await http.delete(`/users/moment-requests/${meetingId}`);
+            setUpcomingMeetings((prev) => prev.filter((m) => m.id !== meetingId));
+          } catch {
+            Alert.alert('Error', 'Failed to cancel the meeting. Please try again.');
+          }
+        },
+      },
+    ]);
+  };
 
   const handleToggleBlock = async (val: boolean) => {
     const uid = contactUserId || contact?.contactUserId || contact?.contactUser?.id;
@@ -202,7 +373,7 @@ const AppStack_ContactProfileScreen: React.FC<Props> = ({ navigation, route }) =
                 borderColor: colors.card,
               },
             ]}>
-            <Text style={[tw`font-dm font-bold`, { fontSize: moderateScale(9), color: colors.grey }]}>+{extra}</Text>
+            <Text style={[tw`font-associate-bold`, { fontSize: moderateScale(9), color: colors.grey }]}>+{extra}</Text>
           </View>
         )}
       </View>
@@ -211,172 +382,157 @@ const AppStack_ContactProfileScreen: React.FC<Props> = ({ navigation, route }) =
 
   const renderMeetingCard = (m: MeetingRequest) => {
     const statusLabel = m.status === 'confirmed' ? 'Confirmed' : m.status === 'pending' ? 'Pending' : m.status;
+    const isConfirmed = m.status === 'confirmed';
+    const score = typeof m.confidenceScore === 'number' ? m.confidenceScore : null;
+
     return (
-      <View
+      <SwipeableRow
         key={m.id}
-        style={[
-          tw`rounded-3xl`,
-          { backgroundColor: colors.card, padding: moderateScale(16), marginBottom: verticalScale(12) },
-        ]}>
-        <View style={tw`flex-row items-center`} >
-          <View
-            style={[
-              tw`rounded-full`,
-              {
-                backgroundColor: m.status === 'confirmed' ? colors.greenTint : colors.field,
-                paddingHorizontal: horizontalScale(10),
-                paddingVertical: verticalScale(4),
-                marginRight: horizontalScale(8),
-              },
-            ]}>
-            <Text
+        onReschedule={() => navigation.navigate('AppStack_CalendarScreen', { momentRequestId: m.id })}
+        onCancel={() => handleCancelMeeting(m.id)}>
+        <View style={[tw`rounded-3xl`, { backgroundColor: colors.card, padding: ms(14) }]}>
+          {/* Status + price badges */}
+          <View style={[tw`flex-row`, { marginBottom: v(6) }]}>
+            <View
               style={[
-                tw`font-dm font-bold`,
-                { color: m.status === 'confirmed' ? colors.greenText : colors.grey, fontSize: moderateScale(11) },
+                tw`rounded-full`,
+                {
+                  backgroundColor: isConfirmed ? colors.greenTint : colors.field,
+                  paddingHorizontal: h(10),
+                  paddingVertical: v(3),
+                  marginRight: h(6),
+                },
               ]}>
-              {statusLabel}
-            </Text>
-          </View>
-          <View
-            style={[
-              tw`rounded-full`,
-              {
-                backgroundColor: m.isPaid ? colors.ink : colors.greenTint,
-                paddingHorizontal: horizontalScale(10),
-                paddingVertical: verticalScale(4),
-              },
-            ]}>
-            <Text
+              <Text style={[tw`font-associate-bold`, { color: isConfirmed ? colors.greenText : colors.grey, fontSize: ms(11) }]}>
+                {statusLabel}
+              </Text>
+            </View>
+            <View
               style={[
-                tw`font-dm font-bold`,
-                { color: m.isPaid ? colors.white : colors.greenText, fontSize: moderateScale(11) },
+                tw`rounded-full`,
+                {
+                  backgroundColor: m.isPaid ? colors.ink : colors.greenTint,
+                  paddingHorizontal: h(10),
+                  paddingVertical: v(3),
+                },
               ]}>
-              {m.isPaid ? formatPrice(m.priceCents, m.currency) : 'Free'}
-            </Text>
+              <Text style={[tw`font-associate-bold`, { color: m.isPaid ? colors.white : colors.greenText, fontSize: ms(11) }]}>
+                {m.isPaid ? formatPrice(m.priceCents, m.currency) : 'Free'}
+              </Text>
+            </View>
           </View>
-        </View>
 
-        <Text style={[tw`font-dm font-bold`, { color: colors.ink, fontSize: moderateScale(16), marginTop: verticalScale(8) }]}>
-          {m.title}
-        </Text>
+          {/* Title */}
+          <Text style={[tw`font-associate-bold`, { color: colors.ink, fontSize: ms(15), marginBottom: v(8) }]}>
+            {m.title}
+          </Text>
 
-        <View style={{ marginTop: verticalScale(8) }}>
-          <Text style={[tw`font-dm`, { color: colors.grey, fontSize: moderateScale(12.5) }]}>
-            🕐 {formatMeetingTime(m.startTime, m.endTime)}
-          </Text>
-          <Text style={[tw`font-dm`, { color: colors.grey, fontSize: moderateScale(12.5) }]}>
-            📅 {formatMeetingDate(m.startTime)}
-          </Text>
-          <Text style={[tw`font-dm`, { color: colors.grey, fontSize: moderateScale(12.5) }]}>
-            🌐 {m.locationType === 'in_person' ? 'In-person' : 'Remote'}
-          </Text>
-          {m.locationLabel && (
-            <Text style={[tw`font-dm`, { color: colors.grey, fontSize: moderateScale(12.5) }]}>
-              📍 {m.locationLabel}
-            </Text>
+          {/* Meta rows */}
+          <View style={{ gap: v(4) }}>
+            <MetaRow icon={UpcomingIcon} label={formatMeetingTime(m.startTime, m.endTime)} />
+            <MetaRow icon={CalendarIcon} label={formatMeetingDate(m.startTime)} />
+            <MetaRow globe label={m.locationType === 'in_person' ? 'In-person' : 'Remote'} />
+            {m.locationLabel && <MetaRow icon={LocationIcon} label={m.locationLabel} />}
+          </View>
+
+          {/* Confidence Score */}
+          {score !== null && (
+            <View style={{ marginTop: v(10) }}>
+              <View style={[tw`flex-row items-center justify-between`, { marginBottom: v(4) }]}>
+                <Text style={[tw`font-associate`, { color: colors.grey, fontSize: ms(12) }]}>Confidence Score:</Text>
+                <Text style={[tw`font-associate-bold`, { color: colors.green, fontSize: ms(12) }]}>
+                  {score.toFixed(2)}
+                </Text>
+              </View>
+              <View style={{ height: v(6), backgroundColor: colors.field, borderRadius: h(3), overflow: 'hidden' }}>
+                <View style={{ width: `${Math.round(score * 100)}%`, height: '100%', backgroundColor: colors.green, borderRadius: h(3) }} />
+              </View>
+            </View>
           )}
-        </View>
 
-        <View style={[tw`flex-row items-center justify-between`, { marginTop: verticalScale(10) }]}>
-          {renderAvatarStack(m.participants)}
-          <View style={tw`flex-row`}>
-            <TouchableOpacity
-              onPress={() => navigation.navigate('AppStack_CalendarScreen', { momentRequestId: m.id })}
-              style={[
-                tw`rounded-full items-center justify-center`,
-                {
-                  borderWidth: 1,
-                  borderColor: colors.border,
-                  paddingHorizontal: horizontalScale(12),
-                  paddingVertical: verticalScale(6),
-                  marginRight: horizontalScale(8),
-                },
-              ]}>
-              <Text style={[tw`font-dm`, { color: colors.grey, fontSize: moderateScale(12) }]}>Reschedule</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[
-                tw`rounded-full items-center justify-center`,
-                {
-                  borderWidth: 1,
-                  borderColor: colors.border,
-                  paddingHorizontal: horizontalScale(12),
-                  paddingVertical: verticalScale(6),
-                },
-              ]}>
-              <Text style={[tw`font-dm`, { color: colors.danger, fontSize: moderateScale(12) }]}>Cancel</Text>
-            </TouchableOpacity>
+          {/* Avatar stack */}
+          <View style={[tw`flex-row items-center`, { marginTop: v(10) }]}>
+            {renderAvatarStack(m.participants)}
           </View>
         </View>
-      </View>
+      </SwipeableRow>
     );
   };
 
   const renderHookCard = (hook: Hook) => {
     const isExpanded = !!expandedHooks[hook.id];
     const access = accessBadge[hook.accessLevel] || accessBadge.personal;
+    const hookParticipants = hook.participants
+      ?.filter((p) => p.status === 'accepted')
+      .map((p) => ({ user: p.user ? { avatar: p.user.avatar } : undefined }));
+
     return (
       <View
         key={hook.id}
         style={[
           tw`rounded-3xl`,
-          { backgroundColor: colors.card, padding: moderateScale(16), marginBottom: verticalScale(12) },
+          { backgroundColor: colors.card, padding: ms(16), marginBottom: v(12) },
         ]}>
-        <View style={tw`flex-row items-start justify-between`}>
+        {/* Title + badges row */}
+        <View style={[tw`flex-row items-start justify-between`, { marginBottom: v(8) }]}>
           <Text
             numberOfLines={1}
-            style={[tw`font-dm font-bold flex-1`, { color: colors.ink, fontSize: moderateScale(16), marginRight: horizontalScale(8) }]}>
-            {hook.icon ? `${hook.icon} ` : ''}{hook.title}
+            style={[tw`font-associate-bold flex-1`, { color: colors.ink, fontSize: ms(16), marginRight: h(8) }]}>
+            {hook.title}
           </Text>
           <View style={tw`flex-row items-center`}>
             <View
               style={[
                 tw`rounded-full`,
-                { backgroundColor: access.bg, paddingHorizontal: horizontalScale(10), paddingVertical: verticalScale(4), marginRight: horizontalScale(6) },
+                { backgroundColor: access.bg, paddingHorizontal: h(10), paddingVertical: v(3), marginRight: h(6) },
               ]}>
-              <Text style={[tw`font-dm font-bold`, { color: access.fg, fontSize: moderateScale(11) }]}>{access.label}</Text>
+              <Text style={[tw`font-associate-bold`, { color: access.fg, fontSize: ms(11) }]}>{access.label}</Text>
             </View>
             <View
               style={[
                 tw`rounded-full`,
-                {
-                  backgroundColor: hook.isPaid ? colors.ink : colors.greenTint,
-                  paddingHorizontal: horizontalScale(10),
-                  paddingVertical: verticalScale(4),
-                },
+                { backgroundColor: hook.isPaid ? colors.ink : colors.greenTint, paddingHorizontal: h(10), paddingVertical: v(3) },
               ]}>
-              <Text style={[tw`font-dm font-bold`, { color: hook.isPaid ? colors.white : colors.greenText, fontSize: moderateScale(11) }]}>
+              <Text style={[tw`font-associate-bold`, { color: hook.isPaid ? colors.white : colors.greenText, fontSize: ms(11) }]}>
                 {hook.isPaid ? formatPrice(hook.priceCents, hook.currency) : 'Free'}
               </Text>
             </View>
           </View>
         </View>
 
-        <View style={{ marginTop: verticalScale(8) }}>
-          <Text style={[tw`font-dm`, { color: colors.grey, fontSize: moderateScale(12.5) }]}>
-            🕐 {formatDuration(hook.durationMinutes)}
-          </Text>
+        {/* Meta rows */}
+        <View style={{ gap: v(4) }}>
+          <MetaRow icon={UpcomingIcon} label={formatDuration(hook.durationMinutes)} />
           {hook.locationType === 'in_person' && hook.locationLabel && (
-            <Text style={[tw`font-dm`, { color: colors.grey, fontSize: moderateScale(12.5) }]}>
-              📍 {hook.locationLabel}
-            </Text>
+            <MetaRow icon={LocationIcon} label={hook.locationLabel} />
           )}
         </View>
 
+        {/* Description when expanded */}
         {isExpanded && !!hook.description && (
-          <Text style={[tw`font-dm`, { color: colors.grey, fontSize: moderateScale(12.5), marginTop: verticalScale(8) }]}>
+          <Text style={[tw`font-associate`, { color: colors.grey, fontSize: ms(12.5), marginTop: v(8) }]}>
             {hook.description}
           </Text>
         )}
 
-        <View style={[tw`flex-row items-center justify-between`, { marginTop: verticalScale(12) }]}>
-          <TouchableOpacity
-            onPress={() => setExpandedHooks((p) => ({ ...p, [hook.id]: !p[hook.id] }))}
-            activeOpacity={0.7}>
-            <Text style={[tw`font-dm font-bold`, { color: colors.grey, fontSize: moderateScale(12.5) }]}>
-              {isExpanded ? 'Less details ⌃' : 'More details ⌄'}
-            </Text>
-          </TouchableOpacity>
+        {/* Bottom: avatar stack + actions */}
+        <View style={[tw`flex-row items-center justify-between`, { marginTop: v(12) }]}>
+          <View style={tw`flex-row items-center`}>
+            <TouchableOpacity
+              onPress={() => setExpandedHooks((p) => ({ ...p, [hook.id]: !p[hook.id] }))}
+              activeOpacity={0.7}
+              style={{ flexDirection: 'row', alignItems: 'center', gap: h(4), marginRight: h(12) }}>
+              <Text style={[tw`font-associate-bold`, { color: colors.grey, fontSize: ms(12.5) }]}>
+                {isExpanded ? 'Less details' : 'More details'}
+              </Text>
+              <Image
+                source={ChevronIcon}
+                style={{ width: h(12), height: h(12), transform: [{ rotate: isExpanded ? '270deg' : '90deg' }] }}
+                tintColor={colors.grey}
+              />
+            </TouchableOpacity>
+            {hookParticipants && hookParticipants.length > 0 && renderAvatarStack(hookParticipants)}
+          </View>
           <TouchableOpacity
             onPress={() => {
               const uid = contactUserId || contact?.contactUserId || contact?.contactUser?.id;
@@ -391,14 +547,9 @@ const AppStack_ContactProfileScreen: React.FC<Props> = ({ navigation, route }) =
             activeOpacity={0.85}
             style={[
               tw`rounded-full items-center`,
-              {
-                borderWidth: 1.5,
-                borderColor: colors.green,
-                paddingHorizontal: horizontalScale(18),
-                paddingVertical: verticalScale(6),
-              },
+              { borderWidth: 1.5, borderColor: colors.green, paddingHorizontal: h(18), paddingVertical: v(6) },
             ]}>
-            <Text style={[tw`font-dm font-bold`, { color: colors.green, fontSize: moderateScale(13) }]}>Reserve</Text>
+            <Text style={[tw`font-associate-bold`, { color: colors.green, fontSize: ms(13) }]}>Reserve</Text>
           </TouchableOpacity>
         </View>
       </View>
@@ -419,7 +570,7 @@ const AppStack_ContactProfileScreen: React.FC<Props> = ({ navigation, route }) =
         <TouchableOpacity onPress={() => navigation.goBack()} activeOpacity={0.7}>
           <Image source={BackArrow} style={{ width: horizontalScale(24), height: horizontalScale(24) }} resizeMode="contain" />
         </TouchableOpacity>
-        <Text style={[tw`font-dm font-bold`, { color: colors.ink, fontSize: moderateScale(18.75) }]}>
+        <Text style={[tw`font-associate-bold`, { color: colors.ink, fontSize: moderateScale(18.75) }]}>
           Contact profile
         </Text>
         <TouchableOpacity
@@ -433,7 +584,7 @@ const AppStack_ContactProfileScreen: React.FC<Props> = ({ navigation, route }) =
             }
           }}
           activeOpacity={0.7}>
-          <Text style={{ fontSize: moderateScale(22) }}>🕐</Text>
+          <Image source={UpcomingIcon} style={{ width: h(24), height: h(24) }} tintColor={colors.ink} />
         </TouchableOpacity>
       </View>
 
@@ -446,6 +597,7 @@ const AppStack_ContactProfileScreen: React.FC<Props> = ({ navigation, route }) =
           style={tw`flex-1`}
           contentContainerStyle={{ paddingHorizontal: '8%', paddingBottom: verticalScale(120) }}
           showsVerticalScrollIndicator={false}
+          directionalLockEnabled
           refreshControl={<RefreshControl refreshing={isRefreshing} onRefresh={onRefresh} tintColor={colors.green} />}>
 
           {/* Contact avatar + name + categories */}
@@ -463,15 +615,24 @@ const AppStack_ContactProfileScreen: React.FC<Props> = ({ navigation, route }) =
             </View>
             <View style={tw`flex-1`}>
               <View style={tw`flex-row items-center`}>
-                <Text style={[tw`font-dm font-bold`, { color: colors.ink, fontSize: moderateScale(18) }]}>
+                <Text style={[tw`font-associate-bold`, { color: colors.ink, fontSize: moderateScale(18) }]}>
                   {displayName}
                 </Text>
                 <View
                   style={[
                     tw`rounded-full items-center justify-center`,
-                    { width: horizontalScale(18), height: horizontalScale(18), backgroundColor: '#2D7FF9', marginLeft: horizontalScale(6) },
+                    {
+                      width: horizontalScale(18),
+                      height: horizontalScale(18),
+                      backgroundColor: contactUser?.accountType === 'agent' ? colors.ink : '#2D7FF9',
+                      marginLeft: horizontalScale(6),
+                    },
                   ]}>
-                  <Text style={{ color: colors.white, fontSize: moderateScale(10), fontWeight: 'bold' }}>✓</Text>
+                  <Image
+                    source={contactUser?.accountType === 'agent' ? BrainIcon : CheckIcon}
+                    style={{ width: h(10), height: h(10) }}
+                    tintColor={colors.white}
+                  />
                 </View>
               </View>
               {/* Hook category pills from hook titles */}
@@ -488,7 +649,7 @@ const AppStack_ContactProfileScreen: React.FC<Props> = ({ navigation, route }) =
                           paddingVertical: verticalScale(3),
                         },
                       ]}>
-                      <Text style={[tw`font-dm`, { color: colors.greenText, fontSize: moderateScale(11) }]}>{h.title}</Text>
+                      <Text style={[tw`font-associate`, { color: colors.greenText, fontSize: moderateScale(11) }]}>{h.title}</Text>
                     </View>
                   ))}
                 </View>
@@ -500,7 +661,7 @@ const AppStack_ContactProfileScreen: React.FC<Props> = ({ navigation, route }) =
           {contactUser?.bio && (
             <Text
               style={[
-                tw`font-dm`,
+                tw`font-associate`,
                 { color: colors.inkSoft, fontSize: moderateScale(13.5), fontStyle: 'italic', marginBottom: verticalScale(14) },
               ]}>
               "{contactUser.bio}"
@@ -510,7 +671,7 @@ const AppStack_ContactProfileScreen: React.FC<Props> = ({ navigation, route }) =
           {/* Block / Auto-Confirm toggles */}
           <View style={[tw`rounded-2xl`, { backgroundColor: colors.card, marginBottom: verticalScale(10) }]}>
             <View style={[tw`flex-row items-center justify-between`, { padding: moderateScale(16) }]}>
-              <Text style={[tw`font-dm`, { color: colors.ink, fontSize: moderateScale(15) }]}>Block</Text>
+              <Text style={[tw`font-associate`, { color: colors.ink, fontSize: moderateScale(15) }]}>Block</Text>
               <Switch
                 value={isBlocked}
                 onValueChange={handleToggleBlock}
@@ -520,7 +681,7 @@ const AppStack_ContactProfileScreen: React.FC<Props> = ({ navigation, route }) =
           </View>
           <View style={[tw`rounded-2xl`, { backgroundColor: colors.card, marginBottom: verticalScale(18) }]}>
             <View style={[tw`flex-row items-center justify-between`, { padding: moderateScale(16) }]}>
-              <Text style={[tw`font-dm`, { color: colors.ink, fontSize: moderateScale(15) }]}>Auto-Confirm</Text>
+              <Text style={[tw`font-associate`, { color: colors.ink, fontSize: moderateScale(15) }]}>Auto-Confirm</Text>
               <Switch
                 value={autoConfirm}
                 onValueChange={handleToggleAutoConfirm}
@@ -547,7 +708,7 @@ const AppStack_ContactProfileScreen: React.FC<Props> = ({ navigation, route }) =
                 ]}>
                 <Text
                   style={[
-                    tw`font-dm font-bold`,
+                    tw`font-associate-bold`,
                     {
                       color: activeTab === tab ? colors.green : colors.grey,
                       fontSize: moderateScale(14.5),
@@ -561,7 +722,7 @@ const AppStack_ContactProfileScreen: React.FC<Props> = ({ navigation, route }) =
 
           {activeTab === 'upcoming' ? (
             upcomingMeetings.length === 0 ? (
-              <Text style={[tw`text-center font-dm`, { color: colors.grey, paddingVertical: verticalScale(30), fontSize: moderateScale(14) }]}>
+              <Text style={[tw`text-center font-associate`, { color: colors.grey, paddingVertical: verticalScale(30), fontSize: moderateScale(14) }]}>
                 No upcoming meetings
               </Text>
             ) : (
@@ -569,7 +730,7 @@ const AppStack_ContactProfileScreen: React.FC<Props> = ({ navigation, route }) =
             )
           ) : (
             contactHooks.length === 0 ? (
-              <Text style={[tw`text-center font-dm`, { color: colors.grey, paddingVertical: verticalScale(30), fontSize: moderateScale(14) }]}>
+              <Text style={[tw`text-center font-associate`, { color: colors.grey, paddingVertical: verticalScale(30), fontSize: moderateScale(14) }]}>
                 No open hooks
               </Text>
             ) : (
@@ -605,8 +766,8 @@ const AppStack_ContactProfileScreen: React.FC<Props> = ({ navigation, route }) =
           }}
           activeOpacity={0.85}
           style={[tw`rounded-full flex-row items-center justify-center`, { backgroundColor: colors.green, paddingVertical: verticalScale(15) }]}>
-          <Text style={{ fontSize: moderateScale(16), marginRight: horizontalScale(8) }}>🪝</Text>
-          <Text style={[tw`font-dm font-bold`, { color: colors.white, fontSize: moderateScale(16) }]}>
+          <Image source={HookIcon} style={{ width: h(20), height: h(20), marginRight: h(8) }} tintColor={colors.white} />
+          <Text style={[tw`font-associate-bold`, { color: colors.white, fontSize: ms(16) }]}>
             View available times
           </Text>
         </TouchableOpacity>

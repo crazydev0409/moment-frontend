@@ -15,10 +15,11 @@ import tw from '~/tailwindcss';
 import { AppStackParamList } from '.';
 import {
   BackArrow,
-  UpcomingIcon,
+  CalendarIcon,
   CheckIcon,
   CrossIcon,
   RescheduleIcon,
+  UpcomingIcon,
   UserIcon,
   UserXIcon,
   NotificationsIcon,
@@ -73,7 +74,7 @@ function groupNotifications(notifications: AppNotification[]): NotifGroup[] {
 function getNotifIconMeta(type: string): { icon: number; bg: string; positive: boolean } {
   switch (type) {
     case 'moment_request_created':
-      return { icon: UpcomingIcon, bg: colors.greenTint, positive: true };
+      return { icon: CalendarIcon, bg: colors.greenTint, positive: true };
     case 'moment_request_accepted':
       return { icon: CheckIcon, bg: colors.greenTint, positive: true };
     case 'moment_request_rejected':
@@ -154,7 +155,7 @@ const AppStack_NotificationScreen: React.FC<Props> = ({ navigation }) => {
           <Image source={BackArrow} style={{ width: horizontalScale(24), height: horizontalScale(24) }} resizeMode="contain" />
         </TouchableOpacity>
         <View style={tw`flex-1 items-center`}>
-          <Text style={[tw`font-dm font-bold`, { color: colors.ink, fontSize: moderateScale(18.75) }]}>
+          <Text style={[tw`font-associate-bold`, { color: colors.ink, fontSize: moderateScale(18.75) }]}>
             Notifications
           </Text>
         </View>
@@ -166,9 +167,25 @@ const AppStack_NotificationScreen: React.FC<Props> = ({ navigation }) => {
           <ActivityIndicator size="large" color={colors.green} />
         </View>
       ) : notifications.length === 0 ? (
-        <View style={tw`flex-1 items-center justify-center`}>
-          <Text style={{ fontSize: moderateScale(80), marginBottom: verticalScale(8) }}>😑</Text>
-          <Text style={[tw`font-dm`, { color: colors.grey, fontSize: moderateScale(16) }]}>
+        <View style={[tw`flex-1 items-center justify-center`, { paddingBottom: verticalScale(80) }]}>
+          <View
+            style={[
+              tw`rounded-full items-center justify-center`,
+              {
+                width: horizontalScale(96),
+                height: horizontalScale(96),
+                backgroundColor: colors.greenTint,
+                marginBottom: verticalScale(16),
+              },
+            ]}>
+            <Image
+              source={NotificationsIcon}
+              style={{ width: horizontalScale(48), height: horizontalScale(48) }}
+              tintColor={colors.green}
+              resizeMode="contain"
+            />
+          </View>
+          <Text style={[tw`font-associate`, { color: colors.grey, fontSize: moderateScale(16) }]}>
             No notifications yet
           </Text>
         </View>
@@ -182,7 +199,7 @@ const AppStack_NotificationScreen: React.FC<Props> = ({ navigation }) => {
             <View key={group.label}>
               <Text
                 style={[
-                  tw`font-dm`,
+                  tw`font-associate`,
                   {
                     color: colors.grey,
                     fontSize: moderateScale(13),
@@ -230,10 +247,10 @@ const AppStack_NotificationScreen: React.FC<Props> = ({ navigation }) => {
                     <View style={tw`flex-1`}>
                       <Text
                         numberOfLines={1}
-                        style={[tw`font-dm font-bold`, { color: colors.ink, fontSize: moderateScale(13.5) }]}>
+                        style={[tw`font-associate-bold`, { color: colors.ink, fontSize: moderateScale(13.5) }]}>
                         {n.title}
                       </Text>
-                      <Text style={[tw`font-dm`, { color: colors.grey, fontSize: moderateScale(12) }]}>
+                      <Text style={[tw`font-associate`, { color: colors.grey, fontSize: moderateScale(12) }]}>
                         {formatNotifTime(n.createdAt)}
                       </Text>
                     </View>

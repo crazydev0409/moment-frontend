@@ -1,13 +1,14 @@
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
+import { useFocusEffect } from '@react-navigation/native';
 import { BlurView } from 'expo-blur';
-import { useAtom } from 'jotai';
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
   Dimensions,
   Image,
   KeyboardAvoidingView,
+  LayoutAnimation,
   Modal,
   Platform,
   ScrollView,
@@ -15,8 +16,13 @@ import {
   Text,
   TextInput,
   TouchableOpacity,
+  UIManager,
   View,
 } from 'react-native';
+
+if (Platform.OS === 'android') {
+  UIManager.setLayoutAnimationEnabledExperimental?.(true);
+}
 import MapView, { Marker } from 'react-native-maps';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Svg, { Circle, Path } from 'react-native-svg';
@@ -24,10 +30,11 @@ import Svg, { Circle, Path } from 'react-native-svg';
 import { AppStackParamList } from '.';
 
 import { getPlacesByQuery } from '~/helpers/common';
+import { formatPrice } from '~/helpers/hooks';
 import { http, mapApiKey } from '~/helpers/http';
 import { horizontalScale, moderateScale, verticalScale } from '~/helpers/responsive';
-import { Avatar, SearchIcon } from '~/lib/images';
-import { userAtom } from '~/store';
+import { AvailabilitySchedule } from '~/helpers/calendarAvailability';
+import { Avatar, SearchIcon, UpcomingIcon, LocationIcon, ChevronIcon, CheckIcon, CrossIcon, EditIcon } from '~/lib/images';
 
 type Props = NativeStackScreenProps<AppStackParamList, 'AppStack_SendCatchScreen'>;
 type FlowMode = 'one' | 'group';
@@ -41,6 +48,11 @@ interface HookOption {
   status: 'Open' | 'Shared';
   duration: number;
   location: string;
+  isPaid: boolean;
+  priceCents?: number | null;
+  billingType?: 'fixed' | 'hourly' | null;
+  description?: string | null;
+  capacity?: number | null;
 }
 
 interface Contact {
@@ -213,7 +225,6 @@ const MiniIcon = ({
 
 const AppStack_SendCatchScreen: React.FC<Props> = ({ navigation, route }) => {
   const insets = useSafeAreaInsets();
-  const [user] = useAtom(userAtom);
   const mode: FlowMode = route.params?.mode || 'one';
   const initialContact = route.params?.initialContact;
   const [step, setStep] = useState<Step>(
@@ -223,6 +234,8 @@ const AppStack_SendCatchScreen: React.FC<Props> = ({ navigation, route }) => {
         ? 'contacts'
         : 'hooks'
   );
+  const [hooks, setHooks] = useState<HookOption[]>([]);
+  const [hooksLoading, setHooksLoading] = useState(false);
   const [contacts, setContacts] = useState<Contact[]>([]);
   const [contactsLoading, setContactsLoading] = useState(true);
   const [selectedContacts, setSelectedContacts] = useState<Contact[]>(
@@ -231,6 +244,7 @@ const AppStack_SendCatchScreen: React.FC<Props> = ({ navigation, route }) => {
   const [contactSearch, setContactSearch] = useState('');
   const [hookSearch, setHookSearch] = useState('');
   const [selectedHook, setSelectedHook] = useState<HookOption | null>(null);
+  const [expandedHookId, setExpandedHookId] = useState<string | null>(null);
   const [selectedDayIndex, setSelectedDayIndex] = useState(() =>
     route.params?.initialDate ? getDayOffset(route.params.initialDate) : 2
   );
@@ -251,46 +265,146 @@ const AppStack_SendCatchScreen: React.FC<Props> = ({ navigation, route }) => {
   const [submitting, setSubmitting] = useState(false);
   const [removeContact, setRemoveContact] = useState<Contact | null>(null);
   const [showCustomizeModal, setShowCustomizeModal] = useState(false);
+  const [userAvailability, setUserAvailability] = useState<AvailabilitySchedule | null>(null);
+  const [recipientAvailabilities, setRecipientAvailabilities] = useState<Record<string, AvailabilitySchedule>>({});
+  const [loadingRecipientAvailability, setLoadingRecipientAvailability] = useState(false);
   const visibleDays = useMemo(() => getVisibleDays(selectedDayIndex), [selectedDayIndex]);
   const selectedStartLabel = formatTimeString(selectedTime);
   const selectedEndLabel = formatTimeString(minutesToTime(timeToMinutes(selectedTime) + duration));
-  const availableTimes = useMemo(() => {
-    const dayStart = 9 * 60;
-    const dayEnd = 17 * 60;
-    const slots: string[] = [];
-    for (let minute = dayStart; minute + duration <= dayEnd; minute += 30) {
-      slots.push(minutesToTime(minute));
-    }
-    return slots;
-  }, [duration]);
-
   const selectedDayDate = useMemo(() => {
     const d = new Date();
     d.setDate(d.getDate() + selectedDayIndex);
     return d;
   }, [selectedDayIndex]);
 
-  useEffect(() => {
-    loadContacts();
+  const availableTimes = useMemo(() => {
+    const weekday = selectedDayDate.getDay();
+
+    // Collect slots per participant for this weekday
+    const allSlotSets: { startMinutes: number; endMinutes: number }[][] = [];
+
+    // Sender
+    const senderSlots = (userAvailability?.slots ?? [])
+      .filter((s) => s.weekday === weekday)
+      .map((s) => ({ startMinutes: s.startMinutes, endMinutes: s.endMinutes }));
+    allSlotSets.push(senderSlots.length > 0 ? senderSlots : [{ startMinutes: 9 * 60, endMinutes: 17 * 60 }]);
+
+    // Recipients
+    for (const contact of selectedContacts) {
+      const uid = contact.contactUser?.id;
+      if (uid && recipientAvailabilities[uid]) {
+        const rSlots = recipientAvailabilities[uid].slots
+          .filter((s) => s.weekday === weekday)
+          .map((s) => ({ startMinutes: s.startMinutes, endMinutes: s.endMinutes }));
+        if (rSlots.length > 0) allSlotSets.push(rSlots);
+      }
+    }
+
+    // Intersect all slot sets
+    let intersection = allSlotSets[0];
+    for (let i = 1; i < allSlotSets.length; i++) {
+      const other = allSlotSets[i];
+      const next: { startMinutes: number; endMinutes: number }[] = [];
+      for (const a of intersection) {
+        for (const b of other) {
+          const start = Math.max(a.startMinutes, b.startMinutes);
+          const end = Math.min(a.endMinutes, b.endMinutes);
+          if (start < end) next.push({ startMinutes: start, endMinutes: end });
+        }
+      }
+      intersection = next.sort((a, b) => a.startMinutes - b.startMinutes);
+    }
+
+    // Generate 15-min start times where the full meeting fits inside a window
+    const slots: string[] = [];
+    for (const window of intersection) {
+      for (let minute = window.startMinutes; minute + duration <= window.endMinutes; minute += 15) {
+        slots.push(minutesToTime(minute));
+      }
+    }
+    return slots;
+  }, [duration, selectedDayDate, userAvailability, recipientAvailabilities, selectedContacts]);
+
+  const loadHooks = useCallback(async () => {
+    try {
+      setHooksLoading(true);
+      const res = await http.get('/hooks');
+      const fetched: HookOption[] = (res.data.hooks || []).map((h: any) => ({
+        id: h.id,
+        name: h.title,
+        status: h.accessLevel === 'open' ? 'Open' : 'Shared',
+        duration: h.durationMinutes,
+        location: h.locationType === 'in_person' ? (h.locationLabel || 'In-person') : 'Remote',
+        isPaid: !!h.isPaid,
+        priceCents: h.priceCents ?? null,
+        billingType: h.billingType ?? null,
+        description: h.description ?? null,
+        capacity: h.capacity ?? null,
+      }));
+      setHooks(fetched);
+      setSelectedHook((prev) => prev ?? (fetched[0] || null));
+    } catch (err) {
+      console.error('Error loading hooks:', err);
+    } finally {
+      setHooksLoading(false);
+    }
   }, []);
 
-  const hooks = useMemo<HookOption[]>(
-    () =>
-      (user.meetingTypes || []).map((name, index) => ({
-        id: `${name}-${index}`,
-        name,
-        status: mode === 'group' ? 'Shared' : 'Open',
-        duration: 30,
-        location: 'Remote',
-      })),
-    [mode, user.meetingTypes]
-  );
-
   useEffect(() => {
-    if (!selectedHook && hooks.length > 0) {
-      setSelectedHook(hooks[0]);
+    loadContacts();
+    loadHooks();
+    http
+      .get('/users/availability')
+      .then((res) => setUserAvailability(res.data))
+      .catch(() => {/* keep fallback */});
+  }, []);
+
+  useFocusEffect(useCallback(() => {
+    loadHooks();
+  }, [loadHooks]));
+
+  // Fetch each recipient's availability whenever the contact selection changes
+  useEffect(() => {
+    const ids = selectedContacts
+      .map((c) => c.contactUser?.id)
+      .filter((id): id is string => !!id);
+
+    if (ids.length === 0) {
+      setRecipientAvailabilities({});
+      return;
     }
-  }, [hooks, selectedHook]);
+
+    let cancelled = false;
+    setLoadingRecipientAvailability(true);
+
+    Promise.all(
+      ids.map((id) =>
+        http
+          .get(`/users/${id}/availability`)
+          .then((res) => ({ id, schedule: res.data as AvailabilitySchedule }))
+          .catch(() => ({ id, schedule: null })),
+      ),
+    ).then((results) => {
+      if (cancelled) return;
+      const map: Record<string, AvailabilitySchedule> = {};
+      for (const { id, schedule } of results) {
+        if (schedule) map[id] = schedule;
+      }
+      setRecipientAvailabilities(map);
+    }).finally(() => {
+      if (!cancelled) setLoadingRecipientAvailability(false);
+    });
+
+    return () => { cancelled = true; };
+  }, [selectedContacts]);
+
+  // When available times change (day or availability loaded), ensure selectedTime is valid
+  useEffect(() => {
+    setSelectedTime((prev) => {
+      if (availableTimes.includes(prev)) return prev;
+      return availableTimes[0] ?? prev;
+    });
+  }, [availableTimes]);
 
   useEffect(() => {
     if (!selectedHook) return;
@@ -335,7 +449,7 @@ const AppStack_SendCatchScreen: React.FC<Props> = ({ navigation, route }) => {
   const loadContacts = async () => {
     try {
       setContactsLoading(true);
-      const response = await http.get('/users/contacts');
+      const response = await http.get('/users/contacts/registered');
       const loaded = Array.isArray(response.data.contacts) ? response.data.contacts : [];
       setContacts(loaded);
     } catch (error) {
@@ -490,6 +604,7 @@ const AppStack_SendCatchScreen: React.FC<Props> = ({ navigation, route }) => {
           endTime: end.toISOString(),
           title,
           description,
+          hookId: selectedHook?.id ?? null,
           meetingType: pricing === 'paid' ? 'paid session' : 'meet',
           locationType: format === 'onsite' ? 'onsite' : 'remote',
           locationLabel: format === 'onsite' ? location : 'Remote meeting',
@@ -506,6 +621,7 @@ const AppStack_SendCatchScreen: React.FC<Props> = ({ navigation, route }) => {
           endTime: end.toISOString(),
           title,
           description,
+          hookId: selectedHook?.id ?? null,
           locationType: format === 'onsite' ? 'onsite' : 'remote',
           locationLabel: format === 'onsite' ? location : 'Remote meeting',
           locationAddress: format === 'onsite' ? locationAddress || null : null,
@@ -516,10 +632,14 @@ const AppStack_SendCatchScreen: React.FC<Props> = ({ navigation, route }) => {
         });
       }
 
+      const y = start.getFullYear();
+      const m = String(start.getMonth() + 1).padStart(2, '0');
+      const d = String(start.getDate()).padStart(2, '0');
       navigation.navigate('AppStack_HomePageScreen', {
         toast: {
           title: 'Meeting scheduled successfully',
           subtitle: `${formatDayLabel()}, ${formatTime(start)} • ${format === 'onsite' ? location : 'Remote'}`,
+          calendarDate: `${y}-${m}-${d}`,
         },
       });
     } catch (error: any) {
@@ -580,7 +700,12 @@ const AppStack_SendCatchScreen: React.FC<Props> = ({ navigation, route }) => {
         {renderHeader(
           'Select a contact',
           'You can select only one participant',
-          <Text style={styles.addPerson}>+</Text>
+          <TouchableOpacity
+            activeOpacity={0.7}
+            onPress={() => navigation.navigate('AppStack_ContactScreen')}
+            hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}>
+            <Text style={styles.addPerson}>+</Text>
+          </TouchableOpacity>
         )}
         <ScrollView contentContainerStyle={styles.contactList} showsVerticalScrollIndicator={false}>
           {contactsLoading ? (
@@ -589,28 +714,40 @@ const AppStack_SendCatchScreen: React.FC<Props> = ({ navigation, route }) => {
             <Text style={styles.emptyText}>No contacts found.</Text>
           ) : null}
           {displayContacts.map((contact) => {
-            const selected = selectedContacts.some((item) => item.id === contact.id);
+            const isRegistered = !!contact.contactUser?.id;
+            const selected = isRegistered && selectedContacts.some((item) => item.id === contact.id);
             return (
               <TouchableOpacity
                 key={contact.id}
-                activeOpacity={0.8}
-                style={styles.contactCard}
+                activeOpacity={isRegistered ? 0.8 : 1}
+                style={[
+                  styles.contactCard,
+                  !isRegistered && { backgroundColor: '#F8F9FB', borderColor: '#EEF0F3' },
+                ]}
                 onPress={() => toggleContact(contact)}>
                 <View style={styles.contactAvatarWrap}>
                   <Image
-                    source={
-                      contact.contactUser?.avatar ? { uri: contact.contactUser.avatar } : Avatar
-                    }
-                    style={styles.contactAvatar}
+                    source={contact.contactUser?.avatar ? { uri: contact.contactUser.avatar } : Avatar}
+                    style={[styles.contactAvatar, !isRegistered && { opacity: 0.4 }]}
                   />
-                  <View style={styles.checkBadge}>
-                    <Text style={styles.checkBadgeText}>✓</Text>
+                  {isRegistered && (
+                    <View style={styles.checkBadge}>
+                      <Image source={CheckIcon} style={{ width: ms(12), height: ms(12) }} tintColor="#FFFFFF" />
+                    </View>
+                  )}
+                </View>
+                <Text style={[styles.contactName, !isRegistered && { color: COLORS.pale }]}>
+                  {contact.displayName}
+                </Text>
+                {isRegistered ? (
+                  <View style={[styles.radio, selected && styles.radioSelected]}>
+                    {selected ? <View style={styles.radioInner} /> : null}
                   </View>
-                </View>
-                <Text style={styles.contactName}>{contact.displayName}</Text>
-                <View style={[styles.radio, selected && styles.radioSelected]}>
-                  {selected ? <View style={styles.radioInner} /> : null}
-                </View>
+                ) : (
+                  <View style={{ borderWidth: 1, borderColor: COLORS.line, borderRadius: h(14), paddingHorizontal: h(12), paddingVertical: v(5) }}>
+                    <Text style={{ color: COLORS.pale, fontFamily: 'AssociateSansRegular', fontSize: ms(12) }}>Invite</Text>
+                  </View>
+                )}
               </TouchableOpacity>
             );
           })}
@@ -655,8 +792,16 @@ const AppStack_SendCatchScreen: React.FC<Props> = ({ navigation, route }) => {
         <ScrollView
           contentContainerStyle={{ paddingBottom: v(128) }}
           showsVerticalScrollIndicator={false}>
+          {hooksLoading ? (
+            <ActivityIndicator size="large" color={COLORS.green} style={{ marginTop: v(40) }} />
+          ) : null}
           {displayHooks.map((hook) => {
             const selected = selectedHook?.id === hook.id;
+            const expanded = expandedHookId === hook.id;
+            const toggleExpand = () => {
+              LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+              setExpandedHookId(expanded ? null : hook.id);
+            };
             return (
               <TouchableOpacity
                 key={hook.id}
@@ -664,25 +809,78 @@ const AppStack_SendCatchScreen: React.FC<Props> = ({ navigation, route }) => {
                 activeOpacity={0.85}
                 onPress={() => setSelectedHook(hook)}>
                 <View style={styles.hookTop}>
-                  <Text style={styles.hookName}>{hook.name}</Text>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: h(6), flex: 1 }}>
+                    <Text style={styles.hookName}>{hook.name}</Text>
+                    <TouchableOpacity
+                      hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                      activeOpacity={0.7}
+                      onPress={() => navigation.navigate('AppStack_HookEditorScreen', { hookId: hook.id, source: 'sendCatch' })}>
+                      <Image source={EditIcon} style={{ width: h(14), height: h(14) }} tintColor="#6F7780" resizeMode="contain" />
+                    </TouchableOpacity>
+                  </View>
                   <View style={styles.hookBadges}>
-                    <Text style={styles.openBadge}>{mode === 'group' ? 'Shared' : 'Open'}</Text>
-                    <Text style={styles.freeBadge}>Free</Text>
+                    <Text style={styles.openBadge}>{hook.status}</Text>
+                    <Text style={styles.freeBadge}>
+                      {hook.isPaid
+                        ? `${formatPrice(hook.priceCents)}${hook.billingType === 'hourly' ? '/hr' : ''}`
+                        : 'Free'}
+                    </Text>
                   </View>
                 </View>
                 <View style={styles.hookDetails}>
-                  <Text style={styles.hookDetailText}>◷ {hook.duration} min</Text>
-                  <Text style={styles.hookDetailText}>⌖ {hook.location}</Text>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                    <Image source={UpcomingIcon} style={{ width: 13, height: 13 }} tintColor="#6F7780" />
+                    <Text style={styles.hookDetailText}>{hook.duration} min</Text>
+                  </View>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                    <Image source={LocationIcon} style={{ width: 13, height: 13 }} tintColor="#6F7780" />
+                    <Text style={styles.hookDetailText}>{hook.location}</Text>
+                  </View>
                 </View>
-                <View style={styles.moreDetails}>
-                  <Text style={styles.moreDetailsText}>More details⌄</Text>
-                </View>
+                {expanded && (
+                  <View style={styles.hookExpandedDetails}>
+                    {!!hook.description && (
+                      <Text style={styles.hookExpandedDescription}>{hook.description}</Text>
+                    )}
+                    {hook.capacity != null && (
+                      <View style={styles.hookExpandedRow}>
+                        <Text style={styles.hookExpandedLabel}>Capacity</Text>
+                        <Text style={styles.hookExpandedValue}>{hook.capacity} people</Text>
+                      </View>
+                    )}
+                    <View style={styles.hookExpandedRow}>
+                      <Text style={styles.hookExpandedLabel}>Pricing</Text>
+                      <Text style={styles.hookExpandedValue}>
+                        {hook.isPaid
+                          ? `${formatPrice(hook.priceCents)} · ${hook.billingType === 'hourly' ? 'Hourly' : 'Fixed'}`
+                          : 'Free'}
+                      </Text>
+                    </View>
+                    <View style={styles.hookExpandedRow}>
+                      <Text style={styles.hookExpandedLabel}>Access</Text>
+                      <Text style={styles.hookExpandedValue}>{hook.status}</Text>
+                    </View>
+                  </View>
+                )}
+                <TouchableOpacity
+                  style={styles.moreDetails}
+                  activeOpacity={0.7}
+                  onPress={toggleExpand}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+                    <Text style={styles.moreDetailsText}>{expanded ? 'Less details' : 'More details'}</Text>
+                    <Image
+                      source={ChevronIcon}
+                      style={{ width: 11, height: 11, transform: [{ rotate: expanded ? '-90deg' : '90deg' }] }}
+                      tintColor="#6F7780"
+                    />
+                  </View>
+                </TouchableOpacity>
               </TouchableOpacity>
             );
           })}
-          {displayHooks.length === 0 ? (
+          {!hooksLoading && displayHooks.length === 0 ? (
             <Text style={styles.emptyText}>
-              No hooks found. Add hooks to your profile before sending a catch.
+              No hooks found. Create a hook first before sending a catch.
             </Text>
           ) : null}
         </ScrollView>
@@ -735,34 +933,44 @@ const AppStack_SendCatchScreen: React.FC<Props> = ({ navigation, route }) => {
           paddingHorizontal: h(16),
           paddingBottom: v(180),
         }}>
-        <View style={styles.timeGrid}>
-          {availableTimes.map((time) => {
-            const isSelected = selectedTime === time;
-            return (
-              <TouchableOpacity
-                key={time}
-                style={[styles.timeGridPill, isSelected && styles.timeGridPillSelected]}
-                onPress={() => setSelectedTime(time)}>
-                <Text
-                  style={[
-                    styles.timeGridPillText,
-                    isSelected && styles.timeGridPillTextSelected,
-                  ]}>
-                  {formatTimeString(time)}
-                </Text>
-                {isSelected ? (
-                  <Text style={styles.timeGridEndLabel}>
-                    {'→ '}
-                    {selectedEndLabel}
-                  </Text>
-                ) : null}
-              </TouchableOpacity>
-            );
-          })}
-        </View>
-        {availableTimes.length === 0 ? (
-          <Text style={styles.emptyText}>No available start times for this duration.</Text>
-        ) : null}
+        {loadingRecipientAvailability ? (
+          <ActivityIndicator size="large" color={COLORS.green} style={{ marginTop: v(40) }} />
+        ) : (
+          <>
+            <View style={styles.timeGrid}>
+              {availableTimes.map((time) => {
+                const isSelected = selectedTime === time;
+                return (
+                  <TouchableOpacity
+                    key={time}
+                    style={[styles.timeGridPill, isSelected && styles.timeGridPillSelected]}
+                    onPress={() => setSelectedTime(time)}>
+                    <Text
+                      style={[
+                        styles.timeGridPillText,
+                        isSelected && styles.timeGridPillTextSelected,
+                      ]}>
+                      {formatTimeString(time)}
+                    </Text>
+                    {isSelected ? (
+                      <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: v(2) }}>
+                        <Image source={ChevronIcon} style={{ width: h(13), height: h(13), marginRight: h(4) }} tintColor="rgba(255,255,255,0.8)" />
+                        <Text style={styles.timeGridEndLabel}>{selectedEndLabel}</Text>
+                      </View>
+                    ) : null}
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+            {availableTimes.length === 0 ? (
+              <Text style={styles.emptyText}>
+                {selectedContacts.length > 0
+                  ? 'No overlapping availability between all participants for this day and duration.'
+                  : 'Not available on this day. Update your availability in settings.'}
+              </Text>
+            ) : null}
+          </>
+        )}
       </ScrollView>
       <View style={styles.bottomBar}>
         <TouchableOpacity
@@ -1066,9 +1274,6 @@ const AppStack_SendCatchScreen: React.FC<Props> = ({ navigation, route }) => {
                     pinColor={COLORS.green}
                   />
                 </MapView>
-                <View style={styles.mapLabel}>
-                  <Text style={styles.mapLabelText}>{selectedPlace.name}</Text>
-                </View>
               </View>
             ) : null}
             <View style={styles.selectedPlaceCard}>
@@ -1263,7 +1468,7 @@ const CustomizeRow = ({
       <Text style={styles.customValue}>{value}</Text>
     )}
     <View style={styles.customSpacer} />
-    {control || <Text style={styles.chevron}>›</Text>}
+    {control || <Image source={ChevronIcon} style={{ width: h(16), height: h(16) }} tintColor={COLORS.muted} />}
   </TouchableOpacity>
 );
 
@@ -1274,7 +1479,7 @@ const InviteeChip = ({ contact, onRemove }: { contact: Contact; onRemove: () => 
       style={styles.chipAvatar}
     />
     <Text style={styles.chipText}>{contact.displayName}</Text>
-    <Text style={styles.chipRemove}>×</Text>
+    <Image source={CrossIcon} style={{ width: h(14), height: h(14), marginLeft: h(8) }} tintColor={COLORS.muted} />
   </TouchableOpacity>
 );
 
@@ -1289,23 +1494,23 @@ const styles = StyleSheet.create({
   headerTitleWrap: { flex: 1, alignItems: 'center' },
   headerTitle: {
     color: COLORS.ink,
-    fontFamily: 'Inter_700Bold',
+    fontFamily: 'AssociateSansBold',
     fontSize: ms(22),
     lineHeight: ms(28),
   },
   headerSubtitle: {
     color: COLORS.muted,
-    fontFamily: 'Inter_400Regular',
+    fontFamily: 'AssociateSansRegular',
     fontSize: ms(17),
     marginTop: v(2),
   },
   headerRight: { width: h(34), alignItems: 'flex-end' },
-  addPerson: { color: COLORS.ink, fontFamily: 'Inter_700Bold', fontSize: ms(31) },
-  skipText: { color: COLORS.green, fontFamily: 'Inter_400Regular', fontSize: ms(18) },
+  addPerson: { color: COLORS.ink, fontFamily: 'AssociateSansBold', fontSize: ms(31) },
+  skipText: { color: COLORS.green, fontFamily: 'AssociateSansRegular', fontSize: ms(18) },
   contactList: { paddingHorizontal: h(16), paddingBottom: v(116), gap: v(12) },
   emptyText: {
     color: COLORS.muted,
-    fontFamily: 'Inter_400Regular',
+    fontFamily: 'AssociateSansRegular',
     fontSize: ms(17),
     paddingVertical: v(24),
     textAlign: 'center',
@@ -1335,8 +1540,8 @@ const styles = StyleSheet.create({
     borderWidth: 2,
     borderColor: COLORS.white,
   },
-  checkBadgeText: { color: COLORS.white, fontSize: ms(12), fontFamily: 'Inter_700Bold' },
-  contactName: { flex: 1, color: COLORS.ink, fontFamily: 'Inter_400Regular', fontSize: ms(16) },
+  checkBadgeText: { color: COLORS.white, fontSize: ms(12), fontFamily: 'AssociateSansBold' },
+  contactName: { flex: 1, color: COLORS.ink, fontFamily: 'AssociateSansRegular', fontSize: ms(16) },
   radio: {
     width: h(31),
     height: h(31),
@@ -1359,7 +1564,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  fixedButtonText: { color: COLORS.white, fontFamily: 'Inter_700Bold', fontSize: ms(20) },
+  fixedButtonText: { color: COLORS.white, fontFamily: 'AssociateSansBold', fontSize: ms(20) },
   hookSearch: {
     marginHorizontal: h(16),
     height: v(58),
@@ -1374,14 +1579,14 @@ const styles = StyleSheet.create({
   hookSearchInput: {
     flex: 1,
     color: COLORS.ink,
-    fontFamily: 'Inter_400Regular',
+    fontFamily: 'AssociateSansRegular',
     fontSize: ms(16),
     padding: 0,
   },
   searchIcon: { width: h(26), height: h(26), tintColor: '#9EACBA' },
   hooksTitle: {
     color: COLORS.ink,
-    fontFamily: 'Inter_700Bold',
+    fontFamily: 'AssociateSansBold',
     fontSize: ms(23),
     marginHorizontal: h(16),
     marginTop: v(31),
@@ -1398,7 +1603,7 @@ const styles = StyleSheet.create({
   },
   hookCardSelected: { borderColor: '#CBE985', borderWidth: 2 },
   hookTop: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  hookName: { color: COLORS.ink, fontFamily: 'Inter_400Regular', fontSize: ms(16) },
+  hookName: { color: COLORS.ink, fontFamily: 'AssociateSansRegular', fontSize: ms(16) },
   hookBadges: { flexDirection: 'row', gap: h(8) },
   openBadge: {
     overflow: 'hidden',
@@ -1407,7 +1612,7 @@ const styles = StyleSheet.create({
     borderRadius: h(13),
     paddingHorizontal: h(10),
     paddingVertical: v(4),
-    fontFamily: 'Inter_400Regular',
+    fontFamily: 'AssociateSansRegular',
     fontSize: ms(15),
   },
   freeBadge: {
@@ -1417,7 +1622,7 @@ const styles = StyleSheet.create({
     borderRadius: h(13),
     paddingHorizontal: h(12),
     paddingVertical: v(4),
-    fontFamily: 'Inter_400Regular',
+    fontFamily: 'AssociateSansRegular',
     fontSize: ms(15),
   },
   hookDetails: {
@@ -1428,7 +1633,36 @@ const styles = StyleSheet.create({
     padding: h(14),
     gap: v(8),
   },
-  hookDetailText: { color: COLORS.muted, fontFamily: 'Inter_400Regular', fontSize: ms(18) },
+  hookDetailText: { color: COLORS.muted, fontFamily: 'AssociateSansRegular', fontSize: ms(18) },
+  hookExpandedDetails: {
+    marginTop: v(14),
+    borderTopWidth: 1,
+    borderTopColor: COLORS.line,
+    paddingTop: v(14),
+    gap: v(10),
+  },
+  hookExpandedDescription: {
+    color: COLORS.muted,
+    fontFamily: 'AssociateSansRegular',
+    fontSize: ms(14),
+    lineHeight: ms(20),
+    marginBottom: v(4),
+  },
+  hookExpandedRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  hookExpandedLabel: {
+    color: COLORS.muted,
+    fontFamily: 'AssociateSansRegular',
+    fontSize: ms(14),
+  },
+  hookExpandedValue: {
+    color: COLORS.ink,
+    fontFamily: 'AssociateSansBold',
+    fontSize: ms(14),
+  },
   moreDetails: {
     marginTop: v(15),
     height: v(44),
@@ -1437,7 +1671,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  moreDetailsText: { color: COLORS.muted, fontFamily: 'Inter_700Bold', fontSize: ms(15) },
+  moreDetailsText: { color: COLORS.muted, fontFamily: 'AssociateSansBold', fontSize: ms(15) },
   dayRail: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -1447,7 +1681,7 @@ const styles = StyleSheet.create({
   dayItem: { alignItems: 'center', width: h(48) },
   dayLabel: {
     color: COLORS.muted,
-    fontFamily: 'Inter_400Regular',
+    fontFamily: 'AssociateSansRegular',
     fontSize: ms(13),
     marginBottom: v(10),
   },
@@ -1464,11 +1698,11 @@ const styles = StyleSheet.create({
     height: h(58),
     borderRadius: h(29),
   },
-  dayNumber: { color: COLORS.ink, fontFamily: 'Inter_700Bold', fontSize: ms(16) },
+  dayNumber: { color: COLORS.ink, fontFamily: 'AssociateSansBold', fontSize: ms(16) },
   dayNumberTextSelected: { color: COLORS.white },
   monthLabel: {
     color: COLORS.ink,
-    fontFamily: 'Inter_700Bold',
+    fontFamily: 'AssociateSansBold',
     fontSize: ms(16),
     textAlign: 'center',
     marginBottom: v(14),
@@ -1494,13 +1728,13 @@ const styles = StyleSheet.create({
   },
   timeGridPillText: {
     color: COLORS.green,
-    fontFamily: 'Inter_700Bold',
+    fontFamily: 'AssociateSansBold',
     fontSize: ms(16),
   },
   timeGridPillTextSelected: { color: COLORS.white },
   timeGridEndLabel: {
     color: 'rgba(255,255,255,0.8)',
-    fontFamily: 'Inter_400Regular',
+    fontFamily: 'AssociateSansRegular',
     fontSize: ms(13),
     marginTop: v(2),
   },
@@ -1530,13 +1764,13 @@ const styles = StyleSheet.create({
   },
   summaryText: {
     color: COLORS.muted,
-    fontFamily: 'Inter_400Regular',
+    fontFamily: 'AssociateSansRegular',
     fontSize: ms(14),
     flex: 1,
   },
   summaryEdit: {
     color: COLORS.green,
-    fontFamily: 'Inter_700Bold',
+    fontFamily: 'AssociateSansBold',
     fontSize: ms(14),
     marginLeft: h(12),
   },
@@ -1565,18 +1799,18 @@ const styles = StyleSheet.create({
   disabledRow: { opacity: 0.38 },
   customLabel: {
     color: COLORS.muted,
-    fontFamily: 'Inter_400Regular',
+    fontFamily: 'AssociateSansRegular',
     fontSize: ms(15),
     marginLeft: h(11),
   },
   customValue: {
     color: COLORS.ink,
-    fontFamily: 'Inter_400Regular',
+    fontFamily: 'AssociateSansRegular',
     fontSize: ms(15),
     flexShrink: 1,
   },
   customSpacer: { flex: 1 },
-  chevron: { color: COLORS.muted, fontFamily: 'Inter_400Regular', fontSize: ms(31) },
+  chevron: { color: COLORS.muted, fontFamily: 'AssociateSansRegular', fontSize: ms(31) },
   segment: { flexDirection: 'row', backgroundColor: '#F5F5F5', borderRadius: h(25), padding: 0 },
   segmentItem: {
     paddingHorizontal: h(15),
@@ -1586,7 +1820,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   segmentActive: { backgroundColor: COLORS.green },
-  segmentText: { color: '#8E98A2', fontFamily: 'Inter_400Regular', fontSize: ms(17) },
+  segmentText: { color: '#8E98A2', fontFamily: 'AssociateSansRegular', fontSize: ms(17) },
   segmentTextActive: { color: COLORS.white },
   rowAvatars: { flexDirection: 'row', alignItems: 'center' },
   rowAvatar: {
@@ -1611,18 +1845,18 @@ const styles = StyleSheet.create({
   editTitle: {
     flex: 1,
     color: COLORS.ink,
-    fontFamily: 'Inter_700Bold',
+    fontFamily: 'AssociateSansBold',
     fontSize: ms(22),
     marginLeft: h(10),
   },
-  saveText: { color: COLORS.green, fontFamily: 'Inter_400Regular', fontSize: ms(18) },
+  saveText: { color: COLORS.green, fontFamily: 'AssociateSansRegular', fontSize: ms(18) },
   editInput: {
     height: v(50),
     borderRadius: h(25),
     borderWidth: 1,
     borderColor: '#CBE985',
     color: COLORS.ink,
-    fontFamily: 'Inter_400Regular',
+    fontFamily: 'AssociateSansRegular',
     fontSize: ms(16),
     paddingHorizontal: h(20),
     marginBottom: v(22),
@@ -1635,11 +1869,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
   },
-  optionText: { color: COLORS.ink, fontFamily: 'Inter_400Regular', fontSize: ms(16) },
+  optionText: { color: COLORS.ink, fontFamily: 'AssociateSansRegular', fontSize: ms(16) },
   customDuration: { paddingTop: v(12), paddingBottom: v(8), gap: v(12) },
   durationLabel: {
     color: COLORS.muted,
-    fontFamily: 'Inter_700Bold',
+    fontFamily: 'AssociateSansBold',
     fontSize: ms(15),
   },
   durationControlRow: {
@@ -1658,19 +1892,19 @@ const styles = StyleSheet.create({
   },
   stepperText: {
     color: COLORS.white,
-    fontFamily: 'Inter_700Bold',
+    fontFamily: 'AssociateSansBold',
     fontSize: ms(28),
     marginTop: -v(2),
   },
   durationUnit: {
     color: COLORS.muted,
-    fontFamily: 'Inter_400Regular',
+    fontFamily: 'AssociateSansRegular',
     fontSize: ms(16),
     width: h(50),
   },
   durationSummary: {
     color: COLORS.ink,
-    fontFamily: 'Inter_700Bold',
+    fontFamily: 'AssociateSansBold',
     fontSize: ms(16),
     marginTop: v(4),
   },
@@ -1686,7 +1920,7 @@ const styles = StyleSheet.create({
   },
   sliderKnobText: {
     color: COLORS.green,
-    fontFamily: 'Inter_700Bold',
+    fontFamily: 'AssociateSansBold',
     fontSize: ms(20),
   },
   sliderTrack: {
@@ -1718,13 +1952,13 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: COLORS.line,
     color: COLORS.ink,
-    fontFamily: 'Inter_400Regular',
+    fontFamily: 'AssociateSansRegular',
     fontSize: ms(16),
     textAlign: 'center',
   },
   locationHint: {
     color: COLORS.muted,
-    fontFamily: 'Inter_400Regular',
+    fontFamily: 'AssociateSansRegular',
     fontSize: ms(14),
     lineHeight: ms(20),
     marginBottom: v(12),
@@ -1753,7 +1987,7 @@ const styles = StyleSheet.create({
   },
   mapLabelText: {
     color: COLORS.green,
-    fontFamily: 'Inter_700Bold',
+    fontFamily: 'AssociateSansBold',
     fontSize: ms(16),
   },
   selectedPlaceCard: {
@@ -1788,14 +2022,14 @@ const styles = StyleSheet.create({
   placeResultText: { flex: 1 },
   placeTitle: {
     color: COLORS.ink,
-    fontFamily: 'Inter_400Regular',
+    fontFamily: 'AssociateSansRegular',
     fontSize: ms(18),
     marginBottom: v(6),
   },
-  placeSubtitle: { color: COLORS.muted, fontFamily: 'Inter_400Regular', fontSize: ms(14) },
+  placeSubtitle: { color: COLORS.muted, fontFamily: 'AssociateSansRegular', fontSize: ms(14) },
   inputLabel: {
     color: COLORS.muted,
-    fontFamily: 'Inter_400Regular',
+    fontFamily: 'AssociateSansRegular',
     fontSize: ms(18),
     marginBottom: v(10),
   },
@@ -1812,10 +2046,10 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  plusBadgeText: { color: COLORS.white, fontFamily: 'Inter_700Bold', fontSize: ms(17) },
+  plusBadgeText: { color: COLORS.white, fontFamily: 'AssociateSansBold', fontSize: ms(17) },
   inviteeName: {
     color: COLORS.ink,
-    fontFamily: 'Inter_400Regular',
+    fontFamily: 'AssociateSansRegular',
     fontSize: ms(14),
     textAlign: 'center',
     marginTop: v(8),
@@ -1831,10 +2065,10 @@ const styles = StyleSheet.create({
     paddingRight: h(12),
   },
   chipAvatar: { width: h(28), height: h(28), borderRadius: h(14), marginRight: h(7) },
-  chipText: { color: COLORS.ink, fontFamily: 'Inter_400Regular', fontSize: ms(15) },
+  chipText: { color: COLORS.ink, fontFamily: 'AssociateSansRegular', fontSize: ms(15) },
   chipRemove: {
     color: COLORS.muted,
-    fontFamily: 'Inter_400Regular',
+    fontFamily: 'AssociateSansRegular',
     fontSize: ms(22),
     marginLeft: h(8),
   },
@@ -1848,14 +2082,14 @@ const styles = StyleSheet.create({
   },
   confirmTitle: {
     color: COLORS.ink,
-    fontFamily: 'Inter_700Bold',
+    fontFamily: 'AssociateSansBold',
     fontSize: ms(22),
     textAlign: 'center',
     marginBottom: v(12),
   },
   confirmText: {
     color: COLORS.muted,
-    fontFamily: 'Inter_400Regular',
+    fontFamily: 'AssociateSansRegular',
     fontSize: ms(18),
     lineHeight: ms(24),
     textAlign: 'center',
@@ -1879,8 +2113,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  cancelText: { color: COLORS.green, fontFamily: 'Inter_700Bold', fontSize: ms(17) },
-  removeText: { color: COLORS.white, fontFamily: 'Inter_700Bold', fontSize: ms(17) },
+  cancelText: { color: COLORS.green, fontFamily: 'AssociateSansBold', fontSize: ms(17) },
+  removeText: { color: COLORS.white, fontFamily: 'AssociateSansBold', fontSize: ms(17) },
 });
 
 export default AppStack_SendCatchScreen;

@@ -1,7 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
-  Alert,
   Image,
   ScrollView,
   Text,
@@ -9,14 +8,27 @@ import {
   View,
 } from 'react-native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
+import Svg, { Circle, Path } from 'react-native-svg';
 
 import tw from '~/tailwindcss';
 import { AppStackParamList } from '.';
-import { BackArrow, Avatar } from '~/lib/images';
+import {
+  Avatar,
+  BackArrow,
+  CalendarIcon,
+  CheckIcon,
+  CrossIcon,
+  LocationIcon,
+  UpcomingIcon,
+} from '~/lib/images';
 import { http } from '~/helpers/http';
 import { horizontalScale, verticalScale, moderateScale } from '~/helpers/responsive';
 import { colors } from '~/lib/theme';
 import { formatPrice } from '~/helpers/hooks';
+
+const h = horizontalScale;
+const v = verticalScale;
+const ms = (n: number) => moderateScale(n, 0.2);
 
 type Props = NativeStackScreenProps<AppStackParamList, 'AppStack_NotificationDetailScreen'>;
 
@@ -45,6 +57,143 @@ interface MeetingRequest {
   participants?: Array<{ user?: { id: string; name?: string | null; avatar?: string | null } | null }>;
 }
 
+interface Participant {
+  id?: string;
+  name?: string | null;
+  avatar?: string | null;
+}
+
+// ===== SVG Icons =====
+
+const CheckCircleSvg = ({ size = 16 }: { size?: number }) => (
+  <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+    <Circle cx="12" cy="12" r="12" fill={colors.green} />
+    <Path d="M7 12l3.5 3.5L17 8.5" stroke="#fff" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+  </Svg>
+);
+
+const CrossCircleSvg = ({ size = 16 }: { size?: number }) => (
+  <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+    <Circle cx="12" cy="12" r="12" fill={colors.danger} />
+    <Path d="M8 8l8 8M16 8l-8 8" stroke="#fff" strokeWidth="2" strokeLinecap="round" />
+  </Svg>
+);
+
+// ===== Helpers =====
+
+function formatTimeRange(start: string, end: string): string {
+  const s = new Date(start);
+  const e = new Date(end);
+  const fmt = (d: Date) => {
+    let hh = d.getHours();
+    const mm = d.getMinutes();
+    const p = hh >= 12 ? 'pm' : 'am';
+    hh = hh % 12 || 12;
+    return `${hh}:${String(mm).padStart(2, '0')} ${p}`;
+  };
+  return `${fmt(s)}-${fmt(e)}`;
+}
+
+function formatDate(start: string): string {
+  return new Date(start).toLocaleDateString('en-US', { day: 'numeric', month: 'short' });
+}
+
+// ===== Invitee pill (for added/removed sections) =====
+
+const InviteePill: React.FC<{ p: Participant; strikethrough?: boolean }> = ({
+  p,
+  strikethrough,
+}) => (
+  <View
+    style={[
+      tw`flex-row items-center rounded-full`,
+      {
+        backgroundColor: colors.field,
+        paddingHorizontal: h(12),
+        paddingVertical: v(8),
+        marginBottom: v(8),
+        alignSelf: 'flex-start',
+      },
+    ]}>
+    <View
+      style={[
+        tw`rounded-full overflow-hidden items-center justify-center`,
+        { width: h(28), height: h(28), backgroundColor: colors.border, marginRight: h(8) },
+      ]}>
+      {p.avatar ? (
+        <Image source={{ uri: p.avatar }} style={{ width: h(28), height: h(28) }} />
+      ) : (
+        <Image source={Avatar} style={{ width: h(18), height: h(18) }} tintColor={colors.grey} />
+      )}
+    </View>
+    <Text
+      style={{
+        fontFamily: 'AssociateSansRegular',
+        color: strikethrough ? colors.grey : colors.ink,
+        fontSize: ms(14),
+        textDecorationLine: strikethrough ? 'line-through' : 'none',
+      }}>
+      {p.name || 'Unknown'}
+    </Text>
+  </View>
+);
+
+// ===== Invitee avatar (for "Other invitees" horizontal scroll) =====
+
+const InviteeAvatar: React.FC<{ p: Participant }> = ({ p }) => (
+  <View style={[tw`items-center`, { marginRight: h(16) }]}>
+    <View style={{ position: 'relative', marginBottom: v(6) }}>
+      <View
+        style={[
+          tw`rounded-full overflow-hidden items-center justify-center`,
+          { width: h(52), height: h(52), backgroundColor: colors.field },
+        ]}>
+        {p.avatar ? (
+          <Image source={{ uri: p.avatar }} style={{ width: h(52), height: h(52) }} />
+        ) : (
+          <Image source={Avatar} style={{ width: h(30), height: h(30) }} tintColor={colors.grey} />
+        )}
+      </View>
+      {/* Blue check badge */}
+      <View
+        style={[
+          tw`absolute rounded-full items-center justify-center`,
+          {
+            bottom: 0,
+            right: 0,
+            width: h(18),
+            height: h(18),
+            backgroundColor: '#2D7FF9',
+            borderWidth: 1.5,
+            borderColor: colors.card,
+          },
+        ]}>
+        <Image
+          source={CheckIcon}
+          style={{ width: h(9), height: h(9) }}
+          tintColor={colors.white}
+        />
+      </View>
+    </View>
+    {p.name && (
+      <Text
+        numberOfLines={2}
+        style={{
+          fontFamily: 'AssociateSansRegular',
+          color: colors.ink,
+          fontSize: ms(11),
+          textAlign: 'center',
+          maxWidth: h(60),
+        }}>
+        {p.name.split(' ')[0]}
+        {p.name.split(' ').length > 1 ? '\n' + p.name.split(' ').slice(1).join(' ') : ''}
+      </Text>
+    )}
+  </View>
+);
+
+// ===== Main Screen =====
+
 const AppStack_NotificationDetailScreen: React.FC<Props> = ({ navigation, route }) => {
   const { notificationId } = route.params;
 
@@ -63,7 +212,7 @@ const AppStack_NotificationDetailScreen: React.FC<Props> = ({ navigation, route 
 
         if (found?.data) {
           const d = typeof found.data === 'string' ? JSON.parse(found.data) : found.data;
-          if (d.momentRequestId) {
+          if (d?.momentRequestId) {
             const [recRes, sentRes] = await Promise.all([
               http.get('/users/moment-requests/received').catch(() => ({ data: { requests: [] } })),
               http.get('/users/moment-requests/sent').catch(() => ({ data: { requests: [] } })),
@@ -72,8 +221,7 @@ const AppStack_NotificationDetailScreen: React.FC<Props> = ({ navigation, route 
               ...(recRes.data.requests || []),
               ...(sentRes.data.requests || []),
             ];
-            const m = all.find((r) => r.id === d.momentRequestId) || null;
-            setMeeting(m);
+            setMeeting(all.find((r) => r.id === d.momentRequestId) || null);
           }
         }
       } catch (err) {
@@ -84,8 +232,6 @@ const AppStack_NotificationDetailScreen: React.FC<Props> = ({ navigation, route 
     })();
   }, [notificationId]);
 
-  const isInviteType = notification?.type === 'moment_request_created';
-
   const handleRespond = async (accept: boolean) => {
     if (!meeting) return;
     try {
@@ -93,180 +239,273 @@ const AppStack_NotificationDetailScreen: React.FC<Props> = ({ navigation, route 
       await http.post(`/users/moment-requests/${meeting.id}/respond`, {
         status: accept ? 'confirmed' : 'rejected',
       });
-      Alert.alert(accept ? 'Accepted' : 'Declined', accept ? 'Meeting confirmed.' : 'Meeting declined.', [
-        { text: 'OK', onPress: () => navigation.goBack() },
-      ]);
+      navigation.goBack();
     } catch (err: any) {
-      Alert.alert('Error', err?.response?.data?.error || 'Could not respond to request.');
+      // Silently fail — the error could be shown inline in the future
+      console.error('respond error', err);
     } finally {
       setIsResponding(false);
     }
   };
 
-  const formatTimeRange = (start: string, end: string) => {
-    const s = new Date(start);
-    const e = new Date(end);
-    const fmt = (d: Date) => {
-      let h = d.getHours();
-      const m = d.getMinutes();
-      const p = h >= 12 ? 'pm' : 'am';
-      h = h % 12 || 12;
-      return `${h}:${String(m).padStart(2, '0')} ${p}`;
-    };
-    return `${fmt(s)}-${fmt(e)}`;
-  };
-
-  const formatDate = (start: string) =>
-    new Date(start).toLocaleDateString('en-US', { day: 'numeric', month: 'short' });
-
-  return (
-    <View style={[tw`flex-1`, { backgroundColor: colors.pageBg }]}>
-      {/* Header */}
-      <View
-        style={[
-          tw`flex-row items-center`,
-          { marginTop: verticalScale(55), paddingHorizontal: '8%', marginBottom: verticalScale(16) },
-        ]}>
-        <TouchableOpacity onPress={() => navigation.goBack()} activeOpacity={0.7}>
-          <Image source={BackArrow} style={{ width: horizontalScale(24), height: horizontalScale(24) }} resizeMode="contain" />
-        </TouchableOpacity>
-        <View style={tw`flex-1 items-center`}>
-          <Text style={[tw`font-dm font-bold`, { color: colors.ink, fontSize: moderateScale(18.75) }]}>
-            Notification details
-          </Text>
-        </View>
-        <View style={{ width: horizontalScale(24) }} />
-      </View>
-
-      {isLoading ? (
+  if (isLoading) {
+    return (
+      <View style={[tw`flex-1`, { backgroundColor: colors.pageBg }]}>
+        <NotifHeader onBack={() => navigation.goBack()} />
         <View style={tw`flex-1 items-center justify-center`}>
           <ActivityIndicator size="large" color={colors.green} />
         </View>
-      ) : !notification ? (
+      </View>
+    );
+  }
+
+  if (!notification) {
+    return (
+      <View style={[tw`flex-1`, { backgroundColor: colors.pageBg }]}>
+        <NotifHeader onBack={() => navigation.goBack()} />
         <View style={tw`flex-1 items-center justify-center`}>
-          <Text style={[tw`font-dm`, { color: colors.grey, fontSize: moderateScale(14) }]}>Notification not found</Text>
+          <Text style={{ fontFamily: 'AssociateSansRegular', color: colors.grey, fontSize: ms(14) }}>
+            Notification not found
+          </Text>
         </View>
-      ) : (
-        <ScrollView
-          style={tw`flex-1`}
-          contentContainerStyle={{ paddingHorizontal: '8%', paddingBottom: verticalScale(120) }}
-          showsVerticalScrollIndicator={false}>
-          {/* Main card */}
-          <View
-            style={[
-              tw`rounded-3xl`,
-              { backgroundColor: colors.card, padding: moderateScale(16), marginBottom: verticalScale(16) },
-            ]}>
-            {/* Sender row */}
-            <View style={[tw`flex-row items-center`, { marginBottom: verticalScale(10) }]}>
-              <View
-                style={[
-                  tw`rounded-full overflow-hidden items-center justify-center`,
-                  { width: horizontalScale(46), height: horizontalScale(46), backgroundColor: colors.field, marginRight: horizontalScale(12) },
-                ]}>
-                {meeting?.sender?.avatar ? (
-                  <Image source={{ uri: meeting.sender.avatar }} style={{ width: '100%', height: '100%' }} />
-                ) : (
-                  <Image source={Avatar} style={{ width: horizontalScale(28), height: horizontalScale(28) }} />
-                )}
-              </View>
-              <View style={tw`flex-1`}>
-                <Text style={[tw`font-dm font-bold`, { color: colors.ink, fontSize: moderateScale(14.5) }]}>
-                  {notification.title}
-                </Text>
+      </View>
+    );
+  }
+
+  const type = notification.type;
+  const isInviteType = type === 'moment_request_created';
+  const isAcceptedType = type === 'moment_request_accepted';
+  const isDeclinedType =
+    type === 'moment_request_rejected' || type === 'moment_request_canceled';
+  const isMomentRequestType = isInviteType || isAcceptedType || isDeclinedType || type === 'moment_request_rescheduled';
+  const isParticipantAddType = type.includes('added') || type.includes('participant_add');
+  const isParticipantRemoveType = type.includes('removed') || type.includes('participant_remov');
+
+  // Parse extra participant data from notification.data
+  const parsedData = (() => {
+    try {
+      return typeof notification.data === 'string'
+        ? JSON.parse(notification.data)
+        : notification.data || {};
+    } catch {
+      return {};
+    }
+  })();
+
+  const addedParticipants: Participant[] = parsedData.addedParticipants || [];
+  const removedParticipants: Participant[] = parsedData.removedParticipants || [];
+  const otherInvitees: Participant[] =
+    (meeting?.participants || [])
+      .map((p) => p.user)
+      .filter((u): u is NonNullable<typeof u> => !!u) || [];
+
+  const showInviteesSection =
+    otherInvitees.length > 0 || addedParticipants.length > 0 || removedParticipants.length > 0;
+
+  return (
+    <View style={[tw`flex-1`, { backgroundColor: colors.pageBg }]}>
+      <NotifHeader onBack={() => navigation.goBack()} />
+
+      <ScrollView
+        style={tw`flex-1`}
+        contentContainerStyle={{
+          paddingHorizontal: '8%',
+          paddingBottom: v(isInviteType && meeting ? 120 : 40),
+        }}
+        showsVerticalScrollIndicator={false}>
+        {/* Main detail card */}
+        <View
+          style={[
+            tw`rounded-3xl`,
+            {
+              backgroundColor: colors.card,
+              padding: h(16),
+              marginBottom: v(16),
+            },
+          ]}>
+          {/* Header row: avatar + title + badge */}
+          <View style={[tw`flex-row items-start`, { marginBottom: v(12) }]}>
+            {/* Show avatar for moment-request types only */}
+            {(isMomentRequestType) && (
+              <View style={{ position: 'relative', marginRight: h(12) }}>
                 <View
                   style={[
-                    tw`self-start rounded-full`,
-                    {
-                      backgroundColor: meeting?.isPaid ? colors.ink : colors.greenTint,
-                      paddingHorizontal: horizontalScale(10),
-                      paddingVertical: verticalScale(3),
-                      marginTop: verticalScale(4),
-                    },
+                    tw`rounded-full overflow-hidden items-center justify-center`,
+                    { width: h(46), height: h(46), backgroundColor: colors.field },
                   ]}>
-                  <Text style={[tw`font-dm font-bold`, { color: meeting?.isPaid ? colors.white : colors.greenText, fontSize: moderateScale(11) }]}>
-                    {meeting?.isPaid ? formatPrice(meeting.priceCents, meeting.currency) : 'Free'}
-                  </Text>
+                  {meeting?.sender?.avatar ? (
+                    <Image
+                      source={{ uri: meeting.sender.avatar }}
+                      style={{ width: h(46), height: h(46) }}
+                    />
+                  ) : (
+                    <Image
+                      source={Avatar}
+                      style={{ width: h(28), height: h(28) }}
+                      tintColor={colors.grey}
+                    />
+                  )}
                 </View>
-              </View>
-            </View>
-
-            {/* Meeting details */}
-            {meeting && (
-              <View>
-                <Text style={[tw`font-dm`, { color: colors.grey, fontSize: moderateScale(13) }]}>
-                  🕐 {formatTimeRange(meeting.startTime, meeting.endTime)}
-                </Text>
-                <Text style={[tw`font-dm`, { color: colors.grey, fontSize: moderateScale(13) }]}>
-                  📅 {formatDate(meeting.startTime)}
-                </Text>
-                {meeting.locationLabel && (
-                  <Text style={[tw`font-dm`, { color: colors.grey, fontSize: moderateScale(13) }]}>
-                    📍 {meeting.locationLabel}
-                  </Text>
+                {/* Status badge */}
+                {isAcceptedType && (
+                  <View style={{ position: 'absolute', bottom: 0, right: 0 }}>
+                    <CheckCircleSvg size={h(18)} />
+                  </View>
+                )}
+                {isDeclinedType && (
+                  <View style={{ position: 'absolute', bottom: 0, right: 0 }}>
+                    <CrossCircleSvg size={h(18)} />
+                  </View>
                 )}
               </View>
             )}
+
+            <View style={tw`flex-1`}>
+              <Text
+                style={{
+                  fontFamily: 'AssociateSansBold',
+                  color: colors.ink,
+                  fontSize: ms(14.5),
+                  marginBottom: v(6),
+                }}>
+                {notification.title}
+              </Text>
+              {/* Price badge */}
+              <View
+                style={[
+                  tw`self-start rounded-full`,
+                  {
+                    backgroundColor: meeting?.isPaid ? colors.ink : colors.greenTint,
+                    paddingHorizontal: h(10),
+                    paddingVertical: v(3),
+                  },
+                ]}>
+                <Text
+                  style={{
+                    fontFamily: 'AssociateSansBold',
+                    color: meeting?.isPaid ? colors.white : colors.greenText,
+                    fontSize: ms(11),
+                  }}>
+                  {meeting?.isPaid
+                    ? formatPrice(meeting.priceCents, meeting.currency)
+                    : 'Free'}
+                </Text>
+              </View>
+            </View>
           </View>
 
-          {/* Other invitees (for invite-type notifications) */}
-          {isInviteType && meeting?.participants && meeting.participants.length > 0 && (
-            <View style={{ marginBottom: verticalScale(16) }}>
-              <Text style={[tw`font-dm font-bold`, { color: colors.ink, fontSize: moderateScale(15), marginBottom: verticalScale(10) }]}>
+          {/* Meeting detail rows */}
+          {meeting && (
+            <View style={{ gap: v(6), marginBottom: showInviteesSection ? v(16) : 0 }}>
+              <View style={[tw`flex-row items-center`, { gap: h(8) }]}>
+                <Image
+                  source={UpcomingIcon}
+                  style={{ width: h(14), height: h(14) }}
+                  tintColor={colors.grey}
+                />
+                <Text
+                  style={{
+                    fontFamily: 'AssociateSansRegular',
+                    color: colors.grey,
+                    fontSize: ms(13),
+                  }}>
+                  {formatTimeRange(meeting.startTime, meeting.endTime)}
+                </Text>
+              </View>
+              <View style={[tw`flex-row items-center`, { gap: h(8) }]}>
+                <Image
+                  source={CalendarIcon}
+                  style={{ width: h(14), height: h(14) }}
+                  tintColor={colors.grey}
+                />
+                <Text
+                  style={{
+                    fontFamily: 'AssociateSansRegular',
+                    color: colors.grey,
+                    fontSize: ms(13),
+                  }}>
+                  {formatDate(meeting.startTime)}
+                </Text>
+              </View>
+              {meeting.locationLabel && (
+                <View style={[tw`flex-row items-center`, { gap: h(8) }]}>
+                  <Image
+                    source={LocationIcon}
+                    style={{ width: h(14), height: h(14) }}
+                    tintColor={colors.grey}
+                  />
+                  <Text
+                    style={{
+                      fontFamily: 'AssociateSansRegular',
+                      color: colors.grey,
+                      fontSize: ms(13),
+                    }}>
+                    {meeting.locationLabel}
+                  </Text>
+                </View>
+              )}
+            </View>
+          )}
+
+          {/* Added invitees section (participant-add notifications) */}
+          {addedParticipants.length > 0 && (
+            <View style={{ marginBottom: v(14) }}>
+              <Text
+                style={{
+                  fontFamily: 'AssociateSansBold',
+                  color: colors.ink,
+                  fontSize: ms(14),
+                  marginBottom: v(8),
+                }}>
+                Added invitees
+              </Text>
+              {addedParticipants.map((p, i) => (
+                <InviteePill key={p.id || i} p={p} />
+              ))}
+            </View>
+          )}
+
+          {/* Removed invitees section (participant-remove notifications) */}
+          {removedParticipants.length > 0 && (
+            <View style={{ marginBottom: v(14) }}>
+              <Text
+                style={{
+                  fontFamily: 'AssociateSansBold',
+                  color: colors.ink,
+                  fontSize: ms(14),
+                  marginBottom: v(8),
+                }}>
+                Removed invitees
+              </Text>
+              {removedParticipants.map((p, i) => (
+                <InviteePill key={p.id || i} p={p} strikethrough />
+              ))}
+            </View>
+          )}
+
+          {/* Other invitees horizontal scroll */}
+          {otherInvitees.length > 0 && (
+            <View>
+              <Text
+                style={{
+                  fontFamily: 'AssociateSansBold',
+                  color: colors.ink,
+                  fontSize: ms(14),
+                  marginBottom: v(12),
+                }}>
                 Other invitees
               </Text>
               <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-                {meeting.participants.map((p, idx) => (
-                  <View
-                    key={idx}
-                    style={[tw`items-center`, { marginRight: horizontalScale(16) }]}>
-                    <View
-                      style={[
-                        tw`rounded-full overflow-hidden items-center justify-center`,
-                        { width: horizontalScale(52), height: horizontalScale(52), backgroundColor: colors.field, marginBottom: verticalScale(6), position: 'relative' },
-                      ]}>
-                      {p.user?.avatar ? (
-                        <Image source={{ uri: p.user.avatar }} style={{ width: '100%', height: '100%' }} />
-                      ) : (
-                        <Image source={Avatar} style={{ width: horizontalScale(30), height: horizontalScale(30) }} />
-                      )}
-                    </View>
-                    <View
-                      style={[
-                        tw`absolute rounded-full items-center justify-center`,
-                        {
-                          bottom: verticalScale(22),
-                          right: horizontalScale(2),
-                          width: horizontalScale(16),
-                          height: horizontalScale(16),
-                          backgroundColor: '#2D7FF9',
-                          borderWidth: 1.5,
-                          borderColor: colors.card,
-                        },
-                      ]}>
-                      <Text style={{ color: colors.white, fontSize: moderateScale(8), fontWeight: 'bold' }}>✓</Text>
-                    </View>
-                    {p.user?.name && (
-                      <Text
-                        numberOfLines={1}
-                        style={[
-                          tw`font-dm text-center`,
-                          { color: colors.ink, fontSize: moderateScale(11), maxWidth: horizontalScale(60) },
-                        ]}>
-                        {p.user.name.split(' ')[0]}
-                        {'\n'}
-                        {p.user.name.split(' ').slice(1).join(' ')}
-                      </Text>
-                    )}
-                  </View>
+                {otherInvitees.map((p, i) => (
+                  <InviteeAvatar key={p.id || i} p={p} />
                 ))}
               </ScrollView>
             </View>
           )}
-        </ScrollView>
-      )}
+        </View>
+      </ScrollView>
 
-      {/* Accept / Decline buttons (only for invite notifications) */}
+      {/* Accept / Decline buttons — invite type only */}
       {isInviteType && meeting && (
         <View
           style={[
@@ -274,9 +513,10 @@ const AppStack_NotificationDetailScreen: React.FC<Props> = ({ navigation, route 
             {
               bottom: 0,
               paddingHorizontal: '8%',
-              paddingTop: verticalScale(12),
-              paddingBottom: verticalScale(30),
-              gap: horizontalScale(12),
+              paddingTop: v(12),
+              paddingBottom: v(34),
+              gap: h(12),
+              backgroundColor: colors.pageBg,
             },
           ]}>
           <TouchableOpacity
@@ -285,10 +525,19 @@ const AppStack_NotificationDetailScreen: React.FC<Props> = ({ navigation, route 
             disabled={isResponding}
             style={[
               tw`flex-1 rounded-full flex-row items-center justify-center`,
-              { backgroundColor: colors.field, paddingVertical: verticalScale(15) },
+              { backgroundColor: colors.field, paddingVertical: v(15) },
             ]}>
-            <Text style={{ fontSize: moderateScale(14), marginRight: horizontalScale(6) }}>✕</Text>
-            <Text style={[tw`font-dm font-bold`, { color: colors.ink, fontSize: moderateScale(15) }]}>
+            <Image
+              source={CrossIcon}
+              style={{ width: h(14), height: h(14), marginRight: h(6) }}
+              tintColor={colors.ink}
+            />
+            <Text
+              style={{
+                fontFamily: 'AssociateSansBold',
+                color: colors.ink,
+                fontSize: ms(15),
+              }}>
               Decline Invite
             </Text>
           </TouchableOpacity>
@@ -298,14 +547,23 @@ const AppStack_NotificationDetailScreen: React.FC<Props> = ({ navigation, route 
             disabled={isResponding}
             style={[
               tw`flex-1 rounded-full flex-row items-center justify-center`,
-              { backgroundColor: colors.green, paddingVertical: verticalScale(15) },
+              { backgroundColor: colors.green, paddingVertical: v(15) },
             ]}>
             {isResponding ? (
               <ActivityIndicator color={colors.white} />
             ) : (
               <>
-                <Text style={{ fontSize: moderateScale(14), marginRight: horizontalScale(6), color: colors.white }}>✓</Text>
-                <Text style={[tw`font-dm font-bold`, { color: colors.white, fontSize: moderateScale(15) }]}>
+                <Image
+                  source={CheckIcon}
+                  style={{ width: h(14), height: h(14), marginRight: h(6) }}
+                  tintColor={colors.white}
+                />
+                <Text
+                  style={{
+                    fontFamily: 'AssociateSansBold',
+                    color: colors.white,
+                    fontSize: ms(15),
+                  }}>
                   Accept Invite
                 </Text>
               </>
@@ -316,5 +574,38 @@ const AppStack_NotificationDetailScreen: React.FC<Props> = ({ navigation, route 
     </View>
   );
 };
+
+// ===== Shared header =====
+
+const NotifHeader: React.FC<{ onBack: () => void }> = ({ onBack }) => (
+  <View
+    style={[
+      tw`flex-row items-center`,
+      {
+        marginTop: verticalScale(55),
+        paddingHorizontal: '8%',
+        marginBottom: verticalScale(16),
+      },
+    ]}>
+    <TouchableOpacity onPress={onBack} activeOpacity={0.7}>
+      <Image
+        source={BackArrow}
+        style={{ width: horizontalScale(24), height: horizontalScale(24) }}
+        resizeMode="contain"
+      />
+    </TouchableOpacity>
+    <View style={tw`flex-1 items-center`}>
+      <Text
+        style={{
+          fontFamily: 'AssociateSansBold',
+          color: colors.ink,
+          fontSize: moderateScale(18.75),
+        }}>
+        Notification details
+      </Text>
+    </View>
+    <View style={{ width: horizontalScale(24) }} />
+  </View>
+);
 
 export default AppStack_NotificationDetailScreen;

@@ -79,8 +79,8 @@ export const ACCESS_LEVEL_META: Record<
     label: 'Private',
     color: accessBadge.private.fg,
     bg: accessBadge.private.bg,
-    description: 'Not public and available only through direct sharing.',
-    hasInvitees: true,
+    description: 'One-time use. Creates a single catch, then disappears.',
+    hasInvitees: false,
   },
   open: {
     label: 'Open',

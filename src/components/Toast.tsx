@@ -5,12 +5,13 @@ import { horizontalScale, verticalScale, moderateScale } from '~/helpers/respons
 
 interface ToastProps {
   message: string;
+  subtitle?: string;
   visible: boolean;
   duration?: number;
   onHide?: () => void;
 }
 
-const Toast: React.FC<ToastProps> = ({ message, visible, duration = 3000, onHide }) => {
+const Toast: React.FC<ToastProps> = ({ message, subtitle, visible, duration = 3000, onHide }) => {
   const [fadeAnim] = useState(new Animated.Value(0));
 
   useEffect(() => {
@@ -46,7 +47,12 @@ const Toast: React.FC<ToastProps> = ({ message, visible, duration = 3000, onHide
         { bottom: verticalScale(90), left: horizontalScale(18.75), right: horizontalScale(18.75), paddingHorizontal: horizontalScale(15), paddingVertical: verticalScale(11.25), opacity: fadeAnim }
       ]}
     >
-      <Text style={[tw`text-white text-center font-dm`, { fontSize: moderateScale(13.125) }]}>{message}</Text>
+      <Text style={[tw`text-white text-center font-associate`, { fontSize: moderateScale(13.125) }]}>{message}</Text>
+      {subtitle ? (
+        <Text style={[tw`text-center font-associate`, { color: 'rgba(255,255,255,0.7)', fontSize: moderateScale(11.5), marginTop: verticalScale(2) }]}>
+          {subtitle}
+        </Text>
+      ) : null}
     </Animated.View>
   );
 };

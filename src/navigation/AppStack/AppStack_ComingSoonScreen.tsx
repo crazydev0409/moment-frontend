@@ -27,19 +27,19 @@ const AppStack_ComingSoonScreen: React.FC<Props> = ({ navigation }) => {
           >
             <Image source={BackArrow} style={{ width: horizontalScale(24), height: horizontalScale(24) }} resizeMode="contain" />
           </TouchableOpacity>
-          <Text style={[tw`font-bold font-dm text-black`, { fontSize: moderateScale(18.75) }]}>Business</Text>
+          <Text style={[tw`font-associate-bold text-black`, { fontSize: moderateScale(18.75) }]}>Business</Text>
         </View>
       </View>
 
       {/* Content */}
       <View style={[tw`flex-1 items-center justify-center`, { paddingHorizontal: '4%' }]}>
-        <Text style={[tw`font-bold font-dm text-black`, { fontSize: moderateScale(33.75), marginBottom: verticalScale(15) }]}>
+        <Text style={[tw`font-associate-bold text-black`, { fontSize: moderateScale(33.75), marginBottom: verticalScale(15) }]}>
           Coming Soon
         </Text>
-        <Text style={[tw`font-dm text-grey text-center`, { fontSize: moderateScale(15) }]}>
+        <Text style={[tw`font-associate text-grey text-center`, { fontSize: moderateScale(15) }]}>
           This feature is currently under development.
         </Text>
-        <Text style={[tw`font-dm text-grey text-center`, { fontSize: moderateScale(15), marginTop: verticalScale(7.5) }]}>
+        <Text style={[tw`font-associate text-grey text-center`, { fontSize: moderateScale(15), marginTop: verticalScale(7.5) }]}>
           Stay tuned for updates!
         </Text>
       </View>

@@ -12,7 +12,7 @@ export const BellRinging = require('../../assets/images/bell_ringing.png');
 
 // Nav icons
 export const HomeIcon = require(`../../assets/images/icons/home.png`);
-export const CalendarIcon = require(`../../assets/images/icons/calendar.png`);
+export const CalendarIcon = require(`../../assets/images/icons/calendar (1).png`);
 export const MeshIcon = require(`../../assets/images/icons/mesh.png`);
 
 // Calendar provider icons
@@ -30,13 +30,15 @@ export const CheckIcon = require(`../../assets/images/icons/check.png`);
 export const FilterIcon = require(`../../assets/images/icons/filter.png`);
 export const QRIcon = require(`../../assets/images/icons/qr.png`);
 export const LocationIcon = require(`../../assets/images/icons/location.png`);
+export const ChevronIcon = require(`../../assets/images/icons/ARROW straight.png`);
+export const NextIcon = require(`../../assets/images/icons/next.png`);
 
 // Navigation / status icons
+export const PhoneIcon = require(`../../assets/images/icons/phone.png`);
 export const NotificationsIcon = require(`../../assets/images/icons/notifications.png`);
 export const HookIcon = require(`../../assets/images/icons/Hook.png`);
 export const RescheduleIcon = require(`../../assets/images/icons/reschedule.png`);
 export const UpcomingIcon = require(`../../assets/images/icons/upcoming.png`);
-export const CalendarGearIcon = require(`../../assets/images/icons/calendar (1).png`);
 
 // User icons
 export const UserIcon = require(`../../assets/images/icons/user.png`);
@@ -49,6 +51,7 @@ export const SecurityIcon = require(`../../assets/images/icons/security.png`);
 export const PayIcon = require(`../../assets/images/icons/pay.png`);
 export const BrainIcon = require(`../../assets/images/icons/brain.png`);
 export const LogOutIcon = require(`../../assets/images/icons/log out.png`);
+export const EyeIcon = require(`../../assets/images/icons/eye.png`);
 
 // Weather Icons
 export const WeClearSky = require('../../assets/images/we_clear_sky.png');
