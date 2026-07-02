@@ -43,7 +43,8 @@
         {
           "cameraPermission": "Allow $(PRODUCT_NAME) to use your camera to scan booking QR codes."
         }
-      ]
+      ],
+      "@stripe/stripe-react-native"
     ],
     "orientation": "portrait",
     "icon": "./assets/images/icon-android.png",

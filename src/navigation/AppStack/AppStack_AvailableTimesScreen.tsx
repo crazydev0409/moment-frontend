@@ -9,6 +9,7 @@ import {
   View,
 } from 'react-native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
+import { useStripe } from '@stripe/stripe-react-native';
 
 import tw from '~/tailwindcss';
 import { AppStackParamList } from '.';
@@ -53,6 +54,7 @@ const END_HOUR = 20;  // 8pm
 
 const AppStack_AvailableTimesScreen: React.FC<Props> = ({ navigation, route }) => {
   const { contactUserId, contactName } = route.params;
+  const { initPaymentSheet, presentPaymentSheet } = useStripe();
 
   const [hooks, setHooks] = useState<Hook[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -104,19 +106,51 @@ const AppStack_AvailableTimesScreen: React.FC<Props> = ({ navigation, route }) =
     startDate.setHours(Math.floor(startMinutes / 60), startMinutes % 60, 0, 0);
     const endDate = new Date(startDate.getTime() + hook.durationMinutes * 60 * 1000);
 
+    const bookingPayload = {
+      receiverId: contactUserId,
+      startTime: startDate.toISOString(),
+      endTime: endDate.toISOString(),
+      title: hook.title,
+      locationType: hook.locationType,
+      locationLabel: hook.locationLabel,
+      hookId: hook.id,
+    };
+
     try {
       setIsBooking(true);
-      await http.post('/users/moment-requests', {
-        receiverId: contactUserId,
-        startTime: startDate.toISOString(),
-        endTime: endDate.toISOString(),
-        title: hook.title,
-        locationType: hook.locationType,
-        locationLabel: hook.locationLabel,
-        hookId: hook.id,
-      });
-      setSelectedSlot(null);
-      setToast({ message: 'Request sent successfully', subtitle: 'Waiting for confirmation' });
+
+      if (hook.isPaid) {
+        const checkoutRes = await http.post('/payments/hook-bookings', bookingPayload);
+        const { clientSecret, customerId, ephemeralKeySecret } = checkoutRes.data;
+
+        const { error: initError } = await initPaymentSheet({
+          merchantDisplayName: 'Catch',
+          customerId,
+          customerEphemeralKeySecret: ephemeralKeySecret,
+          paymentIntentClientSecret: clientSecret,
+        });
+        if (initError) {
+          Alert.alert('Error', initError.message);
+          return;
+        }
+
+        const { error: presentError } = await presentPaymentSheet();
+        if (presentError) {
+          // A canceled MomentRequest is left pending; the backend expires it
+          // automatically after an hour if it's never retried.
+          if (presentError.code !== 'Canceled') {
+            Alert.alert('Error', presentError.message);
+          }
+          return;
+        }
+
+        setSelectedSlot(null);
+        setToast({ message: 'Payment authorized', subtitle: 'Waiting for confirmation' });
+      } else {
+        await http.post('/users/moment-requests', bookingPayload);
+        setSelectedSlot(null);
+        setToast({ message: 'Request sent successfully', subtitle: 'Waiting for confirmation' });
+      }
     } catch (err: any) {
       Alert.alert('Error', err?.response?.data?.error || 'Could not send request.');
     } finally {

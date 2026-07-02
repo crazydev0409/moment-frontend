@@ -26,6 +26,8 @@ import AppStack_SettingsScreen from './AppStack_SettingsScreen';
 import AppStack_ApplicationThemeScreen from './AppStack_ApplicationThemeScreen';
 import AppStack_NotificationSettingsScreen from './AppStack_NotificationSettingsScreen';
 import AppStack_AccountSecurityScreen from './AppStack_AccountSecurityScreen';
+import AppStack_ChangeEmailScreen from './AppStack_ChangeEmailScreen';
+import AppStack_ChangePhoneScreen from './AppStack_ChangePhoneScreen';
 import AppStack_PaymentsScreen from './AppStack_PaymentsScreen';
 import AppStack_AIAssistantScreen from './AppStack_AIAssistantScreen';
 import AppStack_PayoutDetailsScreen from './AppStack_PayoutDetailsScreen';
@@ -91,6 +93,10 @@ export type AppStackParamList = {
   AppStack_ApplicationThemeScreen: undefined;
   AppStack_NotificationSettingsScreen: undefined;
   AppStack_AccountSecurityScreen: undefined;
+  AppStack_ChangeEmailScreen: {
+    currentEmail?: string;
+  } | undefined;
+  AppStack_ChangePhoneScreen: undefined;
   AppStack_PaymentsScreen: undefined;
   AppStack_AIAssistantScreen: undefined;
   AppStack_PayoutDetailsScreen: undefined;
@@ -178,6 +184,8 @@ const AppStackNavigator: React.FC = () => {
       <Stack.Screen name="AppStack_ApplicationThemeScreen" component={AppStack_ApplicationThemeScreen} />
       <Stack.Screen name="AppStack_NotificationSettingsScreen" component={AppStack_NotificationSettingsScreen} />
       <Stack.Screen name="AppStack_AccountSecurityScreen" component={AppStack_AccountSecurityScreen} />
+      <Stack.Screen name="AppStack_ChangeEmailScreen" component={AppStack_ChangeEmailScreen} />
+      <Stack.Screen name="AppStack_ChangePhoneScreen" component={AppStack_ChangePhoneScreen} />
       <Stack.Screen name="AppStack_PaymentsScreen" component={AppStack_PaymentsScreen} />
       <Stack.Screen name="AppStack_AIAssistantScreen" component={AppStack_AIAssistantScreen} />
       <Stack.Screen name="AppStack_PayoutDetailsScreen" component={AppStack_PayoutDetailsScreen} />

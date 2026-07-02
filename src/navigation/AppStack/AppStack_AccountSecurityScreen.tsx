@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -11,11 +11,12 @@ import {
   View,
 } from 'react-native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
+import { useFocusEffect } from '@react-navigation/native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useAtom } from 'jotai';
 import tw from '~/tailwindcss';
 import { AppStackParamList } from '.';
-import { BackArrow } from '~/lib/images';
+import { BackArrow, ChevronIcon } from '~/lib/images';
 import { horizontalScale as h, verticalScale as v, moderateScale as ms } from '~/helpers/responsive';
 import { colors } from '~/lib/theme';
 import { http } from '~/helpers/http';
@@ -38,20 +39,23 @@ const RadioRow = ({
   selected,
   onPress,
   showDivider,
+  disabled,
 }: {
   label: string;
   subtitle: string;
   selected: boolean;
   onPress: () => void;
   showDivider: boolean;
+  disabled?: boolean;
 }) => (
   <>
     <TouchableOpacity
       onPress={onPress}
       activeOpacity={0.7}
+      disabled={disabled}
       style={[
         tw`flex-row items-center justify-between`,
-        { paddingVertical: v(16), paddingHorizontal: h(18) },
+        { paddingVertical: v(16), paddingHorizontal: h(18), opacity: disabled ? 0.6 : 1 },
       ]}>
       <View style={tw`flex-1`}>
         <Text style={[tw`font-associate-bold`, { color: colors.ink, fontSize: ms(15) }]}>
@@ -86,21 +90,81 @@ const RadioRow = ({
   </>
 );
 
-const VISIBILITY_KEY = '@profile_visibility';
+const NavRow = ({
+  label,
+  subtitle,
+  onPress,
+  showDivider,
+}: {
+  label: string;
+  subtitle?: string;
+  onPress: () => void;
+  showDivider: boolean;
+}) => (
+  <>
+    <TouchableOpacity
+      onPress={onPress}
+      activeOpacity={0.7}
+      style={[
+        tw`flex-row items-center justify-between`,
+        { paddingVertical: v(16), paddingHorizontal: h(18) },
+      ]}>
+      <View style={tw`flex-1`}>
+        <Text style={[tw`font-associate-bold`, { color: colors.ink, fontSize: ms(15) }]}>
+          {label}
+        </Text>
+        {!!subtitle && (
+          <Text style={[tw`font-associate`, { color: colors.grey, fontSize: ms(12.5), marginTop: v(2) }]}>
+            {subtitle}
+          </Text>
+        )}
+      </View>
+      <Image
+        source={ChevronIcon}
+        style={{ width: h(14), height: h(14), transform: [{ rotate: '90deg' }] }}
+        tintColor={colors.grey}
+        resizeMode="contain"
+      />
+    </TouchableOpacity>
+    {showDivider && (
+      <View style={{ height: 1, backgroundColor: colors.border, marginHorizontal: h(18) }} />
+    )}
+  </>
+);
 
 const AppStack_AccountSecurityScreen: React.FC<Props> = ({ navigation }) => {
   const [visibility, setVisibility] = useState<VisibilityOption>('public');
+  const [isLoadingVisibility, setIsLoadingVisibility] = useState(true);
+  const [isSavingVisibility, setIsSavingVisibility] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [email, setEmail] = useState<string | null>(null);
 
-  useEffect(() => {
-    AsyncStorage.getItem(VISIBILITY_KEY).then((val) => {
-      if (val === 'public' || val === 'contacts' || val === 'only_me') setVisibility(val);
-    });
-  }, []);
+  useFocusEffect(
+    useCallback(() => {
+      http
+        .get('/users/profile')
+        .then((res) => {
+          const val = res.data?.profileVisibility;
+          if (val === 'public' || val === 'contacts' || val === 'only_me') setVisibility(val);
+          setEmail(res.data?.email || null);
+        })
+        .catch(() => {})
+        .finally(() => setIsLoadingVisibility(false));
+    }, [])
+  );
 
   const handleVisibilityChange = async (val: VisibilityOption) => {
+    const previous = visibility;
     setVisibility(val);
-    await AsyncStorage.setItem(VISIBILITY_KEY, val);
+    setIsSavingVisibility(true);
+    try {
+      await http.put('/users/profile', { profileVisibility: val });
+    } catch (error: any) {
+      setVisibility(previous);
+      Alert.alert('Error', error.response?.data?.error || 'Failed to update profile visibility. Please try again.');
+    } finally {
+      setIsSavingVisibility(false);
+    }
   };
   const [isDeletingAccount, setIsDeletingAccount] = useState(false);
   const [, setUser] = useAtom(userAtom);
@@ -168,21 +232,54 @@ const AppStack_AccountSecurityScreen: React.FC<Props> = ({ navigation }) => {
             tw`font-associate-bold`,
             { color: colors.ink, fontSize: ms(16), marginBottom: v(12) },
           ]}>
-          Profile visibility
+          Login details
         </Text>
 
-        <View style={[tw`rounded-2xl overflow-hidden`, { backgroundColor: colors.card }]}>
-          {visibilityOptions.map((opt, idx) => (
-            <RadioRow
-              key={opt.key}
-              label={opt.label}
-              subtitle={opt.subtitle}
-              selected={visibility === opt.key}
-              onPress={() => handleVisibilityChange(opt.key)}
-              showDivider={idx < visibilityOptions.length - 1}
-            />
-          ))}
+        <View style={[tw`rounded-2xl overflow-hidden`, { backgroundColor: colors.card, marginBottom: v(28) }]}>
+          <NavRow
+            label="Email"
+            subtitle={email || 'Not set'}
+            onPress={() => navigation.navigate('AppStack_ChangeEmailScreen', { currentEmail: email || undefined })}
+            showDivider
+          />
+          <NavRow
+            label="Phone number"
+            subtitle="Tap to change the number linked to your account"
+            onPress={() => navigation.navigate('AppStack_ChangePhoneScreen')}
+            showDivider={false}
+          />
         </View>
+
+        <View style={tw`flex-row items-center`}>
+          <Text
+            style={[
+              tw`font-associate-bold`,
+              { color: colors.ink, fontSize: ms(16), marginBottom: v(12) },
+            ]}>
+            Profile visibility
+          </Text>
+          {isSavingVisibility && (
+            <ActivityIndicator size="small" color={colors.grey} style={{ marginLeft: h(8), marginBottom: v(10) }} />
+          )}
+        </View>
+
+        {isLoadingVisibility ? (
+          <ActivityIndicator size="small" color={colors.grey} style={{ marginTop: v(12) }} />
+        ) : (
+          <View style={[tw`rounded-2xl overflow-hidden`, { backgroundColor: colors.card }]}>
+            {visibilityOptions.map((opt, idx) => (
+              <RadioRow
+                key={opt.key}
+                label={opt.label}
+                subtitle={opt.subtitle}
+                selected={visibility === opt.key}
+                onPress={() => handleVisibilityChange(opt.key)}
+                showDivider={idx < visibilityOptions.length - 1}
+                disabled={isSavingVisibility}
+              />
+            ))}
+          </View>
+        )}
       </ScrollView>
 
       {/* Delete Account button pinned to bottom */}

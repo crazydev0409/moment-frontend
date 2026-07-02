@@ -7,6 +7,7 @@ import { StatusBar } from 'expo-status-bar';
 import { useFonts } from 'expo-font';
 import { Inter_400Regular, Inter_700Bold } from '@expo-google-fonts/inter';
 import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-context';
+import { StripeProvider } from '@stripe/stripe-react-native';
 import * as SplashScreen from 'expo-splash-screen';
 import * as Contacts from 'expo-contacts';
 import * as Location from 'expo-location';
@@ -328,9 +329,11 @@ export default function App() {
 
   // App is ready - show the main navigator
   return (
-    <SafeAreaProvider>
-      <AppContent onLayoutRootView={onLayoutRootView} />
-    </SafeAreaProvider>
+    <StripeProvider publishableKey={process.env.EXPO_PUBLIC_STRIPE_PUBLISHABLE_KEY || ''}>
+      <SafeAreaProvider>
+        <AppContent onLayoutRootView={onLayoutRootView} />
+      </SafeAreaProvider>
+    </StripeProvider>
   );
 }
 

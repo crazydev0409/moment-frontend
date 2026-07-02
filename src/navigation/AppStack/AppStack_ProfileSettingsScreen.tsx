@@ -67,7 +67,7 @@ const AppStack_ProfileSettingsScreen: React.FC<Props> = ({ navigation }) => {
     if (isSaving) return;
     try {
       setIsSaving(true);
-      const res = await http.put('/users/profile', { name, bio, email, birthday });
+      const res = await http.put('/users/profile', { name, bio, birthday });
       if (res.status === 200) {
         await fetchProfile();
         setToast('Profile updated');
@@ -176,25 +176,21 @@ const AppStack_ProfileSettingsScreen: React.FC<Props> = ({ navigation }) => {
             <TouchableOpacity
               activeOpacity={0.7}
               onPress={() =>
-                Alert.alert(
-                  'Change Email',
-                  'Changing your email address requires verification. Please contact support or use the web portal.',
-                  [{ text: 'OK' }],
-                )
+                navigation.navigate('AppStack_ChangeEmailScreen', { currentEmail: email || undefined })
               }>
-              <Text style={[tw`font-associate`, { color: colors.ink, fontSize: moderateScale(13) }]}>Change</Text>
+              <Text style={[tw`font-associate`, { color: colors.green, fontSize: moderateScale(13) }]}>Change</Text>
             </TouchableOpacity>
           </View>
-          <TextInput
-            style={inputStyle}
-            value={email}
-            onChangeText={setEmail}
-            placeholder="you@example.com"
-            placeholderTextColor={colors.placeholder}
-            keyboardType="email-address"
-            autoCapitalize="none"
-            autoCorrect={false}
-          />
+          <View style={[inputStyle, { backgroundColor: colors.field }]}>
+            <Text
+              style={{
+                fontFamily: 'AssociateSansRegular',
+                fontSize: moderateScale(14),
+                color: email ? colors.ink : colors.placeholder,
+              }}>
+              {email || 'you@example.com'}
+            </Text>
+          </View>
         </ScrollView>
 
         {/* Save CTA */}

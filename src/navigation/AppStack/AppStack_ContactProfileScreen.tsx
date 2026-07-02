@@ -558,6 +558,7 @@ const AppStack_ContactProfileScreen: React.FC<Props> = ({ navigation, route }) =
 
   const contactUser = contact?.contactUser;
   const displayName = contactName || contact?.displayName || 'Contact';
+  const isDeletedAccount = contactUser?.accountType === 'deleted';
 
   return (
     <View style={[tw`flex-1`, { backgroundColor: colors.pageBg }]}>
@@ -618,23 +619,30 @@ const AppStack_ContactProfileScreen: React.FC<Props> = ({ navigation, route }) =
                 <Text style={[tw`font-associate-bold`, { color: colors.ink, fontSize: moderateScale(18) }]}>
                   {displayName}
                 </Text>
-                <View
-                  style={[
-                    tw`rounded-full items-center justify-center`,
-                    {
-                      width: horizontalScale(18),
-                      height: horizontalScale(18),
-                      backgroundColor: contactUser?.accountType === 'agent' ? colors.ink : '#2D7FF9',
-                      marginLeft: horizontalScale(6),
-                    },
-                  ]}>
-                  <Image
-                    source={contactUser?.accountType === 'agent' ? BrainIcon : CheckIcon}
-                    style={{ width: h(10), height: h(10) }}
-                    tintColor={colors.white}
-                  />
-                </View>
+                {!isDeletedAccount && (
+                  <View
+                    style={[
+                      tw`rounded-full items-center justify-center`,
+                      {
+                        width: horizontalScale(18),
+                        height: horizontalScale(18),
+                        backgroundColor: contactUser?.accountType === 'agent' ? colors.ink : '#2D7FF9',
+                        marginLeft: horizontalScale(6),
+                      },
+                    ]}>
+                    <Image
+                      source={contactUser?.accountType === 'agent' ? BrainIcon : CheckIcon}
+                      style={{ width: h(10), height: h(10) }}
+                      tintColor={colors.white}
+                    />
+                  </View>
+                )}
               </View>
+              {isDeletedAccount && (
+                <Text style={[tw`font-associate`, { color: colors.grey, fontSize: moderateScale(12.5), marginTop: 2 }]}>
+                  This account has been deleted
+                </Text>
+              )}
               {/* Hook category pills from hook titles */}
               {contactHooks.length > 0 && (
                 <View style={[tw`flex-row flex-wrap`, { marginTop: verticalScale(6), gap: 4 }]}>
@@ -753,6 +761,10 @@ const AppStack_ContactProfileScreen: React.FC<Props> = ({ navigation, route }) =
         ]}>
         <TouchableOpacity
           onPress={() => {
+            if (isDeletedAccount) {
+              Alert.alert('Account deleted', 'This person has deleted their Catch account and can no longer be booked.');
+              return;
+            }
             const uid = contactUserId || contact?.contactUserId || contact?.contactUser?.id;
             if (!uid) {
               Alert.alert('Not available', 'This contact has not joined Catch yet.');
@@ -765,10 +777,17 @@ const AppStack_ContactProfileScreen: React.FC<Props> = ({ navigation, route }) =
             });
           }}
           activeOpacity={0.85}
-          style={[tw`rounded-full flex-row items-center justify-center`, { backgroundColor: colors.green, paddingVertical: verticalScale(15) }]}>
-          <Image source={HookIcon} style={{ width: h(20), height: h(20), marginRight: h(8) }} tintColor={colors.white} />
-          <Text style={[tw`font-associate-bold`, { color: colors.white, fontSize: ms(16) }]}>
-            View available times
+          style={[
+            tw`rounded-full flex-row items-center justify-center`,
+            { backgroundColor: isDeletedAccount ? colors.border : colors.green, paddingVertical: verticalScale(15) },
+          ]}>
+          <Image
+            source={HookIcon}
+            style={{ width: h(20), height: h(20), marginRight: h(8) }}
+            tintColor={isDeletedAccount ? colors.grey : colors.white}
+          />
+          <Text style={[tw`font-associate-bold`, { color: isDeletedAccount ? colors.grey : colors.white, fontSize: ms(16) }]}>
+            {isDeletedAccount ? 'No longer available' : 'View available times'}
           </Text>
         </TouchableOpacity>
       </View>

@@ -38,7 +38,8 @@
       "node": "20.18.0",
       "env": {
         "EXPO_PUBLIC_API_BASE_URL": "https://moment-backend.azurewebsites.net/api",
-        "EXPO_PUBLIC_GOOGLE_PLACES_API_KEY": "AIzaSyC4xWLooS8XR9tOC0V8a4SM-mgewmL5TNs"
+        "EXPO_PUBLIC_GOOGLE_PLACES_API_KEY": "AIzaSyC4xWLooS8XR9tOC0V8a4SM-mgewmL5TNs",
+        "EXPO_PUBLIC_STRIPE_PUBLISHABLE_KEY": ""
       },
       "android": {
         "buildType": "app-bundle",
