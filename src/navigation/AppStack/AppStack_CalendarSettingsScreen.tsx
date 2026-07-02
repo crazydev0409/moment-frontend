@@ -133,6 +133,18 @@ const AppStack_CalendarSettingsScreen: React.FC<Props> = ({ navigation }) => {
       await http.post(`/users/calendar-integrations/${provider}/sync`);
       await load();
     } catch (err: any) {
+      await load();
+      if (err?.response?.data?.code === 'RECONNECT_REQUIRED') {
+        Alert.alert(
+          `Reconnect ${providerLabels[provider]}`,
+          `Your ${providerLabels[provider]} connection expired, usually because this account was signed into a new device. Reconnect to keep syncing.`,
+          [
+            { text: 'Not Now', style: 'cancel' },
+            { text: 'Reconnect', onPress: () => connectProvider(provider) },
+          ],
+        );
+        return;
+      }
       Alert.alert('Sync failed', err?.response?.data?.error || 'Failed to sync calendar.');
     } finally {
       setSyncing(null);
@@ -289,6 +301,7 @@ const AppStack_CalendarSettingsScreen: React.FC<Props> = ({ navigation }) => {
             {(['google', 'icloud', 'microsoft'] as CalendarProvider[]).map((provider) => {
               const integration = getIntegration(provider);
               const isConnected = integration?.connected;
+              const needsReconnect = integration?.status === 'reconnect_required';
               const isSyncing = syncing === provider;
               return (
                 <View
@@ -338,7 +351,7 @@ const AppStack_CalendarSettingsScreen: React.FC<Props> = ({ navigation }) => {
                   ) : (
                     <TouchableOpacity onPress={() => connectProvider(provider)} activeOpacity={0.7}>
                       <Text style={[tw`font-associate-bold`, { color: colors.green, fontSize: ms(14) }]}>
-                        Connect
+                        {needsReconnect ? 'Reconnect' : 'Connect'}
                       </Text>
                     </TouchableOpacity>
                   )}
