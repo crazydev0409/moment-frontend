@@ -2,11 +2,11 @@
 // Must be imported before any component renders so TaskManager.defineTask runs at module level
 import '~/services/backgroundTaskService';
 import { useCallback, useEffect, useState } from 'react';
-import { View, Alert, Platform } from 'react-native';
+import { View, Alert } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { useFonts } from 'expo-font';
 import { Inter_400Regular, Inter_700Bold } from '@expo-google-fonts/inter';
-import { SafeAreaProvider, useSafeAreaInsets } from 'react-native-safe-area-context';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { StripeProvider } from '@stripe/stripe-react-native';
 import * as SplashScreen from 'expo-splash-screen';
 import * as Contacts from 'expo-contacts';
@@ -338,24 +338,12 @@ export default function App() {
 }
 
 function AppContent({ onLayoutRootView }: { onLayoutRootView: (e: any) => void }) {
-  const insets = useSafeAreaInsets();
   return (
     <>
+      {/* backgroundColor/translucent only affect Android; iOS's status bar has
+          no background of its own to set — it's always an overlay showing
+          whatever is drawn beneath it. */}
       <StatusBar style="light" backgroundColor="#000000" translucent={false} />
-      {/* Black status bar background: Android uses native config; iOS needs a view since status bar is transparent */}
-      {Platform.OS === 'ios' && (
-        <View
-          style={{
-            position: 'absolute',
-            top: 0,
-            left: 0,
-            right: 0,
-            height: insets.top,
-            backgroundColor: '#000000',
-            zIndex: 9999,
-          }}
-        />
-      )}
       <View style={{ flex: 1 }} onLayout={onLayoutRootView}>
         <RootNavigator />
       </View>

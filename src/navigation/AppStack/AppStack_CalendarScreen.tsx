@@ -35,6 +35,7 @@ import { AppStackParamList } from '.';
 import { http } from '~/helpers/http';
 import { horizontalScale, moderateScale, verticalScale } from '~/helpers/responsive';
 import { AvailabilitySchedule } from '~/helpers/calendarAvailability';
+import { layoutEventsForDay, layoutEventsForMonthRow, dayKey } from '~/helpers/calendarLayout';
 import { Avatar, NotificationsIcon, GoogleCalendarIcon, OutlookIcon, HookIcon, CheckIcon } from '~/lib/images';
 import { getDeviceId } from '~/services/deviceService';
 import { setupSocketEventListeners, getSocket, initializeSocket } from '~/services/socketService';
@@ -48,7 +49,7 @@ interface BookableUserResponse {
   avatar?: string | null;
 }
 type CalendarProvider = 'google' | 'microsoft' | 'icloud';
-type ViewMode = 'agenda' | 'month';
+type ViewMode = 'day' | 'week' | 'month' | 'year';
 type Sheet = null | 'details' | 'edit' | 'time' | 'location' | 'invitees';
 
 type CalendarIntegration = {
@@ -86,6 +87,7 @@ type CalendarItem = {
   receiverId?: string;
   sender?: Person;
   receiver?: Person;
+  allDay?: boolean;
 };
 
 const COLORS = {
@@ -105,6 +107,48 @@ const h = (size: number) => horizontalScale(size);
 const v = (size: number) => verticalScale(size);
 const ms = (size: number) => moderateScale(size, 0.2);
 
+// The single dial controlling how much of the day is visible at once, in Day
+// and Week views alike. Was v(80) previously (only ~6.5hrs visible without
+// scrolling); v(48) shows ~10-11hrs — enough to see a full workday without scrolling.
+// Every timeline position/height calculation derives from this constant so
+// it stays the one place to retune density.
+const HOUR_HEIGHT = v(48);
+// Pixel budgets (not hardcoded minute cutoffs) for the event-card text tiers,
+// so they scale automatically if HOUR_HEIGHT ever changes again.
+const TINY_EVENT_PX = v(20);
+const COMPACT_EVENT_PX = v(32);
+const minutesForPx = (px: number) => (px / HOUR_HEIGHT) * 60;
+// Small visual breathing room between back-to-back events (Google Calendar
+// always leaves a sliver of a gap even when one event's end time exactly
+// matches the next one's start time, rather than letting the blocks touch).
+const EVENT_GAP_PX = v(3);
+// A line of text occupies more vertical space than its raw font size (line
+// height, ascenders/descenders) — used to work backward from an event
+// block's actual pixel height to a font size guaranteed to fit inside it,
+// so short-duration events never get their title clipped at the bottom.
+const EVENT_LINE_HEIGHT_RATIO = 1.15;
+const MIN_EVENT_FONT_PX = ms(9);
+function fitEventFontSize(availableHeightPx: number, lines: number, maxFontPx: number) {
+  const perLine = availableHeightPx / lines;
+  const fitted = perLine / EVENT_LINE_HEIGHT_RATIO;
+  // Never exceeds the tier's normal/default size — only shrinks when the
+  // block is genuinely too short for it.
+  return Math.max(MIN_EVENT_FONT_PX, Math.min(maxFontPx, fitted));
+}
+// Short events borrow space from the block's own inline padding before the
+// font is allowed to shrink — a squeezed meeting reads better with slightly
+// tighter padding and a normal-sized title than with generous padding and a
+// tiny, hard-to-read one. Padding still never drops below `minPadding`.
+function fitEventPadding(boxHeightPx: number, comfortablePadding: number, minPadding: number) {
+  return Math.max(minPadding, Math.min(comfortablePadding, boxHeightPx * 0.12));
+}
+// Month view: at most this many event bars stack in a single day cell before
+// the rest collapse into a "•••" overflow indicator (matches the reference
+// design, and keeps every week row a predictable fixed height regardless of
+// how many events a given day has).
+const MAX_MONTH_LANES = 3;
+const MONTH_BAR_HEIGHT = v(15);
+const MONTH_BAR_GAP = v(2);
 const providerLabels: Record<CalendarProvider, string> = {
   google: 'Google Calendar',
   icloud: 'Apple Calendar',
@@ -189,11 +233,13 @@ const ProviderIcon = ({ provider, size = 24 }: { provider: 'catch' | CalendarPro
 const MiniIcon = ({
   type,
   color = COLORS.pale,
+  size = 24,
 }: {
   type: 'clock' | 'pin' | 'host' | 'edit' | 'search' | 'trash' | 'food';
   color?: string;
+  size?: number;
 }) => (
-  <Svg width={h(24)} height={h(24)} viewBox="0 0 24 24" fill="none">
+  <Svg width={h(size)} height={h(size)} viewBox="0 0 24 24" fill="none">
     {type === 'clock' && (
       <>
         <Circle cx="12" cy="12" r="9" stroke={color} strokeWidth="2.1" />
@@ -279,10 +325,10 @@ function getUnavailableBands(
   }
 
   return unavailable.map(({ startMinutes, endMinutes }) => {
-    // Align with the same coordinate system as events: top = v(10) + (min/60)*v(80)
+    // Align with the same coordinate system as events: top = v(10) + (min/60)*HOUR_HEIGHT
     // For the very first band (midnight), extend to the top of the container.
-    const top = startMinutes === 0 ? 0 : v(10) + (startMinutes / 60) * v(80);
-    const bottom = v(10) + (endMinutes / 60) * v(80);
+    const top = startMinutes === 0 ? 0 : v(10) + (startMinutes / 60) * HOUR_HEIGHT;
+    const bottom = v(10) + (endMinutes / 60) * HOUR_HEIGHT;
     return { top, height: bottom - top };
   });
 }
@@ -310,7 +356,7 @@ const AppStack_CalendarScreen: React.FC<Props> = ({ navigation, route }) => {
   const [connecting, setConnecting] = useState(false);
   const [events, setEvents] = useState<CalendarItem[]>([]);
   const [contacts, setContacts] = useState<Contact[]>([]);
-  const [viewMode, setViewMode] = useState<ViewMode>('agenda');
+  const [viewMode, setViewMode] = useState<ViewMode>('day');
   const [selectedDate, setSelectedDate] = useState(() => {
     if (routeDate) {
       const [year, month, day] = routeDate.split('-').map(Number);
@@ -342,9 +388,26 @@ const AppStack_CalendarScreen: React.FC<Props> = ({ navigation, route }) => {
   const timelineScrollRef = useRef<ScrollView>(null);
   const slideAnim = useRef(new Animated.Value(0)).current;
   const navigateDayRef = useRef<(dir: number) => void>(() => {});
+  // Separate from navigateDayRef since months step by a fixed count (2, to
+  // match the existing 2-months-at-once display) via calendar-month
+  // arithmetic on monthOffset, not day arithmetic on selectedDate — but
+  // reuses the same `slideAnim` for the slide transition since only one view
+  // renders at a time, so there's no conflict.
+  const navigateMonthRef = useRef<(dir: number) => void>(() => {});
+  // Frozen at mount so the agenda's first paint already lands on "now" —
+  // passed as the ScrollView's `contentOffset`, which (unlike scrollTo) applies
+  // before the first frame is shown, so there's no visible jump from the top
+  // of the day down to the current time.
+  const initialTimelineScrollY = useRef(
+    Math.max(0, v(10) + ((new Date().getHours() * 60 + new Date().getMinutes()) / 60) * HOUR_HEIGHT - v(160))
+  ).current;
 
-  // Keep navigateDayRef current every render so the PanResponder closure always sees fresh state.
+  // Keep navigateDayRef current every render so the PanResponder closure always
+  // sees fresh state. `direction` is always ±1 from the swipe gesture; the
+  // actual date step (1 day in Day view, 7 in Week view) is resolved here from
+  // the current viewMode so both views can share one pager/PanResponder.
   navigateDayRef.current = (direction: number) => {
+    const stepDays = viewMode === 'week' ? 7 : 1;
     const w = Dimensions.get('window').width;
     Animated.timing(slideAnim, {
       toValue: -direction * w,
@@ -353,10 +416,32 @@ const AppStack_CalendarScreen: React.FC<Props> = ({ navigation, route }) => {
     }).start(() => {
       setSelectedDate((prev) => {
         const next = new Date(prev);
-        next.setDate(next.getDate() + direction);
+        next.setDate(next.getDate() + direction * stepDays);
         return next;
       });
       slideAnim.setValue(direction * w);
+      Animated.timing(slideAnim, {
+        toValue: 0,
+        duration: 220,
+        useNativeDriver: false,
+      }).start();
+    });
+  };
+
+  // Months page vertically (swipe up = next month, down = previous — same
+  // sense as scrolling a list forward/back reveals later/earlier content),
+  // one month at a time, driven by the same slideAnim value Day/Week use for
+  // translateX — reused here as translateY since only one view is ever
+  // mounted at once, so there's no conflict.
+  navigateMonthRef.current = (direction: number) => {
+    const hgt = Dimensions.get('window').height;
+    Animated.timing(slideAnim, {
+      toValue: -direction * hgt,
+      duration: 220,
+      useNativeDriver: false,
+    }).start(() => {
+      setMonthOffset((prev) => prev + direction);
+      slideAnim.setValue(direction * hgt);
       Animated.timing(slideAnim, {
         toValue: 0,
         duration: 220,
@@ -410,17 +495,21 @@ const AppStack_CalendarScreen: React.FC<Props> = ({ navigation, route }) => {
   }, []);
 
   useEffect(() => {
-    if (loading || viewMode !== 'agenda') return;
+    if (loading || (viewMode !== 'day' && viewMode !== 'week')) return;
     if (routeMomentRequestId) return; // meeting deep-link — let that effect scroll instead
     if (!isSameDay(selectedDate, new Date())) return;
     const now = new Date();
     const minutes = now.getHours() * 60 + now.getMinutes();
-    const top = v(10) + (minutes / 60) * v(80);
+    const top = v(10) + (minutes / 60) * HOUR_HEIGHT;
     const scrollY = Math.max(0, top - v(160));
-    const t = setTimeout(() => {
+    // The initial mount already lands here via the ScrollView's `contentOffset`
+    // (see initialTimelineScrollY) — this only needs to react to genuine
+    // changes afterward (e.g. swiping back to today), so a single animation
+    // frame is enough for the new layout to be ready, no arbitrary wait.
+    const frame = requestAnimationFrame(() => {
       timelineScrollRef.current?.scrollTo({ y: scrollY, animated: false });
-    }, 500);
-    return () => clearTimeout(t);
+    });
+    return () => cancelAnimationFrame(frame);
   }, [selectedDate, loading, viewMode, routeMomentRequestId]);
 
   const monthViewBase = useMemo(() => {
@@ -428,16 +517,30 @@ const AppStack_CalendarScreen: React.FC<Props> = ({ navigation, route }) => {
     return new Date(now.getFullYear(), now.getMonth() + monthOffset, 1);
   }, [monthOffset]);
 
+  // Mirrors agendaPanResponder's shape (live drag-follow + threshold-based
+  // release + spring-back) so swiping Month view feels the same as Day/Week.
   const monthPanResponder = useRef(
     PanResponder.create({
-      onMoveShouldSetPanResponder: (_, gestureState) =>
-        Math.abs(gestureState.dx) > 30 && Math.abs(gestureState.dy) < 40,
-      onPanResponderRelease: (_, gestureState) => {
-        if (gestureState.dx < -50) {
-          setMonthOffset((prev) => prev + 2);
-        } else if (gestureState.dx > 50) {
-          setMonthOffset((prev) => prev - 2);
+      onStartShouldSetPanResponder: () => false,
+      // Vertical instead of Day/Week's horizontal — otherwise identical
+      // shape (live drag-follow, threshold-based release, spring-back).
+      onMoveShouldSetPanResponder: (_, gs) =>
+        Math.abs(gs.dy) > 12 && Math.abs(gs.dy) > Math.abs(gs.dx) * 1.5,
+      onPanResponderMove: (_, gs) => {
+        slideAnim.setValue(gs.dy);
+      },
+      onPanResponderRelease: (_, gs) => {
+        const hgt = Dimensions.get('window').height;
+        if (gs.dy < -(hgt * 0.2) || gs.vy < -0.4) {
+          navigateMonthRef.current(1);
+        } else if (gs.dy > hgt * 0.2 || gs.vy > 0.4) {
+          navigateMonthRef.current(-1);
+        } else {
+          Animated.spring(slideAnim, { toValue: 0, useNativeDriver: false, bounciness: 6 }).start();
         }
+      },
+      onPanResponderTerminate: () => {
+        slideAnim.setValue(0);
       },
     })
   ).current;
@@ -599,10 +702,15 @@ const AppStack_CalendarScreen: React.FC<Props> = ({ navigation, route }) => {
         setSelectedEvent(matchingEvent);
         setSheet('details');
         const eventMinutes = eventDate.getHours() * 60 + eventDate.getMinutes();
-        const scrollY = Math.max(0, v(10) + (eventMinutes / 60) * v(80) - v(160));
-        setTimeout(() => {
-          timelineScrollRef.current?.scrollTo({ y: scrollY, animated: false });
-        }, 500);
+        const scrollY = Math.max(0, v(10) + (eventMinutes / 60) * HOUR_HEIGHT - v(160));
+        // setSelectedDate above triggers a re-render of the agenda for the
+        // event's day; wait two frames so that's committed and laid out
+        // before scrolling, instead of a guessed fixed delay.
+        requestAnimationFrame(() => {
+          requestAnimationFrame(() => {
+            timelineScrollRef.current?.scrollTo({ y: scrollY, animated: false });
+          });
+        });
       }
     }
   }, [routeMomentRequestId, events]);
@@ -760,6 +868,24 @@ const AppStack_CalendarScreen: React.FC<Props> = ({ navigation, route }) => {
       })
       .sort((a, b) => new Date(a.startTime).getTime() - new Date(b.startTime).getTime());
   }, [events, selectedDate]);
+
+  const weekDays = useMemo(() => getWeekDates(selectedDate), [selectedDate]);
+
+  const weekEventsByDay = useMemo(() => {
+    const seen = new Set<string>();
+    const map = new Map<string, CalendarItem[]>();
+    for (const day of weekDays) map.set(dayKey(day), []);
+    for (const event of events) {
+      if (seen.has(event.id)) continue;
+      seen.add(event.id);
+      const key = dayKey(new Date(event.startTime));
+      map.get(key)?.push(event);
+    }
+    for (const list of map.values()) {
+      list.sort((a, b) => new Date(a.startTime).getTime() - new Date(b.startTime).getTime());
+    }
+    return map;
+  }, [events, weekDays]);
 
   const openEventDetails = (event: CalendarItem) => {
     setSelectedEvent(event);
@@ -968,12 +1094,17 @@ const AppStack_CalendarScreen: React.FC<Props> = ({ navigation, route }) => {
   return (
     <View style={styles.screen}>
       <View style={[styles.calendarHeader, { paddingTop: Math.max(insets.top + v(28), v(58)) }]}>
-        <TouchableOpacity
-          style={styles.monthTitleWrap}
-          onPress={() => setViewMode(viewMode === 'agenda' ? 'month' : 'agenda')}>
-          <Text style={styles.monthTitle}>{formatMonthRange(viewMode === 'month' ? monthViewBase : selectedDate)}</Text>
-          <Text style={styles.monthChevron}>{viewMode === 'agenda' ? '▼' : '▲'}</Text>
-        </TouchableOpacity>
+        <View style={styles.monthTitleWrap}>
+          <Text style={styles.monthTitle}>
+            {viewMode === 'day'
+              ? formatDayTitle(selectedDate)
+              : viewMode === 'week'
+                ? formatWeekRangeTitle(weekDays)
+                : viewMode === 'year'
+                  ? String(selectedDate.getFullYear())
+                  : formatSingleMonth(monthViewBase)}
+          </Text>
+        </View>
         <TouchableOpacity
           onPress={() => navigation.navigate('AppStack_NotificationScreen')}
           style={{ position: 'relative' }}>
@@ -1009,15 +1140,19 @@ const AppStack_CalendarScreen: React.FC<Props> = ({ navigation, route }) => {
         </TouchableOpacity>
       </View>
 
-      {viewMode === 'month' ? renderMonthView() : renderAgendaView()}
-      {renderDetailsSheet()}
-      {renderEditSheet()}
-      {renderTimeSheet()}
-      {renderLocationSheet()}
-      {renderInviteesSheet()}
+      <View style={styles.viewSwitcherRow}>
+        <ViewSwitcher active={viewMode} onChange={setViewMode} />
+      </View>
+
+      {viewMode === 'day'
+        ? renderAgendaView()
+        : viewMode === 'week'
+          ? renderWeekView()
+          : viewMode === 'month'
+            ? renderMonthView()
+            : renderYearView()}
+      {renderSheetModal()}
       {renderIcloudModal()}
-      {renderDeleteDialog()}
-      {renderRemoveInviteeDialog()}
       {renderSuccessToast()}
     </View>
   );
@@ -1097,14 +1232,17 @@ const AppStack_CalendarScreen: React.FC<Props> = ({ navigation, route }) => {
   function renderAgendaView() {
     const isToday = isSameDay(selectedDate, new Date());
     const nowMinutes = currentTime.getHours() * 60 + currentTime.getMinutes();
-    const nowTop = v(10) + (nowMinutes / 60) * v(80);
+    const nowTop = v(10) + (nowMinutes / 60) * HOUR_HEIGHT;
     const unavailBands = getUnavailableBands(myAvailability, selectedDate.getDay());
 
     return (
       <View style={styles.content} {...agendaPanResponder.panHandlers}>
         <WeekRail selectedDate={selectedDate} onSelect={setSelectedDate} />
         <Animated.View style={{ flex: 1, transform: [{ translateX: slideAnim }] }}>
-        <ScrollView ref={timelineScrollRef} contentContainerStyle={{ paddingBottom: v(140) }}>
+        <ScrollView
+          ref={timelineScrollRef}
+          contentContainerStyle={{ paddingBottom: v(140) }}
+          contentOffset={{ x: 0, y: initialTimelineScrollY }}>
         <View style={styles.timeline}>
           {/* Unavailable bands — rendered first so they sit behind everything */}
           {unavailBands.map((band, idx) => (
@@ -1126,60 +1264,115 @@ const AppStack_CalendarScreen: React.FC<Props> = ({ navigation, route }) => {
               <View style={styles.currentTimeBar} />
             </View>
           )}
-          {selectedDayEvents.map((event) => {
+          {layoutEventsForDay(selectedDayEvents).map((event) => {
             const durationMins = getDurationMinutes(event);
-            // < 20 min (e.g. 15 min): single-row title + price, micro font
-            const isTiny = durationMins < 20;
-            // 20–29 min: two compact rows (title + price), no time/icon
-            const isCompact = !isTiny && durationMins < 30;
+            // Tiers are pixel budgets (TINY_EVENT_PX/COMPACT_EVENT_PX), converted
+            // to minutes at the current HOUR_HEIGHT — so they stay correctly
+            // proportioned if the density constant ever changes again.
+            const isTiny = durationMins < minutesForPx(TINY_EVENT_PX);
+            const isCompact = !isTiny && durationMins < minutesForPx(COMPACT_EVENT_PX);
             const priceLabel = getPriceLabel(event);
             const providerKey =
               event.source === 'catch' ? 'catch'
               : event.source === 'microsoft' ? 'microsoft'
               : event.source === 'icloud' ? 'icloud'
               : 'google';
+            const pos = getEventPosition(event);
+            const widthPct = 100 / event.totalColumns;
+            const leftPct = event.column * widthPct;
+            const hasOverlap = event.totalColumns > 1;
+            // Padding shrinks first (down to a minimum), then font size, so a
+            // squeezed meeting reads as "normal text, tighter padding" rather
+            // than "tiny unreadable text in a roomy box." Font never exceeds
+            // the tier's normal/default size.
+            const tinyPadding = fitEventPadding(pos.height, v(3), v(1));
+            const tinyFont = fitEventFontSize(pos.height - tinyPadding * 2, 1, ms(10));
+
+            const compactPadding = fitEventPadding(pos.height, v(4), v(1.5));
+            const compactAvailable = pos.height - compactPadding * 2;
+            // If two stacked lines (title + price) genuinely can't fit even
+            // at the minimum legible size, fall back to the single-row
+            // layout instead of forcing an under-sized, still-clipped block.
+            const compactTwoLineRawFont = compactAvailable / 2 / EVENT_LINE_HEIGHT_RATIO;
+            const compactFitsTwoLines = compactTwoLineRawFont >= MIN_EVENT_FONT_PX;
+            const compactTitleFont = fitEventFontSize(compactAvailable, 2, ms(12));
+            const compactPriceFont = fitEventFontSize(compactAvailable, 2, ms(11));
+            const compactSingleFont = fitEventFontSize(pos.height - tinyPadding * 2, 1, ms(11));
+
+            const fullPadding = fitEventPadding(pos.height, h(10), h(4));
+            const fullAvailable = pos.height - fullPadding * 2;
+            const fullTitleFont = fitEventFontSize(fullAvailable, 2, ms(14));
+            const fullTimeFont = fitEventFontSize(fullAvailable, 2, ms(12));
+
+            const showSingleRow = isTiny || hasOverlap || (isCompact && !compactFitsTwoLines);
+            const singleRowFont = isCompact ? compactSingleFont : tinyFont;
             return (
-              <TouchableOpacity
+              // Outer wrapper reserves the same top/height/gutter eventBlock
+              // always used; the inner block is percentage-positioned within
+              // it so overlapping events split side-by-side instead of
+              // stacking directly on top of each other.
+              <View
                 key={event.id}
-                activeOpacity={0.85}
-                style={[
-                  styles.eventBlock,
-                  getEventPosition(event),
-                  event.sourceType === 'external' && styles.externalEventBlock,
-                  isTiny && styles.eventBlockTiny,
-                  isCompact && styles.eventBlockCompact,
-                ]}
-                onPress={() => openEventDetails(event)}>
-                {isTiny ? (
-                  // Single horizontal row: agenda · cost
-                  <View style={styles.eventTinyRow}>
-                    <Text style={styles.eventTinyTitle} numberOfLines={1}>
-                      {cleanTitle(event.title)}
-                    </Text>
-                    <Text style={styles.eventTinyPrice}>{priceLabel}</Text>
-                  </View>
-                ) : isCompact ? (
-                  // Two compact rows: title then price
-                  <>
-                    <Text style={styles.eventCompactTitle} numberOfLines={1}>
-                      {cleanTitle(event.title)}
-                    </Text>
-                    <Text style={styles.eventCompactPrice}>{priceLabel}</Text>
-                  </>
-                ) : (
-                  // Full layout
-                  <>
-                    <Text style={styles.eventTitle}>{cleanTitle(event.title)}</Text>
-                    <Text style={styles.eventTime}>
-                      {formatTime(new Date(event.startTime))} - {formatTime(new Date(event.endTime))}
-                    </Text>
-                    <Text style={styles.eventPrice}>{priceLabel}</Text>
-                    <View style={styles.eventProvider}>
-                      <ProviderIcon provider={providerKey} size={20} />
+                pointerEvents="box-none"
+                style={[styles.eventBlockPosition, { top: pos.top, height: pos.height }]}>
+                <TouchableOpacity
+                  activeOpacity={0.85}
+                  style={[
+                    styles.eventBlockVisual,
+                    {
+                      position: 'absolute',
+                      top: 0,
+                      bottom: 0,
+                      left: `${leftPct}%` as const,
+                      width: `${widthPct}%` as const,
+                    },
+                    hasOverlap && { marginHorizontal: h(1.5) },
+                    event.sourceType === 'external' && styles.externalEventBlock,
+                    isTiny && styles.eventBlockTiny,
+                    isCompact && styles.eventBlockCompact,
+                    isTiny && { paddingVertical: tinyPadding },
+                    isCompact && { paddingVertical: showSingleRow ? tinyPadding : compactPadding },
+                    !isTiny && !isCompact && { paddingTop: fullPadding, paddingBottom: fullPadding },
+                  ]}
+                  onPress={() => openEventDetails(event)}>
+                  {showSingleRow ? (
+                    // Single horizontal row: agenda · cost (also used for any
+                    // overlapping event, or a compact-tier event too short
+                    // for its normal 2-line layout — there isn't enough
+                    // height/width to show more than one line legibly).
+                    <View style={styles.eventTinyRow}>
+                      <Text style={[styles.eventTinyTitle, { fontSize: singleRowFont }]} numberOfLines={1}>
+                        {cleanTitle(event.title)}
+                      </Text>
+                      {!hasOverlap && (
+                        <Text style={[styles.eventTinyPrice, { fontSize: singleRowFont }]}>{priceLabel}</Text>
+                      )}
                     </View>
-                  </>
-                )}
-              </TouchableOpacity>
+                  ) : isCompact ? (
+                    // Two compact rows: title then price
+                    <>
+                      <Text style={[styles.eventCompactTitle, { fontSize: compactTitleFont }]} numberOfLines={1}>
+                        {cleanTitle(event.title)}
+                      </Text>
+                      <Text style={[styles.eventCompactPrice, { fontSize: compactPriceFont }]}>{priceLabel}</Text>
+                    </>
+                  ) : (
+                    // Full layout
+                    <>
+                      <Text style={[styles.eventTitle, { fontSize: fullTitleFont }]} numberOfLines={1}>
+                        {cleanTitle(event.title)}
+                      </Text>
+                      <Text style={[styles.eventTime, { fontSize: fullTimeFont }]} numberOfLines={1}>
+                        {formatTime(new Date(event.startTime))} - {formatTime(new Date(event.endTime))}
+                      </Text>
+                      <Text style={styles.eventPrice}>{priceLabel}</Text>
+                      <View style={styles.eventProvider}>
+                        <ProviderIcon provider={providerKey} size={20} />
+                      </View>
+                    </>
+                  )}
+                </TouchableOpacity>
+              </View>
             );
           })}
         </View>
@@ -1189,156 +1382,345 @@ const AppStack_CalendarScreen: React.FC<Props> = ({ navigation, route }) => {
     );
   }
 
-  function renderMonthView() {
-    const firstMonth = monthViewBase;
-    const secondMonth = new Date(firstMonth.getFullYear(), firstMonth.getMonth() + 1, 1);
+  function renderWeekView() {
+    const now = new Date();
+    const nowMinutes = now.getHours() * 60 + now.getMinutes();
+    const nowTop = v(10) + (nowMinutes / 60) * HOUR_HEIGHT;
+    const hasAnyAllDay = weekDays.some((day) =>
+      (weekEventsByDay.get(dayKey(day)) || []).some((e) => e.allDay)
+    );
+
     return (
-      <View style={styles.monthViewContainer}>
-        <View style={styles.monthNavRow}>
+      <View style={styles.content} {...agendaPanResponder.panHandlers}>
+        <View style={styles.weekGridHeaderRow}>
+          <View style={{ width: h(36) }} />
+          {weekDays.map((day) => {
+            const active = isSameDay(day, selectedDate);
+            return (
+              <TouchableOpacity
+                key={day.toISOString()}
+                style={styles.weekGridHeaderCell}
+                onPress={() => setSelectedDate(day)}>
+                <Text style={styles.weekGridDayName}>{formatDayName(day)}</Text>
+                <View style={[styles.weekGridDayNumber, active && styles.weekGridDayNumberActive]}>
+                  <Text style={[styles.weekGridDayText, active && styles.weekGridDayTextActive]}>
+                    {day.getDate()}
+                  </Text>
+                </View>
+              </TouchableOpacity>
+            );
+          })}
+        </View>
+
+        {hasAnyAllDay && (
+          <View style={styles.weekAllDayRow}>
+            <View style={{ width: h(36) }} />
+            {weekDays.map((day) => {
+              const allDayEvents = (weekEventsByDay.get(dayKey(day)) || []).filter((e) => e.allDay);
+              const visible = allDayEvents.slice(0, 2);
+              const overflow = allDayEvents.length - visible.length;
+              return (
+                <View key={day.toISOString()} style={styles.weekAllDayCell}>
+                  {visible.map((event) => (
+                    <View key={event.id} style={styles.weekAllDayChip}>
+                      <Text style={styles.weekAllDayChipText} numberOfLines={1}>
+                        {cleanTitle(event.title)}
+                      </Text>
+                    </View>
+                  ))}
+                  {overflow > 0 && <Text style={styles.weekAllDayMore}>+{overflow}</Text>}
+                </View>
+              );
+            })}
+          </View>
+        )}
+
+        <Animated.View style={{ flex: 1, transform: [{ translateX: slideAnim }] }}>
+          <ScrollView
+            ref={timelineScrollRef}
+            contentContainerStyle={{ paddingBottom: v(140) }}
+            contentOffset={{ x: 0, y: initialTimelineScrollY }}>
+            <View style={styles.weekTimeline}>
+              {/* Hour grid background — labels + horizontal lines, spans the full width */}
+              {Array.from({ length: 24 }, (_, i) => i).map((hour) => (
+                <View key={hour} style={styles.weekHourRow}>
+                  <Text style={styles.weekHourText}>{formatHourShort(hour)}</Text>
+                  <View style={styles.weekHourLine} />
+                </View>
+              ))}
+
+              {/* Day columns — laid on top of the grid, in normal flow so each
+                  column's own width is available for percentage-positioned
+                  events (avoids needing manual pixel/Dimensions math). */}
+              <View style={styles.weekColumnsRow} pointerEvents="box-none">
+                <View style={{ width: h(36) }} />
+                {weekDays.map((day, dayIndex) => {
+                  const dayEvents = (weekEventsByDay.get(dayKey(day)) || []).filter((e) => !e.allDay);
+                  const laidOut = layoutEventsForDay(dayEvents);
+                  const isTodayColumn = isSameDay(day, new Date());
+                  return (
+                    <View
+                      key={day.toISOString()}
+                      style={[styles.weekDayColumn, dayIndex > 0 && styles.weekDayColumnBorder]}
+                      pointerEvents="box-none">
+                      {isTodayColumn && (
+                        <View pointerEvents="none" style={[styles.weekNowLine, { top: nowTop }]}>
+                          <View style={styles.weekNowDot} />
+                          <View style={styles.weekNowBar} />
+                        </View>
+                      )}
+                      {laidOut.map((event) => {
+                        const pos = getEventPosition(event);
+                        const widthPct = 100 / event.totalColumns;
+                        const leftPct = event.column * widthPct;
+                        const titleFont = fitEventFontSize(pos.height - v(1) * 2, 1, ms(11));
+                        return (
+                          <TouchableOpacity
+                            key={event.id}
+                            activeOpacity={0.85}
+                            style={[
+                              styles.weekEventBlock,
+                              event.sourceType === 'external' && styles.externalEventBlock,
+                              {
+                                top: pos.top,
+                                height: pos.height,
+                                left: `${leftPct}%` as const,
+                                width: `${widthPct}%` as const,
+                              },
+                            ]}
+                            onPress={() => openEventDetails(event)}>
+                            <Text
+                              style={[
+                                styles.weekEventTitle,
+                                event.sourceType === 'external' && styles.weekEventTitleExternal,
+                                { fontSize: titleFont },
+                              ]}
+                              numberOfLines={1}>
+                              {cleanTitle(event.title)}
+                            </Text>
+                          </TouchableOpacity>
+                        );
+                      })}
+                    </View>
+                  );
+                })}
+              </View>
+            </View>
+          </ScrollView>
+        </Animated.View>
+      </View>
+    );
+  }
+
+  function renderMonthView() {
+    return (
+      <View style={styles.monthViewContainer} {...monthPanResponder.panHandlers}>
+        {/* Drag/swipe up or down anywhere to move to the next/previous month
+            — no chevron buttons; vertical drag is the only navigation here
+            (distinct from Day/Week's horizontal paging), so one month is
+            shown at a time rather than two, which also means it always fits
+            on screen without needing its own scroll view. */}
+        <Animated.View style={{ flex: 1, transform: [{ translateY: slideAnim }] }}>
+          <MonthAgendaGrid
+            monthDate={monthViewBase}
+            events={events}
+            selectedDate={selectedDate}
+            onSelectDay={(day) => {
+              setSelectedDate(day);
+              setViewMode('day');
+            }}
+            onSelectEvent={openEventDetails}
+          />
+        </Animated.View>
+      </View>
+    );
+  }
+
+  // Placeholder for Phase 1: a plain scrollable 12-month grid (no event
+  // dots/indicators yet — that needs the fetch window widened and a
+  // FlatList-virtualized layout, both deferred to a later phase). Still
+  // fully functional: tapping a day jumps to Day view, matching the same
+  // "tap to drill in" precedent Month view already uses.
+  function renderYearView() {
+    const year = selectedDate.getFullYear();
+    const months = Array.from({ length: 12 }, (_, i) => new Date(year, i, 1));
+    return (
+      <ScrollView style={styles.content} contentContainerStyle={styles.yearGrid}>
+        <View style={styles.yearNavRow}>
           <TouchableOpacity
             style={styles.monthNavButton}
-            onPress={() => setMonthOffset((prev) => prev - 2)}>
+            onPress={() => setSelectedDate((prev) => new Date(prev.getFullYear() - 1, prev.getMonth(), 1))}>
             <Text style={styles.monthNavText}>‹</Text>
           </TouchableOpacity>
           <View style={{ flex: 1 }} />
           <TouchableOpacity
             style={styles.monthNavButton}
-            onPress={() => setMonthOffset((prev) => prev + 2)}>
+            onPress={() => setSelectedDate((prev) => new Date(prev.getFullYear() + 1, prev.getMonth(), 1))}>
             <Text style={styles.monthNavText}>›</Text>
           </TouchableOpacity>
         </View>
-        <View style={styles.weekLabels}>
-          {['M', 'T', 'W', 'T', 'F', 'S', 'S'].map((day, index) => (
-            <Text key={`weekday-${index}`} style={styles.weekLabel}>
-              {day}
-            </Text>
+        <View style={styles.yearMonthsWrap}>
+          {months.map((monthDate) => (
+            // Just the grid itself (no outer touchable wrapper) — MonthGrid's
+            // own day cells are already tappable, and wrapping the whole thing
+            // in another TouchableOpacity would compete with those taps for
+            // "jump to month view" vs. "jump to day view" on the same tap.
+            <View key={monthDate.toISOString()} style={styles.yearMonthCell}>
+              <MonthGrid
+                monthDate={monthDate}
+                selectedDate={selectedDate}
+                onSelect={(day) => {
+                  setSelectedDate(day);
+                  setViewMode('day');
+                }}
+                compact
+              />
+            </View>
           ))}
         </View>
-        <MonthGrid
-          monthDate={firstMonth}
-          selectedDate={selectedDate}
-          onSelect={(day) => {
-            setSelectedDate(day);
-            setViewMode('agenda');
-          }}
-          compact
-        />
-        <MonthGrid
-          monthDate={secondMonth}
-          selectedDate={selectedDate}
-          onSelect={(day) => {
-            setSelectedDate(day);
-            setViewMode('agenda');
-          }}
-          compact
-        />
-      </View>
+      </ScrollView>
     );
   }
 
-  function renderDetailsSheet() {
-    if (sheet !== 'details' || !selectedEvent) return null;
-    const people = invitees.length ? invitees : getEventPeople(selectedEvent);
+  // All event-related sheets (details/edit/time/location/invitees) plus the
+  // delete/remove-invitee confirmation dialogs share a SINGLE <Modal> here,
+  // switching only the JSX content based on `sheet`. Previously each had its
+  // own <Modal>, so transitioning between them (e.g. tapping "Meeting time"
+  // inside the edit sheet) meant one native Modal unmounting at the exact
+  // moment another mounted — iOS's modal presentation stack doesn't handle
+  // that overlap cleanly and could leave the whole screen touch-unresponsive
+  // after dismissing (Android tolerates it, which is why this only showed up
+  // on iOS). Keeping one persistent Modal instance and only swapping its
+  // children avoids that native transition entirely.
+  function renderSheetModal() {
+    if (!sheet) return null;
+    const onRequestClose = () => {
+      if (sheet === 'details') setSheet(null);
+      else if (sheet === 'edit') setSheet('details');
+      else setSheet('edit'); // time | location | invitees
+    };
     return (
-      <Modal visible transparent animationType="slide" onRequestClose={() => setSheet(null)}>
-        <View style={styles.modalRoot}>
-          <BlurView intensity={10} tint="dark" style={styles.backdrop}>
-            <View style={styles.dim} />
-          </BlurView>
-          <TouchableOpacity style={{ flex: 1 }} activeOpacity={1} onPress={() => setSheet(null)} />
-          <View
-            style={[styles.bottomSheet, { paddingBottom: Math.max(insets.bottom + v(20), v(30)) }]}>
-            <View style={styles.sheetHandle} />
-            <View style={styles.sheetHeader}>
-              <Text style={styles.sheetTitle}>Meeting details</Text>
-              <TouchableOpacity onPress={() => setSheet('edit')}>
-                <MiniIcon type="edit" color={COLORS.muted} />
-              </TouchableOpacity>
-            </View>
-            <View style={styles.detailTitleRow}>
-              <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1, marginRight: h(8) }}>
-                <ProviderIcon
-                  provider={
-                    selectedEvent.source === 'catch'
-                      ? 'catch'
-                      : selectedEvent.source === 'microsoft'
-                        ? 'microsoft'
-                        : selectedEvent.source === 'icloud'
-                          ? 'icloud'
-                          : 'google'
-                  }
-                  size={22}
-                />
-                <Text style={[styles.detailEventName, { marginLeft: h(8), flex: 1 }]} numberOfLines={2}>
-                  {cleanTitle(selectedEvent.title)}
-                </Text>
-              </View>
-              <View style={styles.badges}>
-                <Text style={[
-                  styles.confirmBadge,
-                  selectedEvent.status === 'pending' && { backgroundColor: '#FFF3CD', color: '#856404' },
-                ]}>
-                  {selectedEvent.status === 'approved' ? 'Confirmed' : selectedEvent.status === 'pending' ? 'Pending' : 'External'}
-                </Text>
-                <Text style={styles.freeBadge}>{getPriceLabel(selectedEvent)}</Text>
-              </View>
-            </View>
-            <DetailRow
-              icon="clock"
-              label="Meeting time:"
-              value={`${formatDisplayDate(new Date(selectedEvent.startTime))} - ${formatTime(new Date(selectedEvent.endTime))}`}
-            />
-            <DetailRow
-              icon="pin"
-              label="Location:"
-              value={selectedEvent.locationLabel || 'Remote'}
-            />
-            <DetailRow
-              icon="host"
-              label="Host"
-              value={
-                selectedEvent.senderId === user.id ? 'You' : selectedEvent.sender?.name || 'Host'
-              }
-            />
-            <Text style={styles.inviteesTitle}>Invitees</Text>
-            <ScrollView
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              contentContainerStyle={styles.peopleRail}>
-              {people.map((person) => (
-                <PersonBubble key={person.id} person={person} selectable />
-              ))}
-            </ScrollView>
-            <TouchableOpacity style={styles.foodCard}>
-              <View style={styles.foodIcon}>
-                <MiniIcon type="food" color={COLORS.muted} />
-              </View>
-              <View style={styles.foodTextWrap}>
-                <Text style={styles.foodTitle}>Need a Bite?</Text>
-                <Text style={styles.foodText}>Get your favorite meal delivered in minutes.</Text>
-              </View>
-              <Text style={styles.chevron}>›</Text>
-            </TouchableOpacity>
-          </View>
+      <Modal visible transparent animationType="slide" onRequestClose={onRequestClose}>
+        <View style={{ flex: 1 }}>
+          {sheet === 'details' && renderDetailsContent()}
+          {sheet === 'edit' && renderEditContent()}
+          {sheet === 'time' && renderTimeContent()}
+          {sheet === 'location' && renderLocationContent()}
+          {sheet === 'invitees' && renderInviteesContent()}
+          {deleteConfirm && renderDeleteDialogOverlay()}
+          {removeInvitee && renderRemoveInviteeDialogOverlay()}
         </View>
       </Modal>
     );
   }
 
-  function renderEditSheet() {
-    if (sheet !== 'edit' || !selectedEvent) return null;
+  function renderDetailsContent() {
+    if (!selectedEvent) return null;
+    const people = invitees.length ? invitees : getEventPeople(selectedEvent);
     return (
-      <Modal visible transparent animationType="slide" onRequestClose={() => setSheet('details')}>
-        <KeyboardAvoidingView
-          style={styles.modalRoot}
-          behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-          <BlurView intensity={10} tint="dark" style={styles.backdrop}>
-            <View style={styles.dim} />
-          </BlurView>
-          <TouchableOpacity style={{ flex: 1 }} activeOpacity={1} onPress={() => setSheet('details')} />
+      <View style={styles.modalRoot}>
+        <BlurView intensity={10} tint="dark" style={styles.backdrop}>
+          <View style={styles.dim} />
+        </BlurView>
+        <TouchableOpacity style={{ flex: 1 }} activeOpacity={1} onPress={() => setSheet(null)} />
+        <View
+          style={[styles.bottomSheet, { paddingBottom: Math.max(insets.bottom + v(20), v(30)) }]}>
+          <View style={styles.sheetHandle} />
+          <View style={styles.sheetHeader}>
+            <Text style={styles.sheetTitle}>Meeting details</Text>
+            <TouchableOpacity onPress={() => setSheet('edit')}>
+              <MiniIcon type="edit" color={COLORS.muted} size={20} />
+            </TouchableOpacity>
+          </View>
+          <View style={styles.detailTitleRow}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1, marginRight: h(8) }}>
+              <ProviderIcon
+                provider={
+                  selectedEvent.source === 'catch'
+                    ? 'catch'
+                    : selectedEvent.source === 'microsoft'
+                      ? 'microsoft'
+                      : selectedEvent.source === 'icloud'
+                        ? 'icloud'
+                        : 'google'
+                }
+                size={18}
+              />
+              <Text style={[styles.detailEventName, { marginLeft: h(7), flex: 1 }]} numberOfLines={2}>
+                {cleanTitle(selectedEvent.title)}
+              </Text>
+            </View>
+            <View style={styles.badges}>
+              <Text style={[
+                styles.confirmBadge,
+                selectedEvent.status === 'pending' && { backgroundColor: '#FFF3CD', color: '#856404' },
+              ]}>
+                {selectedEvent.status === 'approved' ? 'Confirmed' : selectedEvent.status === 'pending' ? 'Pending' : 'External'}
+              </Text>
+              <Text style={styles.freeBadge}>{getPriceLabel(selectedEvent)}</Text>
+            </View>
+          </View>
+          <DetailRow
+            icon="clock"
+            label="Meeting time:"
+            value={`${formatDisplayDate(new Date(selectedEvent.startTime))} - ${formatTime(new Date(selectedEvent.endTime))}`}
+          />
+          <DetailRow
+            icon="pin"
+            label="Location:"
+            value={selectedEvent.locationLabel || 'Remote'}
+          />
+          <DetailRow
+            icon="host"
+            label="Host"
+            value={
+              selectedEvent.senderId === user.id ? 'You' : selectedEvent.sender?.name || 'Host'
+            }
+          />
+          <Text style={styles.inviteesTitle}>Invitees</Text>
           <ScrollView
-            style={styles.editSheet}
-            contentContainerStyle={{ paddingBottom: Math.max(insets.bottom + v(22), v(34)) }}>
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.peopleRail}>
+            {people.map((person) => (
+              <PersonBubble key={person.id} person={person} selectable />
+            ))}
+          </ScrollView>
+          <TouchableOpacity style={styles.foodCard}>
+            <View style={styles.foodIcon}>
+              <MiniIcon type="food" color={COLORS.muted} size={20} />
+            </View>
+            <View style={styles.foodTextWrap}>
+              <Text style={styles.foodTitle}>Need a Bite?</Text>
+              <Text style={styles.foodText}>Get your favorite meal delivered in minutes.</Text>
+            </View>
+            <Text style={styles.chevron}>›</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+    );
+  }
+
+  function renderEditContent() {
+    if (!selectedEvent) return null;
+    return (
+      <KeyboardAvoidingView
+        style={styles.modalRoot}
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+        <BlurView intensity={10} tint="dark" style={styles.backdrop}>
+          <View style={styles.dim} />
+        </BlurView>
+        <TouchableOpacity style={{ flex: 1 }} activeOpacity={1} onPress={() => setSheet('details')} />
+        {/* maxHeight lives on this plain View (not the ScrollView itself) —
+            a ScrollView styled directly with a percentage maxHeight tends to
+            claim that full height even when its content is much shorter,
+            which is what left "Delete Event" stranded with a large empty
+            gap below it. A View reliably shrink-wraps to its content (this
+            is exactly how the sibling "Meeting details" sheet, which uses a
+            plain View, already sizes correctly), so nesting the ScrollView
+            inside one fixes the sizing without changing the field order. */}
+        <View style={styles.editSheet}>
+          <ScrollView contentContainerStyle={{ paddingBottom: Math.max(insets.bottom + v(22), v(34)) }}>
             <View style={styles.sheetHandle} />
             <SheetTop
               title="Customize event"
@@ -1388,17 +1770,17 @@ const AppStack_CalendarScreen: React.FC<Props> = ({ navigation, route }) => {
               <Segment active={editPricing} onChange={setEditPricing} />
             </View>
             <TouchableOpacity style={styles.deleteButton} onPress={() => setDeleteConfirm(true)}>
-              <MiniIcon type="trash" color={COLORS.white} />
+              <MiniIcon type="trash" color={COLORS.white} size={19} />
               <Text style={styles.deleteButtonText}>Delete Event</Text>
             </TouchableOpacity>
           </ScrollView>
-        </KeyboardAvoidingView>
-      </Modal>
+        </View>
+      </KeyboardAvoidingView>
     );
   }
 
-  function renderTimeSheet() {
-    if (sheet !== 'time' || !selectedEvent) return null;
+  function renderTimeContent() {
+    if (!selectedEvent) return null;
     const duration = getDurationMinutes(selectedEvent);
 
     const pickSlot = (slotMinutes: number) => {
@@ -1408,7 +1790,6 @@ const AppStack_CalendarScreen: React.FC<Props> = ({ navigation, route }) => {
     };
 
     return (
-      <Modal visible transparent animationType="slide" onRequestClose={() => setSheet('edit')}>
         <View style={styles.fullSheet}>
           <View style={styles.sheetHandle} />
           <SheetTop title="Edit meeting time" onBack={() => setSheet('edit')} />
@@ -1434,7 +1815,7 @@ const AppStack_CalendarScreen: React.FC<Props> = ({ navigation, route }) => {
             {/* Tappable 15-min slots — behind event blocks */}
             {Array.from({ length: 96 }, (_, i) => {
               const slotMinutes = i * 15;
-              const top = v(10) + (slotMinutes / 60) * v(80);
+              const top = v(10) + (slotMinutes / 60) * HOUR_HEIGHT;
               return (
                 <TouchableOpacity
                   key={`slot-${i}`}
@@ -1450,39 +1831,63 @@ const AppStack_CalendarScreen: React.FC<Props> = ({ navigation, route }) => {
               .filter((e) => isSameDay(new Date(e.startTime), selectedDate))
               .map((event) => {
                 const evDuration = getDurationMinutes(event);
-                const evIsTiny = evDuration < 20;
-                const evIsCompact = !evIsTiny && evDuration < 30;
+                const evIsTiny = evDuration < minutesForPx(TINY_EVENT_PX);
+                const evIsCompact = !evIsTiny && evDuration < minutesForPx(COMPACT_EVENT_PX);
                 const priceLabel = getPriceLabel(event);
+                const evPos = getEventPosition(event);
+                const evTinyPadding = fitEventPadding(evPos.height, v(3), v(1));
+                const evTinyFont = fitEventFontSize(evPos.height - evTinyPadding * 2, 1, ms(10));
+                const evCompactPadding = fitEventPadding(evPos.height, v(4), v(1.5));
+                const evCompactAvailable = evPos.height - evCompactPadding * 2;
+                const evCompactFitsTwoLines = evCompactAvailable / 2 / EVENT_LINE_HEIGHT_RATIO >= MIN_EVENT_FONT_PX;
+                const evCompactTitleFont = fitEventFontSize(evCompactAvailable, 2, ms(12));
+                const evCompactPriceFont = fitEventFontSize(evCompactAvailable, 2, ms(11));
+                const evCompactSingleFont = fitEventFontSize(evPos.height - evTinyPadding * 2, 1, ms(11));
+                const evShowSingleRow = evIsTiny || (evIsCompact && !evCompactFitsTwoLines);
+                const evSingleRowFont = evIsCompact ? evCompactSingleFont : evTinyFont;
                 return (
                   <TouchableOpacity
                     key={event.id}
                     activeOpacity={0.85}
                     style={[
-                      styles.eventBlock,
+                      styles.eventBlockPosition,
+                      styles.eventBlockVisual,
                       evIsTiny && styles.eventBlockTiny,
                       evIsCompact && styles.eventBlockCompact,
-                      getEventPosition(event),
+                      evPos,
                       { backgroundColor: COLORS.green, borderColor: COLORS.green },
+                      evIsTiny && { paddingVertical: evTinyPadding },
+                      evIsCompact && { paddingVertical: evShowSingleRow ? evTinyPadding : evCompactPadding },
                     ]}
                     onPress={() => setRescheduleTime(new Date(event.startTime))}>
-                    {evIsTiny ? (
+                    {evShowSingleRow ? (
                       <View style={styles.eventTinyRow}>
-                        <Text style={[styles.eventTinyTitle, { color: COLORS.white }]} numberOfLines={1}>
+                        <Text
+                          style={[styles.eventTinyTitle, { color: COLORS.white, fontSize: evSingleRowFont }]}
+                          numberOfLines={1}>
                           {cleanTitle(event.title)}
                         </Text>
-                        <Text style={[styles.eventTinyPrice, { color: COLORS.white }]}>{priceLabel}</Text>
+                        <Text style={[styles.eventTinyPrice, { color: COLORS.white, fontSize: evSingleRowFont }]}>
+                          {priceLabel}
+                        </Text>
                       </View>
                     ) : evIsCompact ? (
                       <>
-                        <Text style={[styles.eventCompactTitle, { color: COLORS.white }]} numberOfLines={1}>
+                        <Text
+                          style={[styles.eventCompactTitle, { color: COLORS.white, fontSize: evCompactTitleFont }]}
+                          numberOfLines={1}>
                           {cleanTitle(event.title)}
                         </Text>
-                        <Text style={[styles.eventCompactPrice, { color: COLORS.white }]}>{priceLabel}</Text>
+                        <Text style={[styles.eventCompactPrice, { color: COLORS.white, fontSize: evCompactPriceFont }]}>
+                          {priceLabel}
+                        </Text>
                       </>
                     ) : (
                       <>
-                        <Text style={styles.rescheduleBlockTitle}>{cleanTitle(event.title)}</Text>
-                        <Text style={styles.rescheduleBlockTime}>
+                        <Text style={styles.rescheduleBlockTitle} numberOfLines={1}>
+                          {cleanTitle(event.title)}
+                        </Text>
+                        <Text style={styles.rescheduleBlockTime} numberOfLines={1}>
                           {formatTime(new Date(event.startTime))} - {formatTime(new Date(event.endTime))}
                         </Text>
                         <Text style={[styles.eventPrice, { color: COLORS.white }]}>{priceLabel}</Text>
@@ -1496,35 +1901,58 @@ const AppStack_CalendarScreen: React.FC<Props> = ({ navigation, route }) => {
             {rescheduleTime ? (() => {
               const endTime = new Date(rescheduleTime.getTime() + duration * 60 * 1000);
               const pos = getEventPosition({ startTime: rescheduleTime.toISOString(), endTime: endTime.toISOString() } as CalendarItem);
-              const rIsTiny = duration < 20;
-              const rIsCompact = !rIsTiny && duration < 30;
+              const rIsTiny = duration < minutesForPx(TINY_EVENT_PX);
+              const rIsCompact = !rIsTiny && duration < minutesForPx(COMPACT_EVENT_PX);
               const priceLabel = getPriceLabel(selectedEvent);
+              const rTinyPadding = fitEventPadding(pos.height, v(3), v(1));
+              const rTinyFont = fitEventFontSize(pos.height - rTinyPadding * 2, 1, ms(10));
+              const rCompactPadding = fitEventPadding(pos.height, v(4), v(1.5));
+              const rCompactAvailable = pos.height - rCompactPadding * 2;
+              const rCompactFitsTwoLines = rCompactAvailable / 2 / EVENT_LINE_HEIGHT_RATIO >= MIN_EVENT_FONT_PX;
+              const rCompactTitleFont = fitEventFontSize(rCompactAvailable, 2, ms(12));
+              const rCompactPriceFont = fitEventFontSize(rCompactAvailable, 2, ms(11));
+              const rCompactSingleFont = fitEventFontSize(pos.height - rTinyPadding * 2, 1, ms(11));
+              const rShowSingleRow = rIsTiny || (rIsCompact && !rCompactFitsTwoLines);
+              const rSingleRowFont = rIsCompact ? rCompactSingleFont : rTinyFont;
               return (
                 <View
                   style={[
-                    styles.eventBlock,
+                    styles.eventBlockPosition,
+                    styles.eventBlockVisual,
                     rIsTiny && styles.eventBlockTiny,
                     rIsCompact && styles.eventBlockCompact,
                     { top: pos.top, height: pos.height, backgroundColor: COLORS.green, borderColor: COLORS.green },
+                    rIsTiny && { paddingVertical: rTinyPadding },
+                    rIsCompact && { paddingVertical: rShowSingleRow ? rTinyPadding : rCompactPadding },
                   ]}>
-                  {rIsTiny ? (
+                  {rShowSingleRow ? (
                     <View style={styles.eventTinyRow}>
-                      <Text style={[styles.eventTinyTitle, { color: COLORS.white }]} numberOfLines={1}>
+                      <Text
+                        style={[styles.eventTinyTitle, { color: COLORS.white, fontSize: rSingleRowFont }]}
+                        numberOfLines={1}>
                         {cleanTitle(selectedEvent.title)}
                       </Text>
-                      <Text style={[styles.eventTinyPrice, { color: COLORS.white }]}>{priceLabel}</Text>
+                      <Text style={[styles.eventTinyPrice, { color: COLORS.white, fontSize: rSingleRowFont }]}>
+                        {priceLabel}
+                      </Text>
                     </View>
                   ) : rIsCompact ? (
                     <>
-                      <Text style={[styles.eventCompactTitle, { color: COLORS.white }]} numberOfLines={1}>
+                      <Text
+                        style={[styles.eventCompactTitle, { color: COLORS.white, fontSize: rCompactTitleFont }]}
+                        numberOfLines={1}>
                         {cleanTitle(selectedEvent.title)}
                       </Text>
-                      <Text style={[styles.eventCompactPrice, { color: COLORS.white }]}>{priceLabel}</Text>
+                      <Text style={[styles.eventCompactPrice, { color: COLORS.white, fontSize: rCompactPriceFont }]}>
+                        {priceLabel}
+                      </Text>
                     </>
                   ) : (
                     <>
-                      <Text style={styles.rescheduleBlockTitle}>{cleanTitle(selectedEvent.title)}</Text>
-                      <Text style={styles.rescheduleBlockTime}>
+                      <Text style={styles.rescheduleBlockTitle} numberOfLines={1}>
+                        {cleanTitle(selectedEvent.title)}
+                      </Text>
+                      <Text style={styles.rescheduleBlockTime} numberOfLines={1}>
                         {formatTime(rescheduleTime)} - {formatTime(endTime)}
                       </Text>
                       <Text style={[styles.eventPrice, { color: COLORS.white }]}>{priceLabel}</Text>
@@ -1556,12 +1984,10 @@ const AppStack_CalendarScreen: React.FC<Props> = ({ navigation, route }) => {
             </TouchableOpacity>
           </View>
         </View>
-      </Modal>
     );
   }
 
-  function renderLocationSheet() {
-    if (sheet !== 'location') return null;
+  function renderLocationContent() {
     const defaultRegion = {
       latitude: mapCoords?.latitude ?? 37.7749,
       longitude: mapCoords?.longitude ?? -122.4194,
@@ -1569,7 +1995,6 @@ const AppStack_CalendarScreen: React.FC<Props> = ({ navigation, route }) => {
       longitudeDelta: 0.01,
     };
     return (
-      <Modal visible transparent animationType="slide" onRequestClose={() => setSheet('edit')}>
         <View style={styles.fullSheet}>
           <View style={styles.sheetHandle} />
           <SheetTop
@@ -1606,17 +2031,14 @@ const AppStack_CalendarScreen: React.FC<Props> = ({ navigation, route }) => {
             </View>
           ) : null}
         </View>
-      </Modal>
     );
   }
 
-  function renderInviteesSheet() {
-    if (sheet !== 'invitees') return null;
+  function renderInviteesContent() {
     const filteredContacts = contacts.filter((contact) =>
       contact.displayName.toLowerCase().includes(inviteeSearch.toLowerCase())
     );
     return (
-      <Modal visible transparent animationType="slide" onRequestClose={() => setSheet('edit')}>
         <View style={styles.bottomSheetTall}>
           <View style={styles.sheetHandle} />
           <SheetTop
@@ -1674,15 +2096,12 @@ const AppStack_CalendarScreen: React.FC<Props> = ({ navigation, route }) => {
             ))}
           </View>
         </View>
-      </Modal>
     );
   }
 
-  function renderDeleteDialog() {
-    if (!deleteConfirm) return null;
+  function renderDeleteDialogOverlay() {
     return (
-      <Modal visible transparent animationType="fade">
-        <View style={styles.confirmOverlay}>
+        <View style={[styles.confirmOverlay, StyleSheet.absoluteFillObject]}>
           <BlurView intensity={10} tint="dark" style={styles.backdrop}>
             <View style={styles.dim} />
           </BlurView>
@@ -1702,15 +2121,13 @@ const AppStack_CalendarScreen: React.FC<Props> = ({ navigation, route }) => {
             </View>
           </View>
         </View>
-      </Modal>
     );
   }
 
-  function renderRemoveInviteeDialog() {
+  function renderRemoveInviteeDialogOverlay() {
     if (!removeInvitee) return null;
     return (
-      <Modal visible transparent animationType="fade">
-        <View style={styles.confirmOverlay}>
+        <View style={[styles.confirmOverlay, StyleSheet.absoluteFillObject]}>
           <BlurView intensity={10} tint="dark" style={styles.backdrop}>
             <View style={styles.dim} />
           </BlurView>
@@ -1735,7 +2152,6 @@ const AppStack_CalendarScreen: React.FC<Props> = ({ navigation, route }) => {
             </View>
           </View>
         </View>
-      </Modal>
     );
   }
 
@@ -1825,7 +2241,7 @@ const SheetTop = ({
 }) => (
   <View style={styles.editHeader}>
     <TouchableOpacity onPress={onBack}>
-      <BackGlyph size={25} />
+      <BackGlyph size={21} />
     </TouchableOpacity>
     <Text style={styles.editTitle}>{title}</Text>
     {onSave ? (
@@ -1833,7 +2249,7 @@ const SheetTop = ({
         <Text style={styles.saveText}>Save</Text>
       </TouchableOpacity>
     ) : (
-      <View style={{ width: h(48) }} />
+      <View style={{ width: h(40) }} />
     )}
   </View>
 );
@@ -1870,16 +2286,157 @@ const WeekRail = ({
   );
 };
 
+// Full-screen Month view grid: 6 week rows, each day showing continuous
+// colored bars for its events (single-day events render as a 1-day bar,
+// multi-day events span uninterrupted across the days they cover) —
+// matching Google Calendar's mobile month view. Distinct from `MonthGrid`
+// below, which is the compact numbers-only grid still used by Year view.
+const MonthAgendaGrid = ({
+  monthDate,
+  events,
+  selectedDate,
+  onSelectDay,
+  onSelectEvent,
+}: {
+  monthDate: Date;
+  events: CalendarItem[];
+  selectedDate: Date;
+  onSelectDay: (day: Date) => void;
+  onSelectEvent: (event: CalendarItem) => void;
+}) => {
+  const cells = getMonthCells(monthDate);
+  const weeks: Date[][] = [];
+  for (let i = 0; i < cells.length; i += 7) {
+    weeks.push(cells.slice(i, i + 7));
+  }
+
+  let laneHints = new Map<string, number>();
+  const rows = weeks.map((week) => {
+    const spans = layoutEventsForMonthRow(events, week[0], laneHints);
+    laneHints = new Map(spans.filter((s) => s.continuesAfter).map((s) => [s.event.id, s.lane]));
+    return { week, spans };
+  });
+
+  const today = new Date();
+
+  return (
+    <View style={styles.monthAgendaGrid}>
+      <View style={styles.monthAgendaHeaderRow}>
+        {['M', 'T', 'W', 'T', 'F', 'S', 'S'].map((day, index) => (
+          <View key={`weekday-${index}`} style={styles.monthAgendaDayCell}>
+            <Text style={styles.monthAgendaHeaderText}>{day}</Text>
+          </View>
+        ))}
+      </View>
+      {rows.map(({ week, spans }, rowIndex) => (
+        <View key={`row-${rowIndex}`} style={styles.monthAgendaRow}>
+          <View style={styles.monthAgendaDayNumbers} pointerEvents="box-none">
+            {week.map((day) => {
+              const isCurrentMonth = day.getMonth() === monthDate.getMonth();
+              const isToday = isSameDay(day, today);
+              return (
+                <TouchableOpacity
+                  key={day.toISOString()}
+                  style={styles.monthAgendaDayCell}
+                  onPress={() => onSelectDay(day)}>
+                  <View style={[styles.monthAgendaDayCircle, isToday && styles.monthAgendaDayCircleToday]}>
+                    <Text
+                      style={[
+                        styles.monthAgendaDayText,
+                        !isCurrentMonth && styles.mutedMonthDay,
+                        isToday && styles.monthAgendaDayTextToday,
+                      ]}>
+                      {day.getDate()}
+                    </Text>
+                  </View>
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+          <View style={styles.monthAgendaLanesArea} pointerEvents="box-none">
+            {week.map((day, dayIndex) => (
+              <TouchableOpacity
+                key={`underlay-${dayIndex}`}
+                activeOpacity={1}
+                style={[
+                  styles.monthAgendaDayUnderlay,
+                  { left: `${(dayIndex / 7) * 100}%` as const, width: `${100 / 7}%` as const },
+                ]}
+                onPress={() => onSelectDay(day)}
+              />
+            ))}
+            {spans
+              .filter((span) => span.lane < MAX_MONTH_LANES)
+              .map((span) => {
+                const widthPct = ((span.endCol - span.startCol + 1) / 7) * 100;
+                const leftPct = (span.startCol / 7) * 100;
+                const isExternal = span.event.sourceType === 'external';
+                return (
+                  <TouchableOpacity
+                    key={span.event.id}
+                    activeOpacity={0.85}
+                    onPress={() => onSelectEvent(span.event)}
+                    style={[
+                      styles.monthAgendaBar,
+                      isExternal && styles.externalEventBlock,
+                      {
+                        top: span.lane * (MONTH_BAR_HEIGHT + MONTH_BAR_GAP),
+                        left: `${leftPct}%` as const,
+                        width: `${widthPct}%` as const,
+                        marginLeft: span.continuesBefore ? 0 : h(2),
+                        marginRight: span.continuesAfter ? 0 : h(2),
+                      },
+                      span.continuesBefore && styles.monthAgendaBarNoLeftRadius,
+                      span.continuesAfter && styles.monthAgendaBarNoRightRadius,
+                    ]}>
+                    <Text
+                      style={[styles.monthAgendaBarText, isExternal && { color: '#759719' }]}
+                      numberOfLines={1}>
+                      {cleanTitle(span.event.title)}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
+            {week.map((day, dayIndex) => {
+              const overflow = spans.filter(
+                (span) => span.lane >= MAX_MONTH_LANES && span.startCol <= dayIndex && span.endCol >= dayIndex
+              ).length;
+              if (overflow === 0) return null;
+              return (
+                <View
+                  key={`overflow-${dayIndex}`}
+                  pointerEvents="none"
+                  style={[
+                    styles.monthAgendaOverflow,
+                    {
+                      top: MAX_MONTH_LANES * (MONTH_BAR_HEIGHT + MONTH_BAR_GAP),
+                      left: `${(dayIndex / 7) * 100}%` as const,
+                      width: `${100 / 7}%` as const,
+                    },
+                  ]}>
+                  <Text style={styles.monthAgendaOverflowText}>•••</Text>
+                </View>
+              );
+            })}
+          </View>
+        </View>
+      ))}
+    </View>
+  );
+};
+
 const MonthGrid = ({
   monthDate,
   selectedDate,
   onSelect,
   compact,
+  showTitle = true,
 }: {
   monthDate: Date;
   selectedDate: Date;
   onSelect: (day: Date) => void;
   compact?: boolean;
+  showTitle?: boolean;
 }) => {
   const cells = getMonthCells(monthDate);
   const weeks: Date[][] = [];
@@ -1888,9 +2445,11 @@ const MonthGrid = ({
   }
   return (
     <View style={[styles.monthGrid, compact && styles.monthGridCompact]}>
-      <Text style={[styles.monthGridTitle, compact && styles.monthGridTitleCompact]}>
-        {monthDate.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}
-      </Text>
+      {showTitle && (
+        <Text style={[styles.monthGridTitle, compact && styles.monthGridTitleCompact]}>
+          {monthDate.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}
+        </Text>
+      )}
       {weeks.map((week, weekIndex) => (
         <View key={`week-${weekIndex}`} style={styles.monthWeekRow}>
           {week.map((day, dayIndex) => {
@@ -1931,9 +2490,9 @@ const DetailRow = ({
   value: string;
 }) => (
   <View style={styles.detailRow}>
-    <MiniIcon type={icon} />
-    <Text style={styles.detailLabel}>{label}</Text>
-    <Text style={styles.detailValue}>{value}</Text>
+    <MiniIcon type={icon} size={19} />
+    <Text style={styles.detailLabel} numberOfLines={1}>{label}</Text>
+    <Text style={styles.detailValue} numberOfLines={2}>{value}</Text>
   </View>
 );
 
@@ -1999,6 +2558,29 @@ const Segment = ({
   </View>
 );
 
+const VIEW_MODES: ViewMode[] = ['day', 'week', 'month', 'year'];
+const VIEW_MODE_LABELS: Record<ViewMode, string> = {
+  day: 'Day',
+  week: 'Week',
+  month: 'Month',
+  year: 'Year',
+};
+
+const ViewSwitcher = ({ active, onChange }: { active: ViewMode; onChange: (mode: ViewMode) => void }) => (
+  <View style={styles.viewSwitcher}>
+    {VIEW_MODES.map((mode) => (
+      <TouchableOpacity
+        key={mode}
+        style={[styles.viewSwitcherItem, active === mode && styles.viewSwitcherActive]}
+        onPress={() => onChange(mode)}>
+        <Text style={[styles.viewSwitcherText, active === mode && styles.viewSwitcherTextActive]}>
+          {VIEW_MODE_LABELS[mode]}
+        </Text>
+      </TouchableOpacity>
+    ))}
+  </View>
+);
+
 const PersonBubble = ({
   person,
   selectable,
@@ -2056,11 +2638,24 @@ function getLocationText(event: CalendarItem) {
   return event.locationLabel || event.locationAddress || 'Remote';
 }
 
-function formatMonthRange(date: Date) {
-  const nextMonth = new Date(date.getFullYear(), date.getMonth() + 1, 1);
-  const currentLabel = date.toLocaleDateString('en-US', { month: 'short' });
-  const nextLabel = nextMonth.toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
-  return `${currentLabel} - ${nextLabel}`;
+function formatSingleMonth(date: Date) {
+  return date.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+}
+
+// Header title text per view mode.
+function formatDayTitle(date: Date) {
+  return date.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+}
+
+function formatWeekRangeTitle(days: Date[]) {
+  const start = days[0];
+  const end = days[days.length - 1];
+  const sameMonth = start.getMonth() === end.getMonth();
+  const startLabel = start.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+  const endLabel = sameMonth
+    ? end.toLocaleDateString('en-US', { day: 'numeric' })
+    : end.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+  return `${startLabel} - ${endLabel}`;
 }
 
 function getWeekDates(date: Date) {
@@ -2109,6 +2704,13 @@ function formatHour(hour: number) {
     .toLowerCase();
 }
 
+// Compact "9a"/"2p" labels for the Week view's narrower hour gutter.
+function formatHourShort(hour: number) {
+  const period = hour >= 12 ? 'p' : 'a';
+  const displayHour = hour % 12 || 12;
+  return `${displayHour}${period}`;
+}
+
 function formatTime(date: Date) {
   return date
     .toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })
@@ -2135,9 +2737,10 @@ function getDurationMinutes(event: CalendarItem) {
 function getEventPosition(event: CalendarItem) {
   const start = new Date(event.startTime);
   const minutes = start.getHours() * 60 + start.getMinutes();
-  const top = v(10) + (minutes / 60) * v(80);
-  // 15 min = v(20) — matches the minimum getDurationMinutes returns
-  const height = Math.max(v(20), (getDurationMinutes(event) / 60) * v(80));
+  const top = v(10) + (minutes / 60) * HOUR_HEIGHT;
+  const rawHeight = (getDurationMinutes(event) / 60) * HOUR_HEIGHT - EVENT_GAP_PX;
+  // Floor at TINY_EVENT_PX so very short events stay legible/tappable.
+  const height = Math.max(TINY_EVENT_PX, rawHeight);
   return { top, height };
 }
 
@@ -2260,7 +2863,6 @@ const styles = StyleSheet.create({
     fontSize: ms(24),
     lineHeight: ms(30),
   },
-  monthChevron: { color: COLORS.ink, fontSize: ms(15), marginLeft: h(7), marginTop: v(3) },
   content: { flex: 1 },
   weekRail: {
     flexDirection: 'row',
@@ -2292,9 +2894,83 @@ const styles = StyleSheet.create({
   weekDayText: { color: COLORS.ink, fontFamily: 'Inter_700Bold', fontSize: ms(16) },
   weekDayTextActive: { color: COLORS.white },
   timeline: { minHeight: v(620), marginHorizontal: h(16), position: 'relative' },
-  timelineRow: { height: v(80), flexDirection: 'row', alignItems: 'flex-start' },
+  timelineRow: { height: HOUR_HEIGHT, flexDirection: 'row', alignItems: 'flex-start' },
   hourText: { color: COLORS.ink, fontFamily: 'Inter_400Regular', fontSize: ms(13), width: h(65) },
   hourLine: { flex: 1, height: 1, backgroundColor: COLORS.line, marginTop: v(10) },
+
+  // --- Week view ---
+  weekGridHeaderRow: {
+    flexDirection: 'row',
+    paddingHorizontal: h(16),
+    marginBottom: v(10),
+  },
+  weekGridHeaderCell: { flex: 1, alignItems: 'center' },
+  weekGridDayName: { color: COLORS.muted, fontFamily: 'Inter_400Regular', fontSize: ms(11) },
+  weekGridDayNumber: {
+    width: h(26),
+    height: h(26),
+    borderRadius: h(13),
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: v(2),
+  },
+  weekGridDayNumberActive: { backgroundColor: COLORS.ink },
+  weekGridDayText: { color: COLORS.ink, fontFamily: 'Inter_700Bold', fontSize: ms(14) },
+  weekGridDayTextActive: { color: COLORS.white },
+  weekAllDayRow: {
+    flexDirection: 'row',
+    paddingHorizontal: h(16),
+    marginBottom: v(10),
+  },
+  weekAllDayCell: { flex: 1, paddingHorizontal: h(2), gap: v(2) },
+  weekAllDayChip: {
+    backgroundColor: COLORS.green,
+    borderRadius: h(4),
+    paddingHorizontal: h(4),
+    paddingVertical: v(2),
+  },
+  weekAllDayChipText: { color: COLORS.white, fontFamily: 'Inter_700Bold', fontSize: ms(9) },
+  weekAllDayMore: { color: COLORS.muted, fontFamily: 'Inter_400Regular', fontSize: ms(9) },
+  weekTimeline: { minHeight: v(620), marginHorizontal: h(16), position: 'relative' },
+  weekHourRow: { height: HOUR_HEIGHT, flexDirection: 'row', alignItems: 'flex-start' },
+  weekHourText: { color: COLORS.ink, fontFamily: 'Inter_400Regular', fontSize: ms(10), width: h(36) },
+  weekHourLine: { flex: 1, height: 1, backgroundColor: COLORS.line, marginTop: v(10) },
+  weekColumnsRow: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    flexDirection: 'row',
+  },
+  weekDayColumn: { flex: 1, position: 'relative' },
+  weekDayColumnBorder: { borderLeftWidth: 1, borderLeftColor: COLORS.softLine },
+  weekEventBlock: {
+    position: 'absolute',
+    borderRadius: h(3),
+    backgroundColor: COLORS.green,
+    paddingHorizontal: h(3),
+    paddingVertical: v(1),
+    overflow: 'hidden',
+  },
+  weekEventTitle: { color: COLORS.white, fontFamily: 'Inter_700Bold', fontSize: ms(11) },
+  weekEventTitleExternal: { color: '#759719' },
+  weekNowLine: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    flexDirection: 'row',
+    alignItems: 'center',
+    zIndex: 2,
+  },
+  weekNowDot: {
+    width: h(7),
+    height: h(7),
+    borderRadius: h(3.5),
+    backgroundColor: '#E53935',
+    marginLeft: -h(3.5),
+  },
+  weekNowBar: { flex: 1, height: 2, backgroundColor: '#E53935' },
   unavailBand: {
     position: 'absolute',
     left: h(65),
@@ -2302,10 +2978,16 @@ const styles = StyleSheet.create({
     backgroundColor: '#F0F2F6',
     opacity: 0.75,
   },
-  eventBlock: {
+  // Position (top/left/right/height) is kept separate from visual styling so
+  // the main Day-view timeline can override just the horizontal placement
+  // per-event (for side-by-side overlapping events) without duplicating the
+  // border/background/padding declarations.
+  eventBlockPosition: {
     position: 'absolute',
     left: h(72),
     right: 0,
+  },
+  eventBlockVisual: {
     borderRadius: h(4),
     borderWidth: 1,
     borderColor: '#D8EE9B',
@@ -2359,28 +3041,95 @@ const styles = StyleSheet.create({
     fontSize: ms(14),
   },
   eventProvider: { position: 'absolute', right: h(10), bottom: h(8) },
-  weekLabels: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    paddingHorizontal: h(16),
-    marginBottom: v(10),
-  },
-  weekLabel: {
-    color: COLORS.muted,
-    fontFamily: 'Inter_400Regular',
-    fontSize: ms(16),
-    width: h(38),
-    textAlign: 'center',
-  },
   monthViewContainer: {
     flex: 1,
     paddingBottom: v(90),
   },
-  monthNavRow: {
+  monthAgendaGrid: {
+    flex: 1,
+    paddingHorizontal: h(10),
+  },
+  monthAgendaHeaderRow: {
     flexDirection: 'row',
+    paddingBottom: v(6),
+  },
+  monthAgendaHeaderText: {
+    textAlign: 'center',
+    color: COLORS.muted,
+    fontFamily: 'Inter_400Regular',
+    fontSize: ms(13),
+  },
+  monthAgendaRow: {
+    flex: 1,
+    borderTopWidth: 1,
+    borderTopColor: COLORS.softLine,
+    overflow: 'hidden',
+  },
+  monthAgendaDayNumbers: {
+    flexDirection: 'row',
+    paddingTop: v(4),
+  },
+  monthAgendaDayCell: {
+    flex: 1,
     alignItems: 'center',
-    paddingHorizontal: h(16),
-    marginBottom: v(8),
+  },
+  monthAgendaDayCircle: {
+    width: h(22),
+    height: h(22),
+    borderRadius: h(11),
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  monthAgendaDayCircleToday: {
+    backgroundColor: COLORS.green,
+  },
+  monthAgendaDayText: {
+    color: COLORS.ink,
+    fontFamily: 'Inter_400Regular',
+    fontSize: ms(13),
+  },
+  monthAgendaDayTextToday: {
+    color: COLORS.white,
+    fontFamily: 'Inter_700Bold',
+  },
+  monthAgendaLanesArea: {
+    flex: 1,
+    position: 'relative',
+  },
+  monthAgendaDayUnderlay: {
+    position: 'absolute',
+    top: 0,
+    bottom: 0,
+  },
+  monthAgendaBar: {
+    position: 'absolute',
+    height: MONTH_BAR_HEIGHT,
+    borderRadius: h(4),
+    backgroundColor: COLORS.green,
+    justifyContent: 'center',
+    paddingHorizontal: h(5),
+  },
+  monthAgendaBarNoLeftRadius: {
+    borderTopLeftRadius: 0,
+    borderBottomLeftRadius: 0,
+  },
+  monthAgendaBarNoRightRadius: {
+    borderTopRightRadius: 0,
+    borderBottomRightRadius: 0,
+  },
+  monthAgendaBarText: {
+    color: COLORS.white,
+    fontFamily: 'Inter_700Bold',
+    fontSize: ms(10),
+  },
+  monthAgendaOverflow: {
+    position: 'absolute',
+    alignItems: 'center',
+  },
+  monthAgendaOverflowText: {
+    color: COLORS.muted,
+    fontFamily: 'Inter_700Bold',
+    fontSize: ms(11),
   },
   monthNavButton: {
     width: h(40),
@@ -2398,6 +3147,10 @@ const styles = StyleSheet.create({
   },
   monthGrid: { paddingHorizontal: h(16), marginBottom: v(28) },
   monthGridCompact: { marginBottom: v(8) },
+  yearGrid: { paddingBottom: v(40) },
+  yearNavRow: { flexDirection: 'row', paddingHorizontal: h(16), marginBottom: v(12) },
+  yearMonthsWrap: { flexDirection: 'row', flexWrap: 'wrap' },
+  yearMonthCell: { width: '50%' },
   monthGridTitle: {
     color: COLORS.ink,
     fontFamily: 'Inter_700Bold',
@@ -2459,203 +3212,205 @@ const styles = StyleSheet.create({
     borderTopLeftRadius: h(26),
     borderTopRightRadius: h(26),
     paddingHorizontal: h(16),
-    paddingTop: v(16),
+    paddingTop: v(14),
   },
   sheetHandle: {
     alignSelf: 'center',
-    width: h(64),
+    width: h(56),
     height: v(4),
     borderRadius: h(2),
     backgroundColor: COLORS.line,
-    marginBottom: v(19),
+    marginBottom: v(16),
   },
   sheetHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: v(28),
+    marginBottom: v(20),
   },
-  sheetTitle: { color: COLORS.ink, fontFamily: 'Inter_700Bold', fontSize: ms(27) },
+  sheetTitle: { color: COLORS.ink, fontFamily: 'Inter_700Bold', fontSize: ms(21) },
   detailTitleRow: {
     flexDirection: 'row',
-    alignItems: 'center',
+    alignItems: 'flex-start',
     justifyContent: 'space-between',
-    marginBottom: v(26),
+    marginBottom: v(18),
   },
-  detailEventName: { color: COLORS.ink, fontFamily: 'Inter_400Regular', fontSize: ms(22), flex: 1 },
-  badges: { flexDirection: 'row', gap: h(8) },
+  detailEventName: { color: COLORS.ink, fontFamily: 'Inter_400Regular', fontSize: ms(17), flex: 1 },
+  badges: { flexDirection: 'row', flexShrink: 0, flexWrap: 'wrap', justifyContent: 'flex-end', gap: h(6) },
   confirmBadge: {
     overflow: 'hidden',
     color: '#65840E',
     backgroundColor: COLORS.lightGreen,
-    borderRadius: h(15),
-    paddingHorizontal: h(12),
-    paddingVertical: v(5),
+    borderRadius: h(11),
+    paddingHorizontal: h(9),
+    paddingVertical: v(4),
     fontFamily: 'Inter_400Regular',
-    fontSize: ms(15),
+    fontSize: ms(12),
   },
   freeBadge: {
     overflow: 'hidden',
     color: '#65840E',
     backgroundColor: COLORS.lightGreen,
-    borderRadius: h(15),
-    paddingHorizontal: h(14),
-    paddingVertical: v(5),
+    borderRadius: h(11),
+    paddingHorizontal: h(10),
+    paddingVertical: v(4),
     fontFamily: 'Inter_400Regular',
-    fontSize: ms(15),
+    fontSize: ms(12),
   },
-  detailRow: { flexDirection: 'row', alignItems: 'center', minHeight: v(38) },
+  detailRow: { flexDirection: 'row', alignItems: 'center', minHeight: v(32) },
   detailLabel: {
     color: COLORS.muted,
     fontFamily: 'Inter_400Regular',
-    fontSize: ms(18),
-    marginLeft: h(10),
+    fontSize: ms(14),
+    marginLeft: h(8),
   },
   detailValue: {
     flex: 1,
     color: COLORS.ink,
     fontFamily: 'Inter_400Regular',
-    fontSize: ms(18),
+    fontSize: ms(14),
     textAlign: 'right',
+    marginLeft: h(8),
   },
   inviteesTitle: {
     color: COLORS.ink,
     fontFamily: 'Inter_400Regular',
-    fontSize: ms(22),
-    marginBottom: v(12),
+    fontSize: ms(17),
+    marginTop: v(4),
+    marginBottom: v(10),
   },
-  peopleRail: { gap: h(16), paddingBottom: v(10) },
-  personBubble: { width: h(82), alignItems: 'center' },
-  personAvatar: { width: h(64), height: h(64), borderRadius: h(32) },
+  peopleRail: { gap: h(13), paddingBottom: v(8) },
+  personBubble: { width: h(68), alignItems: 'center' },
+  personAvatar: { width: h(52), height: h(52), borderRadius: h(26) },
   personName: {
     color: COLORS.ink,
     fontFamily: 'Inter_400Regular',
-    fontSize: ms(15),
-    lineHeight: ms(18),
+    fontSize: ms(12),
+    lineHeight: ms(15),
     textAlign: 'center',
-    marginTop: v(8),
+    marginTop: v(6),
   },
   personCheck: {
     position: 'absolute',
-    right: h(6),
-    top: h(45),
-    width: h(20),
-    height: h(20),
-    borderRadius: h(10),
+    right: h(5),
+    top: h(37),
+    width: h(16),
+    height: h(16),
+    borderRadius: h(8),
     backgroundColor: '#7EA9DB',
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 2,
     borderColor: COLORS.white,
   },
-  personCheckText: { color: COLORS.white, fontFamily: 'Inter_700Bold', fontSize: ms(11) },
+  personCheckText: { color: COLORS.white, fontFamily: 'Inter_700Bold', fontSize: ms(9) },
   personRemove: {
     position: 'absolute',
-    right: h(2),
+    right: h(1),
     top: 0,
-    width: h(22),
-    height: h(22),
-    borderRadius: h(11),
+    width: h(18),
+    height: h(18),
+    borderRadius: h(9),
     backgroundColor: '#FF5B66',
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 2,
     borderColor: COLORS.white,
   },
-  personRemoveText: { color: COLORS.white, fontFamily: 'Inter_700Bold', fontSize: ms(14) },
+  personRemoveText: { color: COLORS.white, fontFamily: 'Inter_700Bold', fontSize: ms(12) },
   personAdd: {
     position: 'absolute',
-    right: h(2),
+    right: h(1),
     top: 0,
-    width: h(22),
-    height: h(22),
-    borderRadius: h(11),
+    width: h(18),
+    height: h(18),
+    borderRadius: h(9),
     backgroundColor: COLORS.green,
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 2,
     borderColor: COLORS.white,
   },
-  personAddText: { color: COLORS.white, fontFamily: 'Inter_700Bold', fontSize: ms(15) },
+  personAddText: { color: COLORS.white, fontFamily: 'Inter_700Bold', fontSize: ms(12) },
   foodCard: {
-    marginTop: v(20),
-    height: v(76),
-    borderRadius: h(15),
+    marginTop: v(16),
+    height: v(64),
+    borderRadius: h(13),
     borderWidth: 1,
     borderColor: COLORS.softLine,
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: h(14),
+    paddingHorizontal: h(12),
   },
   foodIcon: {
-    width: h(50),
-    height: h(50),
-    borderRadius: h(25),
+    width: h(42),
+    height: h(42),
+    borderRadius: h(21),
     backgroundColor: '#F4F5F6',
     alignItems: 'center',
     justifyContent: 'center',
-    marginRight: h(14),
+    marginRight: h(11),
   },
   foodTextWrap: { flex: 1 },
-  foodTitle: { color: COLORS.ink, fontFamily: 'Inter_700Bold', fontSize: ms(20) },
+  foodTitle: { color: COLORS.ink, fontFamily: 'Inter_700Bold', fontSize: ms(16) },
   foodText: {
     color: COLORS.muted,
     fontFamily: 'Inter_400Regular',
-    fontSize: ms(16),
-    lineHeight: ms(20),
+    fontSize: ms(13),
+    lineHeight: ms(17),
   },
-  chevron: { color: COLORS.pale, fontFamily: 'Inter_400Regular', fontSize: ms(38) },
+  chevron: { color: COLORS.pale, fontFamily: 'Inter_400Regular', fontSize: ms(30) },
   editSheet: {
     backgroundColor: COLORS.white,
     borderTopLeftRadius: h(26),
     borderTopRightRadius: h(26),
     paddingHorizontal: h(16),
-    paddingTop: v(16),
+    paddingTop: v(14),
     maxHeight: '92%',
   },
-  editHeader: { flexDirection: 'row', alignItems: 'center', marginBottom: v(24) },
+  editHeader: { flexDirection: 'row', alignItems: 'center', marginBottom: v(18) },
   editTitle: {
     flex: 1,
     color: COLORS.ink,
     fontFamily: 'Inter_700Bold',
-    fontSize: ms(22),
-    marginLeft: h(10),
+    fontSize: ms(18),
+    marginLeft: h(9),
   },
-  saveText: { color: COLORS.green, fontFamily: 'Inter_400Regular', fontSize: ms(18) },
+  saveText: { color: COLORS.green, fontFamily: 'Inter_400Regular', fontSize: ms(15) },
   fieldLabel: {
     color: COLORS.muted,
     fontFamily: 'Inter_400Regular',
-    fontSize: ms(18),
-    marginBottom: v(10),
-    marginTop: v(12),
+    fontSize: ms(14),
+    marginBottom: v(8),
+    marginTop: v(10),
   },
   largeInput: {
-    height: v(58),
-    borderRadius: h(28),
+    height: v(48),
+    borderRadius: h(24),
     borderWidth: 1,
     borderColor: COLORS.softLine,
     color: COLORS.ink,
     fontFamily: 'Inter_400Regular',
-    fontSize: ms(20),
-    paddingHorizontal: h(20),
-    marginBottom: v(14),
+    fontSize: ms(15),
+    paddingHorizontal: h(16),
+    marginBottom: v(11),
   },
   largeInputReadonly: {
-    height: v(58),
-    borderRadius: h(28),
+    height: v(48),
+    borderRadius: h(24),
     borderWidth: 1,
     borderColor: COLORS.softLine,
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: h(20),
-    marginBottom: v(14),
+    paddingHorizontal: h(16),
+    marginBottom: v(11),
   },
-  readonlyText: { flex: 1, color: COLORS.ink, fontFamily: 'Inter_400Regular', fontSize: ms(19) },
-  chevronSmall: { color: COLORS.ink, fontSize: ms(30) },
+  readonlyText: { flex: 1, color: COLORS.ink, fontFamily: 'Inter_400Regular', fontSize: ms(15) },
+  chevronSmall: { color: COLORS.ink, fontSize: ms(24) },
   addInviteeBubble: {
-    width: h(82),
-    height: v(112),
-    borderRadius: h(41),
+    width: h(68),
+    height: v(92),
+    borderRadius: h(34),
     backgroundColor: '#F8FAFC',
     alignItems: 'center',
     justifyContent: 'center',
@@ -2663,50 +3418,67 @@ const styles = StyleSheet.create({
     borderColor: COLORS.softLine,
   },
   addInviteePlus: {
-    width: h(64),
-    height: h(64),
-    borderRadius: h(32),
+    width: h(52),
+    height: h(52),
+    borderRadius: h(26),
     backgroundColor: COLORS.green,
     color: COLORS.white,
     textAlign: 'center',
-    lineHeight: h(64),
+    lineHeight: h(52),
     fontFamily: 'Inter_400Regular',
-    fontSize: ms(38),
+    fontSize: ms(30),
   },
   addInviteeText: {
     color: COLORS.green,
     fontFamily: 'Inter_700Bold',
-    fontSize: ms(15),
-    marginTop: v(8),
+    fontSize: ms(12),
+    marginTop: v(6),
   },
   pricingRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginTop: v(16),
+    marginTop: v(12),
   },
-  segment: { flexDirection: 'row', backgroundColor: '#F5F5F5', borderRadius: h(28) },
+  segment: { flexDirection: 'row', backgroundColor: '#F5F5F5', borderRadius: h(22) },
   segmentItem: {
-    height: v(50),
-    paddingHorizontal: h(22),
-    borderRadius: h(25),
+    height: v(42),
+    paddingHorizontal: h(18),
+    borderRadius: h(19),
     alignItems: 'center',
     justifyContent: 'center',
   },
   segmentActive: { backgroundColor: COLORS.green },
-  segmentText: { color: '#8E98A2', fontFamily: 'Inter_400Regular', fontSize: ms(19) },
+  segmentText: { color: '#8E98A2', fontFamily: 'Inter_400Regular', fontSize: ms(15) },
   segmentTextActive: { color: COLORS.white },
+  viewSwitcherRow: { paddingHorizontal: h(16), marginBottom: v(18) },
+  viewSwitcher: {
+    flexDirection: 'row',
+    backgroundColor: '#F5F5F5',
+    borderRadius: h(20),
+    padding: h(3),
+  },
+  viewSwitcherItem: {
+    flex: 1,
+    height: v(32),
+    borderRadius: h(17),
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  viewSwitcherActive: { backgroundColor: COLORS.green },
+  viewSwitcherText: { color: '#8E98A2', fontFamily: 'Inter_700Bold', fontSize: ms(13) },
+  viewSwitcherTextActive: { color: COLORS.white },
   deleteButton: {
-    height: v(58),
-    borderRadius: h(29),
+    height: v(48),
+    borderRadius: h(24),
     backgroundColor: COLORS.greyButton,
     alignItems: 'center',
     justifyContent: 'center',
     flexDirection: 'row',
-    gap: h(10),
-    marginTop: v(22),
+    gap: h(8),
+    marginTop: v(18),
   },
-  deleteButtonText: { color: COLORS.white, fontFamily: 'Inter_700Bold', fontSize: ms(20) },
+  deleteButtonText: { color: COLORS.white, fontFamily: 'Inter_700Bold', fontSize: ms(16) },
   fullSheet: {
     flex: 1,
     backgroundColor: COLORS.white,

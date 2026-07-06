@@ -1,7 +1,7 @@
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { useFocusEffect } from '@react-navigation/native';
 import { BlurView } from 'expo-blur';
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -245,10 +245,17 @@ const AppStack_SendCatchScreen: React.FC<Props> = ({ navigation, route }) => {
   const [hookSearch, setHookSearch] = useState('');
   const [selectedHook, setSelectedHook] = useState<HookOption | null>(null);
   const [expandedHookId, setExpandedHookId] = useState<string | null>(null);
+  // Defaults to today (offset 0) so the "soonest available slot from now"
+  // logic below actually applies the moment the screen opens, instead of
+  // requiring the user to manually navigate back to today first.
   const [selectedDayIndex, setSelectedDayIndex] = useState(() =>
-    route.params?.initialDate ? getDayOffset(route.params.initialDate) : 2
+    route.params?.initialDate ? getDayOffset(route.params.initialDate) : 0
   );
-  const [selectedTime, setSelectedTime] = useState(route.params?.initialTime || '09:00');
+  // No hardcoded default time — a fixed "09:00" fallback could easily fall
+  // outside the participants' actual overlapping availability. Starts empty
+  // (unless a specific time was explicitly passed in) and gets populated
+  // once `availableTimes` is computed below, from a slot that's actually free.
+  const [selectedTime, setSelectedTime] = useState<string | null>(route.params?.initialTime || null);
   const [format, setFormat] = useState<'remote' | 'onsite'>('onsite');
   const [pricing, setPricing] = useState<'free' | 'paid'>('free');
   const [price, setPrice] = useState('');
@@ -266,64 +273,86 @@ const AppStack_SendCatchScreen: React.FC<Props> = ({ navigation, route }) => {
   const [removeContact, setRemoveContact] = useState<Contact | null>(null);
   const [showCustomizeModal, setShowCustomizeModal] = useState(false);
   const [userAvailability, setUserAvailability] = useState<AvailabilitySchedule | null>(null);
+  // Starts true and flips false once the fetch below settles — used to stop
+  // the default-time/day logic from acting on the temporary 9am-5pm fallback
+  // window before the sender's real availability has actually loaded.
+  const [loadingUserAvailability, setLoadingUserAvailability] = useState(true);
   const [recipientAvailabilities, setRecipientAvailabilities] = useState<Record<string, AvailabilitySchedule>>({});
   const [loadingRecipientAvailability, setLoadingRecipientAvailability] = useState(false);
   const visibleDays = useMemo(() => getVisibleDays(selectedDayIndex), [selectedDayIndex]);
-  const selectedStartLabel = formatTimeString(selectedTime);
-  const selectedEndLabel = formatTimeString(minutesToTime(timeToMinutes(selectedTime) + duration));
+  const selectedStartLabel = selectedTime ? formatTimeString(selectedTime) : '';
+  const selectedEndLabel = selectedTime
+    ? formatTimeString(minutesToTime(timeToMinutes(selectedTime) + duration))
+    : '';
   const selectedDayDate = useMemo(() => {
     const d = new Date();
     d.setDate(d.getDate() + selectedDayIndex);
     return d;
   }, [selectedDayIndex]);
 
-  const availableTimes = useMemo(() => {
-    const weekday = selectedDayDate.getDay();
+  // Pulled out of the memo below so the "today's slots ran out -> jump to
+  // tomorrow" effect can synchronously compute tomorrow's list too, instead
+  // of bumping the day and waiting for a follow-up render to pick a time
+  // (which left the day switched but no time slot highlighted for a frame).
+  const computeAvailableTimesForDay = useCallback(
+    (dayDate: Date) => {
+      const weekday = dayDate.getDay();
 
-    // Collect slots per participant for this weekday
-    const allSlotSets: { startMinutes: number; endMinutes: number }[][] = [];
+      // Collect slots per participant for this weekday
+      const allSlotSets: { startMinutes: number; endMinutes: number }[][] = [];
 
-    // Sender
-    const senderSlots = (userAvailability?.slots ?? [])
-      .filter((s) => s.weekday === weekday)
-      .map((s) => ({ startMinutes: s.startMinutes, endMinutes: s.endMinutes }));
-    allSlotSets.push(senderSlots.length > 0 ? senderSlots : [{ startMinutes: 9 * 60, endMinutes: 17 * 60 }]);
+      // Sender
+      const senderSlots = (userAvailability?.slots ?? [])
+        .filter((s) => s.weekday === weekday)
+        .map((s) => ({ startMinutes: s.startMinutes, endMinutes: s.endMinutes }));
+      allSlotSets.push(senderSlots.length > 0 ? senderSlots : [{ startMinutes: 9 * 60, endMinutes: 17 * 60 }]);
 
-    // Recipients
-    for (const contact of selectedContacts) {
-      const uid = contact.contactUser?.id;
-      if (uid && recipientAvailabilities[uid]) {
-        const rSlots = recipientAvailabilities[uid].slots
-          .filter((s) => s.weekday === weekday)
-          .map((s) => ({ startMinutes: s.startMinutes, endMinutes: s.endMinutes }));
-        if (rSlots.length > 0) allSlotSets.push(rSlots);
-      }
-    }
-
-    // Intersect all slot sets
-    let intersection = allSlotSets[0];
-    for (let i = 1; i < allSlotSets.length; i++) {
-      const other = allSlotSets[i];
-      const next: { startMinutes: number; endMinutes: number }[] = [];
-      for (const a of intersection) {
-        for (const b of other) {
-          const start = Math.max(a.startMinutes, b.startMinutes);
-          const end = Math.min(a.endMinutes, b.endMinutes);
-          if (start < end) next.push({ startMinutes: start, endMinutes: end });
+      // Recipients
+      for (const contact of selectedContacts) {
+        const uid = contact.contactUser?.id;
+        if (uid && recipientAvailabilities[uid]) {
+          const rSlots = recipientAvailabilities[uid].slots
+            .filter((s) => s.weekday === weekday)
+            .map((s) => ({ startMinutes: s.startMinutes, endMinutes: s.endMinutes }));
+          if (rSlots.length > 0) allSlotSets.push(rSlots);
         }
       }
-      intersection = next.sort((a, b) => a.startMinutes - b.startMinutes);
-    }
 
-    // Generate 15-min start times where the full meeting fits inside a window
-    const slots: string[] = [];
-    for (const window of intersection) {
-      for (let minute = window.startMinutes; minute + duration <= window.endMinutes; minute += 15) {
-        slots.push(minutesToTime(minute));
+      // Intersect all slot sets
+      let intersection = allSlotSets[0];
+      for (let i = 1; i < allSlotSets.length; i++) {
+        const other = allSlotSets[i];
+        const next: { startMinutes: number; endMinutes: number }[] = [];
+        for (const a of intersection) {
+          for (const b of other) {
+            const start = Math.max(a.startMinutes, b.startMinutes);
+            const end = Math.min(a.endMinutes, b.endMinutes);
+            if (start < end) next.push({ startMinutes: start, endMinutes: end });
+          }
+        }
+        intersection = next.sort((a, b) => a.startMinutes - b.startMinutes);
       }
-    }
-    return slots;
-  }, [duration, selectedDayDate, userAvailability, recipientAvailabilities, selectedContacts]);
+
+      // Generate 15-min start times where the full meeting fits inside a window.
+      // Overlapping availability windows (e.g. two unmerged slots for the same
+      // person that share some minutes) can otherwise produce the same start
+      // time more than once, which would render two pills for one time slot —
+      // and both would light up as "selected" since they compare equal.
+      const slots: string[] = [];
+      for (const window of intersection) {
+        for (let minute = window.startMinutes; minute + duration <= window.endMinutes; minute += 15) {
+          slots.push(minutesToTime(minute));
+        }
+      }
+      return Array.from(new Set(slots));
+    },
+    [duration, userAvailability, recipientAvailabilities, selectedContacts]
+  );
+
+  const availableTimes = useMemo(
+    () => computeAvailableTimesForDay(selectedDayDate),
+    [computeAvailableTimesForDay, selectedDayDate]
+  );
 
   const loadHooks = useCallback(async () => {
     try {
@@ -356,7 +385,8 @@ const AppStack_SendCatchScreen: React.FC<Props> = ({ navigation, route }) => {
     http
       .get('/users/availability')
       .then((res) => setUserAvailability(res.data))
-      .catch(() => {/* keep fallback */});
+      .catch(() => {/* keep fallback */})
+      .finally(() => setLoadingUserAvailability(false));
   }, []);
 
   useFocusEffect(useCallback(() => {
@@ -398,13 +428,61 @@ const AppStack_SendCatchScreen: React.FC<Props> = ({ navigation, route }) => {
     return () => { cancelled = true; };
   }, [selectedContacts]);
 
-  // When available times change (day or availability loaded), ensure selectedTime is valid
+  // Picks the initial default time exactly ONCE, as soon as real availability
+  // has loaded — never again after that. This is the only automatic pick
+  // that happens: it prefers the soonest free slot at or after the current
+  // time when today has one (e.g. 5:05pm now -> 5:15pm), or tomorrow's first
+  // free slot if today's availability is entirely in the past. After this
+  // single pick, simply viewing a different date in the day rail must NOT
+  // change `selectedTime` or the button text again — only the user's own tap
+  // on a pill is allowed to change it from here on.
+  const didPickInitialTimeRef = useRef(false);
+  // Scrolls the time list to the soonest/selected slot once, right when it's
+  // first picked — otherwise the list always opens at its very start (e.g.
+  // 9am), and the actual soonest-available pill (e.g. 5:15pm) could be far
+  // down, out of view, on first render.
+  const timeGridScrollRef = useRef<ScrollView>(null);
+  const didScrollToSelectedTimeRef = useRef(false);
   useEffect(() => {
-    setSelectedTime((prev) => {
-      if (availableTimes.includes(prev)) return prev;
-      return availableTimes[0] ?? prev;
-    });
-  }, [availableTimes]);
+    if (didPickInitialTimeRef.current) return;
+    // Don't decide anything yet while the sender's or recipients' real
+    // availability is still loading — until then `availableTimes` is built
+    // from the temporary 9am-5pm fallback window, which could easily (and
+    // wrongly) look "exhausted" and jump straight to tomorrow before the
+    // real, possibly-later-running availability ever gets a chance to load.
+    if (loadingUserAvailability || loadingRecipientAvailability) return;
+    didPickInitialTimeRef.current = true;
+
+    if (selectedDayIndex === 0) {
+      const nowMinutes = timeToMinutes(
+        `${pad2(new Date().getHours())}:${pad2(new Date().getMinutes())}`
+      );
+      const upcomingToday = availableTimes.find((time) => timeToMinutes(time) >= nowMinutes);
+      if (upcomingToday) {
+        setSelectedTime(upcomingToday);
+        return;
+      }
+      // No slot left today at or after now (either none free at all, or
+      // every free slot already passed) — jump to tomorrow and pick its
+      // first slot in the same pass (computed directly here, rather than
+      // just bumping the day and letting a later render pick a time), so
+      // the day and the highlighted slot change together in one update.
+      const tomorrow = new Date(selectedDayDate);
+      tomorrow.setDate(tomorrow.getDate() + 1);
+      const tomorrowTimes = computeAvailableTimesForDay(tomorrow);
+      setSelectedDayIndex(1);
+      setSelectedTime(tomorrowTimes[0] ?? null);
+      return;
+    }
+    setSelectedTime(availableTimes[0] ?? null);
+  }, [
+    availableTimes,
+    selectedDayIndex,
+    selectedDayDate,
+    computeAvailableTimesForDay,
+    loadingUserAvailability,
+    loadingRecipientAvailability,
+  ]);
 
   useEffect(() => {
     if (!selectedHook) return;
@@ -588,6 +666,10 @@ const AppStack_SendCatchScreen: React.FC<Props> = ({ navigation, route }) => {
       Alert.alert('Add invitees', 'Add at least one invitee before sending.');
       return;
     }
+    if (!selectedTime || !availableTimes.includes(selectedTime)) {
+      Alert.alert('Pick a time', 'Select a time that works for all participants before sending.');
+      return;
+    }
 
     try {
       setSubmitting(true);
@@ -653,7 +735,7 @@ const AppStack_SendCatchScreen: React.FC<Props> = ({ navigation, route }) => {
   const buildStartDate = () => {
     const base = new Date();
     base.setDate(base.getDate() + selectedDayIndex);
-    const [hours, minutes] = selectedTime.split(':').map(Number);
+    const [hours, minutes] = (selectedTime || '00:00').split(':').map(Number);
     base.setHours(hours, minutes, 0, 0);
     return base;
   };
@@ -732,7 +814,7 @@ const AppStack_SendCatchScreen: React.FC<Props> = ({ navigation, route }) => {
                   />
                   {isRegistered && (
                     <View style={styles.checkBadge}>
-                      <Image source={CheckIcon} style={{ width: ms(12), height: ms(12) }} tintColor="#FFFFFF" />
+                      <Image source={CheckIcon} style={{ width: ms(10), height: ms(10) }} tintColor="#FFFFFF" />
                     </View>
                   )}
                 </View>
@@ -744,8 +826,8 @@ const AppStack_SendCatchScreen: React.FC<Props> = ({ navigation, route }) => {
                     {selected ? <View style={styles.radioInner} /> : null}
                   </View>
                 ) : (
-                  <View style={{ borderWidth: 1, borderColor: COLORS.line, borderRadius: h(14), paddingHorizontal: h(12), paddingVertical: v(5) }}>
-                    <Text style={{ color: COLORS.pale, fontFamily: 'AssociateSansRegular', fontSize: ms(12) }}>Invite</Text>
+                  <View style={{ borderWidth: 1, borderColor: COLORS.line, borderRadius: h(12), paddingHorizontal: h(10), paddingVertical: v(4) }}>
+                    <Text style={{ color: COLORS.pale, fontFamily: 'AssociateSansRegular', fontSize: ms(11) }}>Invite</Text>
                   </View>
                 )}
               </TouchableOpacity>
@@ -809,13 +891,13 @@ const AppStack_SendCatchScreen: React.FC<Props> = ({ navigation, route }) => {
                 activeOpacity={0.85}
                 onPress={() => setSelectedHook(hook)}>
                 <View style={styles.hookTop}>
-                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: h(6), flex: 1 }}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: h(5), flex: 1 }}>
                     <Text style={styles.hookName}>{hook.name}</Text>
                     <TouchableOpacity
                       hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
                       activeOpacity={0.7}
                       onPress={() => navigation.navigate('AppStack_HookEditorScreen', { hookId: hook.id, source: 'sendCatch' })}>
-                      <Image source={EditIcon} style={{ width: h(14), height: h(14) }} tintColor="#6F7780" resizeMode="contain" />
+                      <Image source={EditIcon} style={{ width: h(12), height: h(12) }} tintColor="#6F7780" resizeMode="contain" />
                     </TouchableOpacity>
                   </View>
                   <View style={styles.hookBadges}>
@@ -828,12 +910,12 @@ const AppStack_SendCatchScreen: React.FC<Props> = ({ navigation, route }) => {
                   </View>
                 </View>
                 <View style={styles.hookDetails}>
-                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                    <Image source={UpcomingIcon} style={{ width: 13, height: 13 }} tintColor="#6F7780" />
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
+                    <Image source={UpcomingIcon} style={{ width: 11, height: 11 }} tintColor="#6F7780" />
                     <Text style={styles.hookDetailText}>{hook.duration} min</Text>
                   </View>
-                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                    <Image source={LocationIcon} style={{ width: 13, height: 13 }} tintColor="#6F7780" />
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
+                    <Image source={LocationIcon} style={{ width: 11, height: 11 }} tintColor="#6F7780" />
                     <Text style={styles.hookDetailText}>{hook.location}</Text>
                   </View>
                 </View>
@@ -899,7 +981,13 @@ const AppStack_SendCatchScreen: React.FC<Props> = ({ navigation, route }) => {
     year: 'numeric',
   });
 
-  const sendButtonLabel = `Send Catch \u00B7 ${formatDayLabel()}, ${selectedStartLabel}`;
+  // Navigating to a different date never auto-changes `selectedTime` (see the
+  // one-time init effect above) \u2014 so if the previously picked time doesn't
+  // apply to whichever day is currently being viewed, the button honestly
+  // prompts for a fresh pick instead of showing a stale, no-longer-valid time.
+  const sendButtonLabel = selectedTime && availableTimes.includes(selectedTime)
+    ? `Send Catch \u00B7 ${formatDayLabel()}, ${selectedStartLabel}`
+    : 'Select an available time';
 
   return (
     <View style={styles.screen}>
@@ -929,11 +1017,12 @@ const AppStack_SendCatchScreen: React.FC<Props> = ({ navigation, route }) => {
         ))}
       </View>
       <ScrollView
+        ref={timeGridScrollRef}
         contentContainerStyle={{
           paddingHorizontal: h(16),
           paddingBottom: v(180),
         }}>
-        {loadingRecipientAvailability ? (
+        {loadingUserAvailability || loadingRecipientAvailability ? (
           <ActivityIndicator size="large" color={COLORS.green} style={{ marginTop: v(40) }} />
         ) : (
           <>
@@ -944,7 +1033,13 @@ const AppStack_SendCatchScreen: React.FC<Props> = ({ navigation, route }) => {
                   <TouchableOpacity
                     key={time}
                     style={[styles.timeGridPill, isSelected && styles.timeGridPillSelected]}
-                    onPress={() => setSelectedTime(time)}>
+                    onPress={() => setSelectedTime(time)}
+                    onLayout={(e) => {
+                      if (!isSelected || didScrollToSelectedTimeRef.current) return;
+                      didScrollToSelectedTimeRef.current = true;
+                      const y = e.nativeEvent.layout.y;
+                      timeGridScrollRef.current?.scrollTo({ y: Math.max(0, y - v(80)), animated: false });
+                    }}>
                     <Text
                       style={[
                         styles.timeGridPillText,
@@ -953,8 +1048,8 @@ const AppStack_SendCatchScreen: React.FC<Props> = ({ navigation, route }) => {
                       {formatTimeString(time)}
                     </Text>
                     {isSelected ? (
-                      <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: v(2) }}>
-                        <Image source={ChevronIcon} style={{ width: h(13), height: h(13), marginRight: h(4) }} tintColor="rgba(255,255,255,0.8)" />
+                      <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: v(1) }}>
+                        <Image source={ChevronIcon} style={{ width: h(11), height: h(11), marginRight: h(3) }} tintColor="rgba(255,255,255,0.8)" />
                         <Text style={styles.timeGridEndLabel}>{selectedEndLabel}</Text>
                       </View>
                     ) : null}
@@ -987,7 +1082,13 @@ const AppStack_SendCatchScreen: React.FC<Props> = ({ navigation, route }) => {
           style={styles.sendButton}
           onPress={submitCatch}
           activeOpacity={0.85}
-          disabled={submitting || !selectedTime}>
+          disabled={
+            submitting ||
+            !selectedTime ||
+            !availableTimes.includes(selectedTime) ||
+            loadingUserAvailability ||
+            loadingRecipientAvailability
+          }>
           {submitting ? (
             <ActivityIndicator color="#fff" />
           ) : (
@@ -995,19 +1096,30 @@ const AppStack_SendCatchScreen: React.FC<Props> = ({ navigation, route }) => {
           )}
         </TouchableOpacity>
       </View>
-      {renderCustomizeModal()}
-      {renderEditSheet()}
-      {renderRemoveDialog()}
+      {renderCustomizeSheetModal()}
     </View>
   );
 
-  function renderCustomizeModal() {
+  // The "Customize event" sheet, its per-field editor (name/duration/
+  // location/invitees/price), and the "remove invitee" confirmation used to
+  // each be their own separate <Modal>. Tapping a field (which sets `sheet`)
+  // left the "Customize event" Modal mounted (driven by `showCustomizeModal`)
+  // while a SECOND Modal also mounted on top of it — two simultaneously
+  // visible native Modals, which iOS's presentation stack does not handle
+  // cleanly (that's exactly why tapping a field did nothing, and closing
+  // afterward could leave the whole screen touch-unresponsive; Android
+  // tolerates this, which is why it only showed up on iOS). All three are
+  // now content switches inside ONE persistent <Modal>, keyed off
+  // `showCustomizeModal`/`sheet`/`removeContact`, so only one native Modal
+  // is ever presented at a time.
+  function renderCustomizeSheetModal() {
+    if (!showCustomizeModal) return null;
     return (
       <Modal
-        visible={showCustomizeModal}
+        visible
         transparent
         animationType="slide"
-        onRequestClose={() => setShowCustomizeModal(false)}>
+        onRequestClose={() => (sheet ? setSheet(null) : setShowCustomizeModal(false))}>
         <KeyboardAvoidingView
           style={styles.modalOverlay}
           behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
@@ -1019,81 +1131,90 @@ const AppStack_SendCatchScreen: React.FC<Props> = ({ navigation, route }) => {
               styles.editSheet,
               { paddingBottom: Math.max(insets.bottom + v(16), v(24)) },
             ]}>
-            <View style={styles.sheetHandle} />
-            <View style={styles.editHeader}>
-              <TouchableOpacity onPress={() => setShowCustomizeModal(false)}>
-                <BackGlyph size={24} />
-              </TouchableOpacity>
-              <Text style={styles.editTitle}>Customize event</Text>
-              <TouchableOpacity onPress={() => setShowCustomizeModal(false)}>
-                <Text style={styles.saveText}>Done</Text>
-              </TouchableOpacity>
-            </View>
-            <ScrollView showsVerticalScrollIndicator={false}>
-              <CustomizeRow
-                icon="globe"
-                label="Format"
-                value=""
-                control={
-                  <Segment
-                    value={format}
-                    left="Remote"
-                    right="In-person"
-                    activeRight={format === 'onsite'}
-                    onLeft={() => setMeetingFormat('remote')}
-                    onRight={() => setMeetingFormat('onsite')}
-                  />
-                }
-              />
-              <CustomizeRow
-                icon="money"
-                label="Pricing"
-                value={pricing === 'paid' && price ? `$${price}` : 'Free'}
-                control={
-                  <Segment
-                    value={pricing}
-                    left="Paid"
-                    right="Free"
-                    activeRight={pricing === 'free'}
-                    onLeft={() => openSheet('price')}
-                    onRight={() => setPricing('free')}
-                  />
-                }
-              />
-              <CustomizeRow
-                icon="calendar"
-                label="Event name"
-                value={eventName || 'Enter name'}
-                onPress={() => openSheet('name')}
-              />
-              <CustomizeRow
-                icon="clock"
-                label="Duration"
-                value={duration ? `${duration} minutes` : 'Select duration'}
-                onPress={() => openSheet('duration')}
-              />
-              <CustomizeRow
-                icon="pin"
-                label="Location"
-                value={format === 'remote' ? 'Remote' : location || 'Select location'}
-                disabled={format === 'remote'}
-                onPress={() => openSheet('location')}
-              />
-              <CustomizeRow
-                icon="people"
-                label="Invitees"
-                value=""
-                onPress={() => openSheet('invitees')}
-                avatars={selectedContacts}
-              />
-            </ScrollView>
+            {sheet ? renderFieldEditorContent() : renderCustomizeFieldsContent()}
           </View>
+          {removeContact && renderRemoveContactOverlay()}
         </KeyboardAvoidingView>
       </Modal>
     );
   }
 
-  function renderEditSheet() {
+  function renderCustomizeFieldsContent() {
+    return (
+      <>
+        <View style={styles.sheetHandle} />
+        <View style={styles.editHeader}>
+          <TouchableOpacity onPress={() => setShowCustomizeModal(false)}>
+            <BackGlyph size={24} />
+          </TouchableOpacity>
+          <Text style={styles.editTitle}>Customize event</Text>
+          <TouchableOpacity onPress={() => setShowCustomizeModal(false)}>
+            <Text style={styles.saveText}>Done</Text>
+          </TouchableOpacity>
+        </View>
+        <ScrollView showsVerticalScrollIndicator={false}>
+          <CustomizeRow
+            icon="globe"
+            label="Format"
+            value=""
+            control={
+              <Segment
+                value={format}
+                left="Remote"
+                right="In-person"
+                activeRight={format === 'onsite'}
+                onLeft={() => setMeetingFormat('remote')}
+                onRight={() => setMeetingFormat('onsite')}
+              />
+            }
+          />
+          <CustomizeRow
+            icon="money"
+            label="Pricing"
+            value={pricing === 'paid' && price ? `$${price}` : 'Free'}
+            control={
+              <Segment
+                value={pricing}
+                left="Paid"
+                right="Free"
+                activeRight={pricing === 'free'}
+                onLeft={() => openSheet('price')}
+                onRight={() => setPricing('free')}
+              />
+            }
+          />
+          <CustomizeRow
+            icon="calendar"
+            label="Event name"
+            value={eventName || 'Enter name'}
+            onPress={() => openSheet('name')}
+          />
+          <CustomizeRow
+            icon="clock"
+            label="Duration"
+            value={duration ? `${duration} minutes` : 'Select duration'}
+            onPress={() => openSheet('duration')}
+          />
+          <CustomizeRow
+            icon="pin"
+            label="Location"
+            value={format === 'remote' ? 'Remote' : location || 'Select location'}
+            disabled={format === 'remote'}
+            onPress={() => openSheet('location')}
+          />
+          <CustomizeRow
+            icon="people"
+            label="Invitees"
+            value=""
+            onPress={() => openSheet('invitees')}
+            avatars={selectedContacts}
+          />
+        </ScrollView>
+      </>
+    );
+  }
+
+  function renderFieldEditorContent() {
     if (!sheet) return null;
     const title =
       sheet === 'price'
@@ -1106,45 +1227,35 @@ const AppStack_SendCatchScreen: React.FC<Props> = ({ navigation, route }) => {
               ? 'Location'
               : 'Location';
     return (
-      <Modal visible transparent animationType="slide" onRequestClose={() => setSheet(null)}>
-        <KeyboardAvoidingView
-          style={styles.modalOverlay}
-          behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-          <BlurView intensity={10} tint="dark" style={styles.modalBackdrop}>
-            <View style={styles.dim} />
-          </BlurView>
-          <View
-            style={[styles.editSheet, { paddingBottom: Math.max(insets.bottom + v(16), v(24)) }]}>
-            <View style={styles.sheetHandle} />
-            <View style={styles.editHeader}>
-              <TouchableOpacity onPress={() => setSheet(null)}>
-                <BackGlyph size={24} />
-              </TouchableOpacity>
-              <Text style={styles.editTitle}>{title}</Text>
-              <TouchableOpacity onPress={saveSheet}>
-                <Text style={styles.saveText}>Save</Text>
-              </TouchableOpacity>
-            </View>
-            {sheet === 'duration' ? (
-              renderDurationEditor()
-            ) : sheet === 'invitees' ? (
-              renderInviteesEditor()
-            ) : sheet === 'location' ? (
-              renderLocationEditor()
-            ) : (
-              <TextInput
-                style={styles.editInput}
-                placeholder={sheet === 'price' ? 'Enter amount $' : 'Enter name'}
-                placeholderTextColor="#A8B3BF"
-                value={draftValue}
-                onChangeText={setDraftValue}
-                keyboardType={sheet === 'price' ? 'number-pad' : 'default'}
-                autoFocus
-              />
-            )}
-          </View>
-        </KeyboardAvoidingView>
-      </Modal>
+      <>
+        <View style={styles.sheetHandle} />
+        <View style={styles.editHeader}>
+          <TouchableOpacity onPress={() => setSheet(null)}>
+            <BackGlyph size={24} />
+          </TouchableOpacity>
+          <Text style={styles.editTitle}>{title}</Text>
+          <TouchableOpacity onPress={saveSheet}>
+            <Text style={styles.saveText}>Save</Text>
+          </TouchableOpacity>
+        </View>
+        {sheet === 'duration' ? (
+          renderDurationEditor()
+        ) : sheet === 'invitees' ? (
+          renderInviteesEditor()
+        ) : sheet === 'location' ? (
+          renderLocationEditor()
+        ) : (
+          <TextInput
+            style={styles.editInput}
+            placeholder={sheet === 'price' ? 'Enter amount $' : 'Enter name'}
+            placeholderTextColor="#A8B3BF"
+            value={draftValue}
+            onChangeText={setDraftValue}
+            keyboardType={sheet === 'price' ? 'number-pad' : 'default'}
+            autoFocus
+          />
+        )}
+      </>
     );
   }
 
@@ -1365,11 +1476,10 @@ const AppStack_SendCatchScreen: React.FC<Props> = ({ navigation, route }) => {
     );
   }
 
-  function renderRemoveDialog() {
+  function renderRemoveContactOverlay() {
     if (!removeContact) return null;
     return (
-      <Modal visible transparent animationType="fade">
-        <View style={styles.confirmOverlay}>
+        <View style={[styles.confirmOverlay, StyleSheet.absoluteFillObject]}>
           <BlurView intensity={10} tint="dark" style={styles.modalBackdrop}>
             <View style={styles.dim} />
           </BlurView>
@@ -1396,7 +1506,6 @@ const AppStack_SendCatchScreen: React.FC<Props> = ({ navigation, route }) => {
             </View>
           </View>
         </View>
-      </Modal>
     );
   }
 };
@@ -1507,7 +1616,7 @@ const styles = StyleSheet.create({
   headerRight: { width: h(34), alignItems: 'flex-end' },
   addPerson: { color: COLORS.ink, fontFamily: 'AssociateSansBold', fontSize: ms(31) },
   skipText: { color: COLORS.green, fontFamily: 'AssociateSansRegular', fontSize: ms(18) },
-  contactList: { paddingHorizontal: h(16), paddingBottom: v(116), gap: v(12) },
+  contactList: { paddingHorizontal: h(16), paddingBottom: v(116), gap: v(10) },
   emptyText: {
     color: COLORS.muted,
     fontFamily: 'AssociateSansRegular',
@@ -1516,43 +1625,43 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   contactCard: {
-    height: v(92),
-    borderRadius: h(18),
+    height: v(74),
+    borderRadius: h(15),
     borderWidth: 1,
     borderColor: COLORS.line,
     backgroundColor: COLORS.white,
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: h(18),
+    paddingHorizontal: h(14),
   },
-  contactAvatarWrap: { width: h(62), height: h(62), marginRight: h(18) },
-  contactAvatar: { width: h(62), height: h(62), borderRadius: h(31) },
+  contactAvatarWrap: { width: h(48), height: h(48), marginRight: h(14) },
+  contactAvatar: { width: h(48), height: h(48), borderRadius: h(24) },
   checkBadge: {
     position: 'absolute',
     right: -h(2),
     bottom: 0,
-    width: h(20),
-    height: h(20),
-    borderRadius: h(10),
+    width: h(17),
+    height: h(17),
+    borderRadius: h(9),
     backgroundColor: '#7EA9DB',
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 2,
     borderColor: COLORS.white,
   },
-  checkBadgeText: { color: COLORS.white, fontSize: ms(12), fontFamily: 'AssociateSansBold' },
-  contactName: { flex: 1, color: COLORS.ink, fontFamily: 'AssociateSansRegular', fontSize: ms(16) },
+  checkBadgeText: { color: COLORS.white, fontSize: ms(10), fontFamily: 'AssociateSansBold' },
+  contactName: { flex: 1, color: COLORS.ink, fontFamily: 'AssociateSansRegular', fontSize: ms(14) },
   radio: {
-    width: h(31),
-    height: h(31),
-    borderRadius: h(16),
+    width: h(26),
+    height: h(26),
+    borderRadius: h(13),
     borderWidth: 2,
     borderColor: '#CDD4DC',
     alignItems: 'center',
     justifyContent: 'center',
   },
   radioSelected: { borderColor: COLORS.green },
-  radioInner: { width: h(21), height: h(21), borderRadius: h(11), backgroundColor: COLORS.green },
+  radioInner: { width: h(17), height: h(17), borderRadius: h(9), backgroundColor: COLORS.green },
   fixedButton: {
     position: 'absolute',
     left: h(16),
@@ -1567,86 +1676,86 @@ const styles = StyleSheet.create({
   fixedButtonText: { color: COLORS.white, fontFamily: 'AssociateSansBold', fontSize: ms(20) },
   hookSearch: {
     marginHorizontal: h(16),
-    height: v(58),
-    borderRadius: h(28),
+    height: v(48),
+    borderRadius: h(24),
     backgroundColor: COLORS.white,
     borderWidth: 1,
     borderColor: COLORS.line,
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: h(19),
+    paddingHorizontal: h(16),
   },
   hookSearchInput: {
     flex: 1,
     color: COLORS.ink,
     fontFamily: 'AssociateSansRegular',
-    fontSize: ms(16),
+    fontSize: ms(14),
     padding: 0,
   },
-  searchIcon: { width: h(26), height: h(26), tintColor: '#9EACBA' },
+  searchIcon: { width: h(20), height: h(20), tintColor: '#9EACBA' },
   hooksTitle: {
     color: COLORS.ink,
     fontFamily: 'AssociateSansBold',
-    fontSize: ms(23),
+    fontSize: ms(19),
     marginHorizontal: h(16),
-    marginTop: v(31),
-    marginBottom: v(14),
+    marginTop: v(22),
+    marginBottom: v(10),
   },
   hookCard: {
     marginHorizontal: h(16),
-    marginBottom: v(12),
-    padding: h(20),
-    borderRadius: h(17),
+    marginBottom: v(10),
+    padding: h(15),
+    borderRadius: h(14),
     borderWidth: 1,
     borderColor: COLORS.line,
     backgroundColor: COLORS.white,
   },
   hookCardSelected: { borderColor: '#CBE985', borderWidth: 2 },
   hookTop: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  hookName: { color: COLORS.ink, fontFamily: 'AssociateSansRegular', fontSize: ms(16) },
-  hookBadges: { flexDirection: 'row', gap: h(8) },
+  hookName: { color: COLORS.ink, fontFamily: 'AssociateSansRegular', fontSize: ms(14) },
+  hookBadges: { flexDirection: 'row', gap: h(6) },
   openBadge: {
     overflow: 'hidden',
     color: '#125BE8',
     backgroundColor: '#EAF2FF',
-    borderRadius: h(13),
-    paddingHorizontal: h(10),
-    paddingVertical: v(4),
+    borderRadius: h(11),
+    paddingHorizontal: h(8),
+    paddingVertical: v(3),
     fontFamily: 'AssociateSansRegular',
-    fontSize: ms(15),
+    fontSize: ms(12),
   },
   freeBadge: {
     overflow: 'hidden',
     color: '#65840E',
     backgroundColor: COLORS.lightGreen,
-    borderRadius: h(13),
-    paddingHorizontal: h(12),
-    paddingVertical: v(4),
+    borderRadius: h(11),
+    paddingHorizontal: h(9),
+    paddingVertical: v(3),
     fontFamily: 'AssociateSansRegular',
-    fontSize: ms(15),
+    fontSize: ms(12),
   },
   hookDetails: {
-    marginTop: v(17),
+    marginTop: v(12),
     borderWidth: 1,
     borderColor: COLORS.line,
-    borderRadius: h(12),
-    padding: h(14),
-    gap: v(8),
+    borderRadius: h(10),
+    padding: h(10),
+    gap: v(6),
   },
-  hookDetailText: { color: COLORS.muted, fontFamily: 'AssociateSansRegular', fontSize: ms(18) },
+  hookDetailText: { color: COLORS.muted, fontFamily: 'AssociateSansRegular', fontSize: ms(13) },
   hookExpandedDetails: {
-    marginTop: v(14),
+    marginTop: v(10),
     borderTopWidth: 1,
     borderTopColor: COLORS.line,
-    paddingTop: v(14),
-    gap: v(10),
+    paddingTop: v(10),
+    gap: v(8),
   },
   hookExpandedDescription: {
     color: COLORS.muted,
     fontFamily: 'AssociateSansRegular',
-    fontSize: ms(14),
-    lineHeight: ms(20),
-    marginBottom: v(4),
+    fontSize: ms(12),
+    lineHeight: ms(17),
+    marginBottom: v(3),
   },
   hookExpandedRow: {
     flexDirection: 'row',
@@ -1656,22 +1765,22 @@ const styles = StyleSheet.create({
   hookExpandedLabel: {
     color: COLORS.muted,
     fontFamily: 'AssociateSansRegular',
-    fontSize: ms(14),
+    fontSize: ms(12),
   },
   hookExpandedValue: {
     color: COLORS.ink,
     fontFamily: 'AssociateSansBold',
-    fontSize: ms(14),
+    fontSize: ms(12),
   },
   moreDetails: {
-    marginTop: v(15),
-    height: v(44),
-    borderRadius: h(22),
+    marginTop: v(12),
+    height: v(36),
+    borderRadius: h(18),
     backgroundColor: '#F5F5F5',
     alignItems: 'center',
     justifyContent: 'center',
   },
-  moreDetailsText: { color: COLORS.muted, fontFamily: 'AssociateSansBold', fontSize: ms(15) },
+  moreDetailsText: { color: COLORS.muted, fontFamily: 'AssociateSansBold', fontSize: ms(12) },
   dayRail: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -1709,18 +1818,18 @@ const styles = StyleSheet.create({
   },
   timeGrid: {
     flexDirection: 'column',
-    gap: h(10),
+    gap: h(8),
   },
   timeGridPill: {
     width: '100%',
-    minHeight: v(52),
-    borderRadius: h(16),
+    minHeight: v(42),
+    borderRadius: h(13),
     borderWidth: 1,
     borderColor: COLORS.green,
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: COLORS.white,
-    paddingVertical: v(8),
+    paddingVertical: v(6),
   },
   timeGridPillSelected: {
     backgroundColor: COLORS.green,
@@ -1729,14 +1838,14 @@ const styles = StyleSheet.create({
   timeGridPillText: {
     color: COLORS.green,
     fontFamily: 'AssociateSansBold',
-    fontSize: ms(16),
+    fontSize: ms(14),
   },
   timeGridPillTextSelected: { color: COLORS.white },
   timeGridEndLabel: {
     color: 'rgba(255,255,255,0.8)',
     fontFamily: 'AssociateSansRegular',
-    fontSize: ms(13),
-    marginTop: v(2),
+    fontSize: ms(11),
+    marginTop: v(1),
   },
   bottomBar: {
     position: 'absolute',

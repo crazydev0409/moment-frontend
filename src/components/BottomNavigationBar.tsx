@@ -832,24 +832,24 @@ const BottomNavigationBar: React.FC<BottomNavigationBarProps> = ({
               tw`absolute left-0 right-0 bottom-0 bg-white rounded-t-3xl`,
               {
                 paddingHorizontal: horizontalScale(16),
-                paddingTop: verticalScale(16),
-                paddingBottom: Math.max(insets.bottom + verticalScale(20), verticalScale(34)),
+                paddingTop: verticalScale(14),
+                paddingBottom: Math.max(insets.bottom + verticalScale(16), verticalScale(28)),
               },
             ]}>
             <View
               style={[
                 tw`self-center rounded-full bg-gray-300`,
                 {
-                  width: horizontalScale(64),
+                  width: horizontalScale(56),
                   height: verticalScale(4),
-                  marginBottom: verticalScale(22),
+                  marginBottom: verticalScale(18),
                 },
               ]}
             />
             <Text
               style={[
                 tw`font-associate-bold text-black`,
-                { fontSize: moderateScale(28), marginBottom: verticalScale(18) },
+                { fontSize: moderateScale(22), marginBottom: verticalScale(14) },
               ]}>
               Select catch type
             </Text>
@@ -865,7 +865,7 @@ const BottomNavigationBar: React.FC<BottomNavigationBarProps> = ({
                 style={[
                   tw`flex-row items-center`,
                   {
-                    paddingVertical: verticalScale(18),
+                    paddingVertical: verticalScale(14),
                     borderBottomWidth: index === 0 ? 1 : 0,
                     borderBottomColor: '#E8EDF2',
                   },
@@ -874,28 +874,28 @@ const BottomNavigationBar: React.FC<BottomNavigationBarProps> = ({
                   style={[
                     tw`rounded-full bg-gray-100 items-center justify-center`,
                     {
-                      width: horizontalScale(56),
-                      height: horizontalScale(56),
-                      marginRight: horizontalScale(16),
+                      width: horizontalScale(46),
+                      height: horizontalScale(46),
+                      marginRight: horizontalScale(14),
                     },
                   ]}>
                   <Image
                     source={TwoPeople}
                     tintColor="#79828B"
-                    style={{ width: horizontalScale(28), height: horizontalScale(28) }}
+                    style={{ width: horizontalScale(22), height: horizontalScale(22) }}
                     resizeMode="contain"
                   />
                 </View>
                 <View style={tw`flex-1`}>
-                  <Text style={[tw`font-associate text-black`, { fontSize: moderateScale(22) }]}>
+                  <Text style={[tw`font-associate text-black`, { fontSize: moderateScale(18) }]}>
                     {item.title}
                   </Text>
                   <Text
-                    style={[tw`font-associate text-grey`, { fontSize: moderateScale(16), marginTop: 2 }]}>
+                    style={[tw`font-associate text-grey`, { fontSize: moderateScale(13), marginTop: 2 }]}>
                     {item.subtitle}
                   </Text>
                 </View>
-                <Text style={[tw`font-associate text-gray-400`, { fontSize: moderateScale(24) }]}>›</Text>
+                <Text style={[tw`font-associate text-gray-400`, { fontSize: moderateScale(20) }]}>›</Text>
               </TouchableOpacity>
             ))}
           </View>

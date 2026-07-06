@@ -326,7 +326,7 @@ const WeatherCloudGlyph = ({ size = 44, color = COLORS.ink }) => (
 );
 
 const EmptyScheduleIllustration = () => (
-  <Svg width={h(214)} height={h(214)} viewBox="0 0 214 214" fill="none">
+  <Svg width={h(130)} height={h(130)} viewBox="0 0 214 214" fill="none">
     <Path
       d="M63 59c23-31 74-20 96 7 29 35 27 98-15 121-37 20-93 8-111-29-15-32 7-69 30-99Z"
       fill="#CAE67C"
@@ -1018,7 +1018,11 @@ const AppStack_HomePageScreen: React.FC<Props> = ({ navigation, route }) => {
           <Image source={SearchIcon} style={styles.searchIcon} resizeMode="contain" />
         </TouchableOpacity>
 
-        {!loading && !hasSelectedDateSchedule ? (
+        {loading ? (
+          <View style={[styles.emptyPanel, styles.loadingWrap]}>
+            <ActivityIndicator size="large" color={COLORS.green} />
+          </View>
+        ) : !hasSelectedDateSchedule ? (
           <View style={styles.emptyPanel}>
             <EmptyScheduleIllustration />
             <Text style={styles.emptyText}>No meetings scheduled</Text>
@@ -1404,7 +1408,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     flexDirection: 'row',
     justifyContent: 'space-between',
-    marginBottom: v(28),
+    marginBottom: v(20),
   },
   headerButton: {
     alignItems: 'center',
@@ -1435,20 +1439,20 @@ const styles = StyleSheet.create({
     fontSize: ms(8),
   },
   dateRail: {
-    gap: h(12),
+    gap: h(8),
     paddingRight: h(24),
   },
   datePill: {
     alignItems: 'center',
     backgroundColor: COLORS.white,
     borderColor: COLORS.line,
-    borderRadius: h(34),
+    borderRadius: h(30),
     borderWidth: 1,
-    height: h(74),
+    height: v(64),
     justifyContent: 'space-between',
-    paddingBottom: h(4),
-    paddingTop: h(10),
-    width: h(52),
+    paddingBottom: v(3),
+    paddingTop: v(8),
+    width: h(46),
   },
   datePillSelected: {
     backgroundColor: COLORS.ink,
@@ -1465,10 +1469,10 @@ const styles = StyleSheet.create({
   dateBubble: {
     alignItems: 'center',
     backgroundColor: '#EEF1F4',
-    borderRadius: h(24),
-    height: h(43),
+    borderRadius: h(19),
+    height: h(38),
     justifyContent: 'center',
-    width: h(43),
+    width: h(38),
   },
   dateBubbleSelected: {
     backgroundColor: COLORS.white,
@@ -1483,23 +1487,23 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     backgroundColor: COLORS.white,
     borderColor: COLORS.line,
-    borderRadius: h(28),
+    borderRadius: h(25),
     borderWidth: 1,
     flexDirection: 'row',
-    height: v(54),
-    marginTop: v(26),
-    paddingHorizontal: h(19),
+    height: v(48),
+    marginTop: v(16),
+    paddingHorizontal: h(16),
   },
   searchPlaceholder: {
     color: '#A8B3BF',
     flex: 1,
     fontFamily: 'Inter_400Regular',
-    fontSize: ms(18),
+    fontSize: ms(15),
   },
   searchIcon: {
-    height: h(24),
+    height: h(20),
     tintColor: '#A8B3BF',
-    width: h(24),
+    width: h(20),
   },
   emptyPanel: {
     alignItems: 'center',
@@ -1507,24 +1511,24 @@ const styles = StyleSheet.create({
     borderColor: COLORS.line,
     borderRadius: h(20),
     borderWidth: 1,
-    marginTop: v(26),
-    paddingBottom: v(36),
+    marginTop: v(16),
+    paddingBottom: v(22),
     paddingHorizontal: h(24),
-    paddingTop: v(58),
+    paddingTop: v(28),
   },
   emptyText: {
     color: COLORS.muted,
     fontFamily: 'Inter_400Regular',
-    fontSize: ms(19),
-    marginBottom: v(28),
-    marginTop: v(16),
+    fontSize: ms(16),
+    marginBottom: v(16),
+    marginTop: v(8),
   },
   scheduleButton: {
     alignItems: 'center',
     alignSelf: 'stretch',
     backgroundColor: COLORS.green,
-    borderRadius: h(28),
-    height: v(56),
+    borderRadius: h(25),
+    height: v(50),
     justifyContent: 'center',
   },
   scheduleButtonText: {

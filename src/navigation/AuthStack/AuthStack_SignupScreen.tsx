@@ -57,6 +57,7 @@ const AuthStack_SignupScreen: React.FC<Props> = ({ navigation }) => {
   const maxPhoneDigits = examplePhone?.nationalNumber.length ?? 16;
   const formattedPhone = new AsYouType(countryCode as any).input(phone);
   const phonePlaceholder = examplePhone?.formatNational() ?? 'Phone number';
+  const isPhoneValid = phone.length > 0 && isValidPhoneNumber(`+${callingCode}${phone}`, countryCode as any);
   const filteredCountries = useMemo(() => {
     const normalizedSearch = countrySearch.trim().toLowerCase();
 
@@ -237,12 +238,13 @@ const AuthStack_SignupScreen: React.FC<Props> = ({ navigation }) => {
           <TouchableOpacity
             onPress={onSendCode}
             activeOpacity={0.8}
-            disabled={isSending}
+            disabled={isSending || !isPhoneValid}
             style={[
               styles.continueButton,
               {
                 height: buttonHeight,
                 marginTop: isCompactHeight ? 74 : 116,
+                backgroundColor: isPhoneValid ? '#9BC425' : '#CBE783',
                 opacity: isSending ? 0.65 : 1,
               },
             ]}>
@@ -401,7 +403,6 @@ const styles = StyleSheet.create({
   continueButton: {
     alignItems: 'center',
     alignSelf: 'stretch',
-    backgroundColor: '#CBE783',
     borderRadius: 999,
     justifyContent: 'center',
   },

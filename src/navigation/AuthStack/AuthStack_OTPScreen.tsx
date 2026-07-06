@@ -50,6 +50,8 @@ const AuthStack_OTPScreen: React.FC<Props> = ({ navigation, route }) => {
   const otpBoxHeight = clamp(height * 0.066, 56, 64);
   const buttonHeight = clamp(height * 0.068, 58, 64);
   const otpDigits = Array.from({ length: OTP_LENGTH }, (_, index) => code[index] ?? '');
+  const activeIndex = code.length < OTP_LENGTH ? code.length : -1;
+  const isCodeComplete = code.length === OTP_LENGTH;
 
   useEffect(() => {
     const timer = setInterval(() => {
@@ -217,25 +219,31 @@ const AuthStack_OTPScreen: React.FC<Props> = ({ navigation, route }) => {
                 marginTop: isCompactHeight ? 26 : 33,
               },
             ]}>
-            {otpDigits.map((digit, index) => (
-              <View
-                // eslint-disable-next-line react/no-array-index-key
-                key={index}
-                style={[
-                  styles.otpBox,
-                  {
-                    height: otpBoxHeight,
-                    width: (width - sidePadding * 2 - clamp(width * 0.016, 5, 10) * 5) / 6,
-                  },
-                ]}>
-                <Text style={styles.otpDigit}>{digit || '0'}</Text>
-              </View>
-            ))}
+            {otpDigits.map((digit, index) => {
+              const isFilled = digit !== '';
+              const isActive = index === activeIndex;
+              return (
+                <View
+                  // eslint-disable-next-line react/no-array-index-key
+                  key={index}
+                  style={[
+                    styles.otpBox,
+                    {
+                      height: otpBoxHeight,
+                      width: (width - sidePadding * 2 - clamp(width * 0.016, 5, 10) * 5) / 6,
+                      borderColor: isActive ? '#9BC425' : isFilled ? '#171827' : '#E7EBF0',
+                    },
+                  ]}>
+                  <Text style={[styles.otpDigit, isFilled && styles.otpDigitFilled]}>{digit}</Text>
+                </View>
+              );
+            })}
           </TouchableOpacity>
 
           <TextInput
             ref={inputRef}
             value={code}
+            autoFocus
             keyboardType="number-pad"
             textContentType="oneTimeCode"
             maxLength={OTP_LENGTH}
@@ -274,12 +282,13 @@ const AuthStack_OTPScreen: React.FC<Props> = ({ navigation, route }) => {
           <TouchableOpacity
             onPress={onPressConfirmCode}
             activeOpacity={0.8}
-            disabled={loading}
+            disabled={loading || !isCodeComplete}
             style={[
               styles.continueButton,
               {
                 height: buttonHeight,
                 marginTop: isCompactHeight ? 37 : 50,
+                backgroundColor: isCodeComplete ? '#9BC425' : '#CBE783',
                 opacity: loading ? 0.65 : 1,
               },
             ]}>
@@ -344,7 +353,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#FFFFFF',
     borderColor: '#E7EBF0',
     borderRadius: 32,
-    borderWidth: 1,
+    borderWidth: 2,
     justifyContent: 'center',
   },
   otpDigit: {
@@ -352,6 +361,10 @@ const styles = StyleSheet.create({
     fontFamily: 'Inter_400Regular',
     fontSize: 20,
     lineHeight: 25,
+  },
+  otpDigitFilled: {
+    color: '#171827',
+    fontFamily: 'Inter_700Bold',
   },
   hiddenInput: {
     height: 1,
@@ -393,7 +406,6 @@ const styles = StyleSheet.create({
   continueButton: {
     alignItems: 'center',
     alignSelf: 'stretch',
-    backgroundColor: '#CBE783',
     borderRadius: 999,
     justifyContent: 'center',
   },
