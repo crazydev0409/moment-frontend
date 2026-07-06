@@ -35,31 +35,6 @@ export const getDeviceInfo = async () => {
 };
 
 /**
- * Register device with backend (optionally include Expo push token for remote notifications)
- */
-export const registerDevice = async (
-    userId: string,
-    rememberMe: boolean,
-    pushToken?: string | null
-): Promise<boolean> => {
-    try {
-        const deviceInfo = await getDeviceInfo();
-        console.log({ rememberMe })
-        const response = await http.post('/devices/register', {
-            userId,
-            rememberMe,
-            ...deviceInfo,
-            ...(pushToken ? { pushToken } : {}),
-        });
-
-        return response.status === 200;
-    } catch (error) {
-        console.error('Error registering device:', error);
-        return false;
-    }
-};
-
-/**
  * Check if current device is registered with remember me enabled
  */
 export const checkDeviceRegistration = async (): Promise<{
@@ -89,21 +64,3 @@ export const checkDeviceRegistration = async (): Promise<{
     }
 };
 
-/**
- * Update remember me preference for current device
- */
-export const updateRememberMe = async (rememberMe: boolean): Promise<boolean> => {
-    try {
-        const deviceId = await getDeviceId();
-
-        const response = await http.post('/devices/update-remember', {
-            deviceId,
-            rememberMe
-        });
-
-        return response.status === 200;
-    } catch (error) {
-        console.error('Error updating remember me:', error);
-        return false;
-    }
-};

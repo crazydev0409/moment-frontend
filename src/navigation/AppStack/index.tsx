@@ -6,7 +6,6 @@ import AppStack_AvailabilityScreen from './AppStack_AvailabilityScreen';
 import AppStack_AvailableTimesScreen from './AppStack_AvailableTimesScreen';
 import AppStack_CalendarScreen from './AppStack_CalendarScreen';
 import AppStack_CalendarSettingsScreen from './AppStack_CalendarSettingsScreen';
-import AppStack_ComingSoonScreen from './AppStack_ComingSoonScreen';
 import AppStack_MeshScreen from './AppStack_MeshScreen';
 import AppStack_ContactScreen from './AppStack_ContactScreen';
 import AppStack_ContactProfileScreen from './AppStack_ContactProfileScreen';
@@ -22,7 +21,6 @@ import AppStack_ProfileSettingsScreen from './AppStack_ProfileSettingsScreen';
 import AppStack_QRScannerScreen from './AppStack_QRScannerScreen';
 import AppStack_SearchScreen from './AppStack_SearchScreen';
 import AppStack_SendCatchScreen from './AppStack_SendCatchScreen';
-import AppStack_SettingsScreen from './AppStack_SettingsScreen';
 import AppStack_ApplicationThemeScreen from './AppStack_ApplicationThemeScreen';
 import AppStack_NotificationSettingsScreen from './AppStack_NotificationSettingsScreen';
 import AppStack_AccountSecurityScreen from './AppStack_AccountSecurityScreen';
@@ -45,7 +43,6 @@ export type AppStackParamList = {
   } | undefined;
   AppStack_ProfileScreen: undefined;
   AppStack_ProfileSettingsScreen: undefined;
-  AppStack_SettingsScreen: undefined;
   AppStack_AvailabilityScreen: undefined;
   AppStack_CalendarSettingsScreen: undefined;
   AppStack_CalendarScreen: {
@@ -69,7 +66,6 @@ export type AppStackParamList = {
     contactUserId: string;
     contactName: string;
   };
-  AppStack_ComingSoonScreen: undefined;
   AppStack_MeshScreen: undefined;
   AppStack_SearchScreen: undefined;
   AppStack_NotificationScreen: undefined;
@@ -148,15 +144,6 @@ const AppStackNavigator: React.FC = () => {
         )}
       </Stack.Screen>
 
-      <Stack.Screen name="AppStack_ComingSoonScreen">
-        {(props: any) => (
-          <View style={tw`flex-1`}>
-            <AppStack_ComingSoonScreen {...props} />
-            <BottomNavigationBar selectedTab="business" />
-          </View>
-        )}
-      </Stack.Screen>
-
       <Stack.Screen name="AppStack_MeshScreen">
         {(props: any) => (
           <View style={tw`flex-1`}>
@@ -168,7 +155,6 @@ const AppStackNavigator: React.FC = () => {
 
       <Stack.Screen name="AppStack_ProfileScreen" component={AppStack_ProfileScreen} />
       <Stack.Screen name="AppStack_ProfileSettingsScreen" component={AppStack_ProfileSettingsScreen} />
-      <Stack.Screen name="AppStack_SettingsScreen" component={AppStack_SettingsScreen} />
       <Stack.Screen name="AppStack_AvailabilityScreen" component={AppStack_AvailabilityScreen} />
       <Stack.Screen name="AppStack_CalendarSettingsScreen" component={AppStack_CalendarSettingsScreen} />
       <Stack.Screen name="AppStack_SearchScreen" component={AppStack_SearchScreen} />

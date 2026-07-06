@@ -157,55 +157,6 @@ export default function App() {
             // Sync contacts with registered users
             await http.post('/users/contacts/sync');
             console.log('Contacts synced successfully');
-
-            // Ensure default calendar exists for current user
-            try {
-              await http.get('/moments/default-calendar');
-            } catch (error: any) {
-              // If calendar doesn't exist, we can't create it from frontend
-              // This is a backend issue - calendar should be created on user registration
-              console.warn('Default calendar not found. Calendar visibility cannot be granted.');
-              console.warn('Note: Default calendar should be created when user registers.');
-            }
-
-            // Grant calendar visibility to all registered contacts (bidirectional)
-            try {
-              const contactsResponse = await http.get('/users/contacts');
-              const registeredContacts = contactsResponse.data.contacts.filter(
-                (contact: any) => contact.contactUserId
-              );
-
-              // Grant calendar visibility for each registered contact
-              for (const contact of registeredContacts) {
-                try {
-                  // First, ensure the contact has a default calendar by checking it
-                  // If they don't have one, we skip granting visibility
-                  try {
-                    // Try to get their calendar (this will fail if they don't have one)
-                    // We can't check this directly, so we'll just try to grant visibility
-                    // and handle the error gracefully
-                    await http.post('/users/visibility', {
-                      userId: contact.contactUserId
-                    });
-                    console.log(`Calendar visibility granted to ${contact.displayName}`);
-                  } catch (visibilityError: any) {
-                    // If error is about calendar not found, log it but continue
-                    if (visibilityError.response?.data?.error?.includes('calendar not found') ||
-                      visibilityError.response?.data?.error?.includes('Default calendar not found')) {
-                      console.warn(`Cannot grant visibility to ${contact.displayName}: They don't have a default calendar yet`);
-                    } else if (!visibilityError.response?.data?.error?.includes('already')) {
-                      console.error(`Failed to grant visibility to ${contact.displayName}:`, visibilityError.response?.data?.error || visibilityError.message);
-                    }
-                  }
-                } catch (error: any) {
-                  console.error(`Error processing contact ${contact.displayName}:`, error);
-                }
-              }
-              console.log('Calendar visibility setup completed');
-            } catch (error) {
-              console.error('Error granting calendar visibility:', error);
-              // Don't block app initialization if this fails
-            }
           }
         }
       } catch (error) {

@@ -412,16 +412,6 @@ export async function scheduleMeetingReminder(meeting: {
   }
 }
 
-// Cancel a scheduled meeting reminder
-export async function cancelMeetingReminder(meetingId: string) {
-  try {
-    await Notifications.cancelScheduledNotificationAsync(`meeting-reminder-${meetingId}`);
-    console.log(`🚫 Canceled reminder for meeting ${meetingId}`);
-  } catch (error: any) {
-    console.error('Failed to cancel meeting reminder:', error.message);
-  }
-}
-
 // Schedule reminders for all upcoming confirmed meetings
 export async function scheduleAllMeetingReminders(currentUserId: string) {
   try {

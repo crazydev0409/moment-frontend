@@ -8,5 +8,4 @@ export const http = axios.create({
   },
 });
 export const uploadPath = 'http://10.0.2.2:3000/uploads/';
-// export const uploadPath = 'https://hotel-booking-backend-splu.onrender.com/uploads/';
 export const mapApiKey = process.env.EXPO_PUBLIC_GOOGLE_PLACES_API_KEY;

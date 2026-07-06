@@ -2,23 +2,17 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { BlurView } from 'expo-blur';
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
   TouchableOpacity,
   Image,
   Modal,
   Text,
-  TextInput,
-  ScrollView,
-  Alert,
-  Platform,
-  KeyboardAvoidingView,
   Animated,
   Dimensions,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { http } from '~/helpers/http';
 import { horizontalScale, verticalScale, moderateScale } from '~/helpers/responsive';
 import {
   HomeIcon,
@@ -27,8 +21,6 @@ import {
   HookIcon,
   PlusIcon,
   CrossIcon,
-  SearchIcon,
-  Avatar,
   TwoPeople,
   ChevronIcon,
 } from '~/lib/images';
@@ -70,34 +62,17 @@ const BottomNavigationBar: React.FC<BottomNavigationBarProps> = ({
   // State for Modals
   const [showAddMenu, setShowAddMenu] = useState(false);
   const [showMeetingTypeModal, setShowMeetingTypeModal] = useState(false);
-  const [showContactModal, setShowContactModal] = useState(false);
-  const [contacts, setContacts] = useState<any[]>([]);
-  const [contactSearchText, setContactSearchText] = useState('');
-  const isTransitioning = false;
   const [homeOnboardingStep, setHomeOnboardingStep] = useState<HomeOnboardingStep | null>(null);
   const [addButtonFrame, setAddButtonFrame] = useState<ButtonFrame | null>(null);
 
   // Animation values for smooth modal transitions
   const addButtonRef = useRef<View>(null);
-  const contactModalSlideAnim = useRef(new Animated.Value(0)).current;
-  const contactModalOpacityAnim = useRef(new Animated.Value(0)).current;
-  const [contactModalContentHeight, setContactModalContentHeight] = useState(
-    Dimensions.get('window').height
-  );
-  const contactScrollMaxHeight = Math.max(
-    contactModalContentHeight - verticalScale(130),
-    verticalScale(150)
-  );
   const screenWidth = Dimensions.get('window').width;
   const navGap = horizontalScale(6);
   const addButtonSize = horizontalScale(57);
   const showHomeOnboarding = selectedTab === 'home' && homeOnboardingStep !== null;
   const showOnboardingAddMenu =
-    showHomeOnboarding &&
-    homeOnboardingStep !== null &&
-    homeOnboardingStep >= 2 &&
-    !showContactModal &&
-    !isTransitioning;
+    showHomeOnboarding && homeOnboardingStep !== null && homeOnboardingStep >= 2;
 
   useEffect(() => {
     const t = setTimeout(() => {
@@ -214,58 +189,6 @@ const BottomNavigationBar: React.FC<BottomNavigationBarProps> = ({
   const handleMyHooks = () => {
     setShowAddMenu(false);
     navigation.navigate('AppStack_MyHooksScreen');
-  };
-
-  const loadContacts = useCallback(async () => {
-    try {
-      const response = await http.get('/users/contacts');
-      setContacts(response.data.contacts || []);
-    } catch (error) {
-      console.error('Error loading contacts:', error);
-      Alert.alert('Error', 'Failed to load contacts. Please try again.', [{ text: 'OK' }]);
-      setShowContactModal(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    if (showContactModal) {
-      loadContacts();
-    }
-  }, [showContactModal, loadContacts]);
-
-  const filteredContacts = contacts
-    .filter((contact) =>
-      contact.displayName.toLowerCase().includes(contactSearchText.toLowerCase())
-    )
-    .sort((a, b) => a.displayName.localeCompare(b.displayName));
-
-  const handleContactSelect = (contact: any) => {
-    setShowContactModal(false);
-    setContactSearchText('');
-    // Navigate to CalendarScreen with selected contact
-    const today = new Date().toISOString().split('T')[0];
-    navigation.navigate('AppStack_CalendarScreen', {
-      date: today,
-      contact,
-    });
-  };
-
-  const handleCloseContactModal = () => {
-    Animated.parallel([
-      Animated.timing(contactModalSlideAnim, {
-        toValue: 0,
-        duration: 300,
-        useNativeDriver: true,
-      }),
-      Animated.timing(contactModalOpacityAnim, {
-        toValue: 0,
-        duration: 300,
-        useNativeDriver: true,
-      }),
-    ]).start(() => {
-      setShowContactModal(false);
-      setContactSearchText('');
-    });
   };
 
   const renderDashboardPreview = () => (
@@ -526,7 +449,6 @@ const BottomNavigationBar: React.FC<BottomNavigationBarProps> = ({
         style={[
           tw`absolute left-0 right-0 justify-center flex-row`,
           { gap: navGap, bottom: Math.max(insets.bottom, 30) },
-          showContactModal && { opacity: 0 },
         ]}>
         <View
           style={[
@@ -612,10 +534,8 @@ const BottomNavigationBar: React.FC<BottomNavigationBarProps> = ({
         </Modal>
       )}
 
-      {/* Add Menu Popup Modal - Only render when contact modal is not active */}
-      {!showContactModal && !isTransitioning && (
-        <Modal
-          visible={showAddMenu || showOnboardingAddMenu}
+      <Modal
+        visible={showAddMenu || showOnboardingAddMenu}
           transparent
           animationType="fade"
           onRequestClose={() => {
@@ -675,7 +595,6 @@ const BottomNavigationBar: React.FC<BottomNavigationBarProps> = ({
                     Send a Catch
                   </Text>
                 </TouchableOpacity>
-                <View style={{ display: 'none', height: 0 }} />
                 <TouchableOpacity
                   style={[
                     tw`bg-white rounded-full flex-row items-center`,
@@ -703,7 +622,6 @@ const BottomNavigationBar: React.FC<BottomNavigationBarProps> = ({
                     My Hooks
                   </Text>
                 </TouchableOpacity>
-                <View style={{ display: 'none', height: 0 }} />
                 <TouchableOpacity
                   style={[
                     tw`bg-white rounded-full flex-row items-center`,
@@ -810,7 +728,6 @@ const BottomNavigationBar: React.FC<BottomNavigationBarProps> = ({
             </View>
           </View>
         </Modal>
-      )}
 
       <Modal
         visible={showMeetingTypeModal}
@@ -902,210 +819,6 @@ const BottomNavigationBar: React.FC<BottomNavigationBarProps> = ({
         </View>
       </Modal>
 
-      {/* Contact Selection Modal - Only render when add menu is not active */}
-      {!showAddMenu && !showMeetingTypeModal && (
-        <Modal
-          visible={showContactModal && !isTransitioning}
-          transparent
-          animationType="none"
-          onRequestClose={handleCloseContactModal}
-          onShow={() => {
-            // Animate in when modal becomes visible
-            Animated.parallel([
-              Animated.timing(contactModalSlideAnim, {
-                toValue: 1,
-                duration: 300,
-                useNativeDriver: true,
-              }),
-              Animated.timing(contactModalOpacityAnim, {
-                toValue: 1,
-                duration: 300,
-                useNativeDriver: true,
-              }),
-            ]).start();
-          }}>
-          <Animated.View style={[tw`flex-1`, { opacity: contactModalOpacityAnim }]}>
-            <BlurView intensity={20} tint="dark" style={tw`absolute inset-0`}>
-              <View style={tw`flex-1 bg-black opacity-40`} />
-            </BlurView>
-            <KeyboardAvoidingView
-              style={tw`flex-1`}
-              behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-              keyboardVerticalOffset={0}>
-              <TouchableOpacity
-                style={tw`flex-1`}
-                activeOpacity={1}
-                onPress={handleCloseContactModal}>
-                <View
-                  style={tw`flex-1 justify-end`}
-                  onLayout={(e) => setContactModalContentHeight(e.nativeEvent.layout.height)}>
-                  <TouchableOpacity activeOpacity={1} onPress={(e) => e.stopPropagation()}>
-                    <Animated.View
-                      style={[
-                        tw`bg-white rounded-t-3xl`,
-                        {
-                          transform: [
-                            {
-                              translateY: contactModalSlideAnim.interpolate({
-                                inputRange: [0, 1],
-                                outputRange: [300, 0],
-                              }),
-                            },
-                          ],
-                        },
-                      ]}>
-                      {/* Header - Fixed */}
-                      <View
-                        style={[
-                          tw`flex-row justify-between items-center`,
-                          {
-                            paddingTop: verticalScale(22.5),
-                            paddingHorizontal: horizontalScale(15),
-                            paddingBottom: verticalScale(15),
-                          },
-                        ]}>
-                        <Text
-                          style={[
-                            tw`text-black font-associate-bold`,
-                            { fontSize: moderateScale(18.75) },
-                          ]}>
-                          Select Contact
-                        </Text>
-                        <TouchableOpacity onPress={handleCloseContactModal} activeOpacity={0.7}>
-                          <Text
-                            style={[tw`text-[#A3CB31] font-associate`, { fontSize: moderateScale(15) }]}>
-                            Cancel
-                          </Text>
-                        </TouchableOpacity>
-                      </View>
-
-                      {/* Search Bar - Fixed */}
-                      <View
-                        style={[
-                          tw`bg-gray-100 rounded-2xl flex-row items-center`,
-                          {
-                            paddingHorizontal: horizontalScale(15),
-                            paddingVertical: verticalScale(11.25),
-                            marginBottom: verticalScale(15),
-                            marginHorizontal: horizontalScale(15),
-                          },
-                        ]}>
-                        <Image
-                          source={SearchIcon}
-                          style={{
-                            width: horizontalScale(18.75),
-                            height: horizontalScale(18.75),
-                            marginRight: horizontalScale(7.5),
-                          }}
-                        />
-                        <TextInput
-                          style={tw`flex-1 text-black font-associate`}
-                          placeholder="Search contacts"
-                          placeholderTextColor="#999"
-                          value={contactSearchText}
-                          onChangeText={setContactSearchText}
-                        />
-                      </View>
-
-                      {/* Contacts List - Scrollable */}
-                      <ScrollView
-                        style={{ maxHeight: contactScrollMaxHeight }}
-                        contentContainerStyle={{
-                          paddingHorizontal: horizontalScale(15),
-                          paddingBottom: verticalScale(30),
-                        }}
-                        showsVerticalScrollIndicator={false}
-                        keyboardShouldPersistTaps="handled">
-                        {filteredContacts.length > 0 ? (
-                          (() => {
-                            const registered = filteredContacts.filter((c) => !!c.contactUser?.id);
-                            const unregistered = filteredContacts.filter((c) => !c.contactUser?.id);
-                            const renderRow = (contact: any, isDisabled: boolean) => (
-                              <TouchableOpacity
-                                key={contact.id}
-                                style={[
-                                  tw`flex-row items-center border-b border-gray-100`,
-                                  { paddingVertical: verticalScale(15) },
-                                ]}
-                                activeOpacity={isDisabled ? 1 : 0.7}
-                                onPress={() => !isDisabled && handleContactSelect(contact)}
-                                disabled={isDisabled}>
-                                <View
-                                  style={[
-                                    tw`rounded-full items-center justify-center overflow-hidden`,
-                                    {
-                                      width: horizontalScale(45),
-                                      height: horizontalScale(45),
-                                      marginRight: horizontalScale(15),
-                                      backgroundColor: isDisabled ? '#EAEEF2' : '#E0E4E8',
-                                    },
-                                  ]}>
-                                  {contact.contactUser?.avatar ? (
-                                    <Image
-                                      source={{ uri: contact.contactUser.avatar }}
-                                      style={{ width: horizontalScale(45), height: horizontalScale(45), borderRadius: 9999 }}
-                                    />
-                                  ) : (
-                                    <Image
-                                      source={Avatar}
-                                      style={{ width: horizontalScale(30), height: horizontalScale(30) }}
-                                    />
-                                  )}
-                                </View>
-                                <View style={tw`flex-1`}>
-                                  <Text
-                                    style={[
-                                      tw`font-associate-bold`,
-                                      { fontSize: moderateScale(15), color: isDisabled ? '#9AA3AC' : '#1C1D26' },
-                                    ]}>
-                                    {contact.displayName}
-                                  </Text>
-                                  {contact.contactPhone && (
-                                    <Text style={[tw`text-grey font-associate`, { fontSize: moderateScale(13) }]}>
-                                      {contact.contactPhone}
-                                    </Text>
-                                  )}
-                                </View>
-                                {isDisabled && (
-                                  <View
-                                    style={{
-                                      borderWidth: 1,
-                                      borderColor: '#D8DEE4',
-                                      borderRadius: 999,
-                                      paddingHorizontal: horizontalScale(10),
-                                      paddingVertical: verticalScale(4),
-                                    }}>
-                                    <Text style={[tw`font-associate-bold`, { color: '#9AA3AC', fontSize: moderateScale(11.5) }]}>
-                                      Invite
-                                    </Text>
-                                  </View>
-                                )}
-                              </TouchableOpacity>
-                            );
-                            return (
-                              <>
-                                {registered.map((c) => renderRow(c, false))}
-                                {unregistered.map((c) => renderRow(c, true))}
-                              </>
-                            );
-                          })()
-                        ) : (
-                          <View
-                            style={{ paddingVertical: verticalScale(37.5), alignItems: 'center' }}>
-                            <Text style={[tw`text-grey font-associate`, { fontSize: moderateScale(15) }]}>
-                              No contacts found
-                            </Text>
-                          </View>
-                        )}
-                      </ScrollView>
-                    </Animated.View>
-                  </TouchableOpacity>
-                </View>
-              </TouchableOpacity>
-            </KeyboardAvoidingView>
-          </Animated.View>
-        </Modal>
-      )}
     </>
   );
 };

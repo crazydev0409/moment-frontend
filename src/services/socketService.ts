@@ -118,13 +118,6 @@ export function getSocket(): Socket | null {
 }
 
 /**
- * Check if socket is connected
- */
-export function isSocketConnected(): boolean {
-  return socket?.connected ?? false;
-}
-
-/**
  * Setup event listeners for moment-related events
  */
 export function setupSocketEventListeners(callbacks: {
@@ -176,16 +169,5 @@ export function setupSocketEventListeners(callbacks: {
       socket.off('moment:canceled', momentCanceledHandler);
     }
   };
-}
-
-/**
- * Send ping to server
- */
-export function pingServer(): void {
-  if (socket?.connected) {
-    socket.emit('ping', (response: any) => {
-      console.log('[Socket] Ping response:', response);
-    });
-  }
 }
 

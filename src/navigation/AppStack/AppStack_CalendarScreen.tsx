@@ -1,12 +1,8 @@
 import { useFocusEffect } from '@react-navigation/native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
-import * as AuthSession from 'expo-auth-session';
 import { BlurView } from 'expo-blur';
-import * as Device from 'expo-device';
 import * as ExpoLocation from 'expo-location';
-import * as Linking from 'expo-linking';
 import * as Notifications from 'expo-notifications';
-import * as WebBrowser from 'expo-web-browser';
 import MapView, { Marker } from 'react-native-maps';
 import { useAtom } from 'jotai';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -37,7 +33,6 @@ import { horizontalScale, moderateScale, verticalScale } from '~/helpers/respons
 import { AvailabilitySchedule } from '~/helpers/calendarAvailability';
 import { layoutEventsForDay, layoutEventsForMonthRow, dayKey } from '~/helpers/calendarLayout';
 import { Avatar, NotificationsIcon, GoogleCalendarIcon, OutlookIcon, HookIcon, CheckIcon } from '~/lib/images';
-import { getDeviceId } from '~/services/deviceService';
 import { setupSocketEventListeners, getSocket, initializeSocket } from '~/services/socketService';
 import { userAtom } from '~/store';
 
@@ -149,14 +144,6 @@ function fitEventPadding(boxHeightPx: number, comfortablePadding: number, minPad
 const MAX_MONTH_LANES = 3;
 const MONTH_BAR_HEIGHT = v(15);
 const MONTH_BAR_GAP = v(2);
-const providerLabels: Record<CalendarProvider, string> = {
-  google: 'Google Calendar',
-  icloud: 'Apple Calendar',
-  microsoft: 'Outlook Calendar',
-};
-
-WebBrowser.maybeCompleteAuthSession();
-
 const BackGlyph = ({ size = 32, color = COLORS.ink }) => (
   <Svg width={size} height={size} viewBox="0 0 32 32" fill="none">
     <Path
@@ -166,19 +153,6 @@ const BackGlyph = ({ size = 32, color = COLORS.ink }) => (
       strokeLinecap="round"
       strokeLinejoin="round"
     />
-  </Svg>
-);
-
-const CalendarPlusIcon = () => (
-  <Svg width={h(54)} height={h(54)} viewBox="0 0 54 54" fill="none">
-    <Rect x="13" y="15" width="25" height="25" rx="4" stroke={COLORS.muted} strokeWidth="3" />
-    <Path
-      d="M19 10v10M32 10v10M13 24h25"
-      stroke={COLORS.muted}
-      strokeWidth="3"
-      strokeLinecap="round"
-    />
-    <Path d="M40 32v16M32 40h16" stroke={COLORS.muted} strokeWidth="3" strokeLinecap="round" />
   </Svg>
 );
 
@@ -336,10 +310,6 @@ function getUnavailableBands(
 const AppStack_CalendarScreen: React.FC<Props> = ({ navigation, route }) => {
   const insets = useSafeAreaInsets();
   const [user] = useAtom(userAtom);
-  const oauthRedirectUri = useMemo(
-    () => AuthSession.makeRedirectUri({ scheme: 'catch', path: 'calendar-integration' }),
-    []
-  );
 
   const routeDate = route.params?.date;
   const routeContact = route.params?.contact;
@@ -347,13 +317,7 @@ const AppStack_CalendarScreen: React.FC<Props> = ({ navigation, route }) => {
   const routeBookingUserId = route.params?.bookingUserId;
 
   const [integrations, setIntegrations] = useState<CalendarIntegration[]>([]);
-  const [selectedProvider, setSelectedProvider] = useState<CalendarProvider | null>(null);
-  const [showConnectOptions, setShowConnectOptions] = useState(false);
-  const [showIcloudModal, setShowIcloudModal] = useState(false);
-  const [icloudAppleId, setIcloudAppleId] = useState('');
-  const [icloudPassword, setIcloudPassword] = useState('');
   const [loading, setLoading] = useState(true);
-  const [connecting, setConnecting] = useState(false);
   const [events, setEvents] = useState<CalendarItem[]>([]);
   const [contacts, setContacts] = useState<Contact[]>([]);
   const [viewMode, setViewMode] = useState<ViewMode>('day');
@@ -544,8 +508,6 @@ const AppStack_CalendarScreen: React.FC<Props> = ({ navigation, route }) => {
       },
     })
   ).current;
-
-  const hasConnectedCalendar = integrations.some((integration) => integration.connected);
 
   const loadCalendarData = useCallback(async () => {
     try {
@@ -786,78 +748,6 @@ const AppStack_CalendarScreen: React.FC<Props> = ({ navigation, route }) => {
     };
   }, [loadCalendarData]);
 
-  const connectProvider = async () => {
-    if (!selectedProvider) return;
-    if (selectedProvider === 'icloud') {
-      setShowIcloudModal(true);
-      return;
-    }
-
-    try {
-      setConnecting(true);
-      const deviceId = await getDeviceId();
-      const deviceName =
-        Device.deviceName || Device.modelName || Device.modelId || 'unknown-device';
-      const response = await http.post(`/users/calendar-integrations/${selectedProvider}/start`, {
-        device_id: deviceId,
-        device_name: deviceName,
-        deviceId,
-        deviceName,
-        redirectUri: oauthRedirectUri,
-      });
-      const result = await WebBrowser.openAuthSessionAsync(
-        response.data.authorizationUrl,
-        oauthRedirectUri
-      );
-
-      if (result.type === 'success' && result.url) {
-        const parsed = Linking.parse(result.url);
-        if (parsed.queryParams?.status === 'success') {
-          setShowConnectOptions(false);
-          await loadCalendarData();
-          return;
-        }
-      }
-      Alert.alert('Connection failed', 'Calendar connection was not completed.');
-    } catch (error: any) {
-      console.error('Error connecting calendar:', error);
-      Alert.alert(
-        'Connection failed',
-        error.response?.data?.error || 'Failed to connect calendar.'
-      );
-    } finally {
-      setConnecting(false);
-    }
-  };
-
-  const handleIcloudConnect = async () => {
-    if (!icloudAppleId.trim() || !icloudPassword.trim()) {
-      Alert.alert('Apple Calendar', 'Enter your Apple ID and app-specific password.');
-      return;
-    }
-
-    try {
-      setConnecting(true);
-      await http.post('/users/calendar-integrations/icloud/connect', {
-        appleId: icloudAppleId.trim(),
-        appSpecificPassword: icloudPassword.trim(),
-      });
-      setShowIcloudModal(false);
-      setShowConnectOptions(false);
-      setIcloudAppleId('');
-      setIcloudPassword('');
-      await loadCalendarData();
-    } catch (error: any) {
-      console.error('Error connecting iCloud calendar:', error);
-      Alert.alert(
-        'Connection failed',
-        error.response?.data?.error || 'Failed to connect Apple Calendar.'
-      );
-    } finally {
-      setConnecting(false);
-    }
-  };
-
   const selectedDayEvents = useMemo(() => {
     const seen = new Set<string>();
     return events
@@ -1006,7 +896,7 @@ const AppStack_CalendarScreen: React.FC<Props> = ({ navigation, route }) => {
     }
   };
 
-  if (loading && !showConnectOptions) {
+  if (loading) {
     return (
       <View style={styles.screen}>
         <Header
@@ -1018,75 +908,6 @@ const AppStack_CalendarScreen: React.FC<Props> = ({ navigation, route }) => {
         <View style={styles.loadingWrap}>
           <ActivityIndicator color={COLORS.green} size="large" />
         </View>
-      </View>
-    );
-  }
-
-  if (!hasConnectedCalendar && !showConnectOptions) {
-    return (
-      <View style={styles.screen}>
-        <Header
-          title="Calendar"
-          onBell={() => navigation.navigate('AppStack_NotificationScreen')}
-          insetsTop={insets.top}
-          badgeCount={unreadNotifCount}
-        />
-        <View style={styles.connectEmpty}>
-          <View style={styles.connectIconCircle}>
-            <CalendarPlusIcon />
-          </View>
-          <Text style={styles.connectTitle}>Connect your calendar</Text>
-          <Text style={styles.connectText}>
-            Sync Google, Apple, or Outlook Calendar to view your schedule in one place
-          </Text>
-          <TouchableOpacity
-            style={styles.primaryButton}
-            onPress={() => setShowConnectOptions(true)}>
-            <Text style={styles.primaryButtonText}>Connect</Text>
-          </TouchableOpacity>
-        </View>
-        {renderIcloudModal()}
-      </View>
-    );
-  }
-
-  if (showConnectOptions) {
-    return (
-      <View style={styles.screen}>
-        <TopBar
-          title="Connect your calendar"
-          insetsTop={insets.top}
-          onBack={() => setShowConnectOptions(false)}
-        />
-        <View style={styles.providerList}>
-          {(['google', 'icloud', 'microsoft'] as CalendarProvider[]).map((provider) => (
-            <TouchableOpacity
-              key={provider}
-              style={[
-                styles.providerCard,
-                selectedProvider === provider && styles.providerCardSelected,
-              ]}
-              onPress={() => setSelectedProvider(provider)}>
-              <ProviderIcon provider={provider} size={36} />
-              <Text style={styles.providerText}>{providerLabels[provider]}</Text>
-            </TouchableOpacity>
-          ))}
-        </View>
-        <TouchableOpacity
-          style={[
-            styles.primaryButton,
-            styles.connectContinue,
-            !selectedProvider && styles.disabledButton,
-          ]}
-          disabled={!selectedProvider || connecting}
-          onPress={connectProvider}>
-          {connecting ? (
-            <ActivityIndicator color="#fff" />
-          ) : (
-            <Text style={styles.primaryButtonText}>Continue</Text>
-          )}
-        </TouchableOpacity>
-        {renderIcloudModal()}
       </View>
     );
   }
@@ -1152,67 +973,9 @@ const AppStack_CalendarScreen: React.FC<Props> = ({ navigation, route }) => {
             ? renderMonthView()
             : renderYearView()}
       {renderSheetModal()}
-      {renderIcloudModal()}
       {renderSuccessToast()}
     </View>
   );
-
-  function renderIcloudModal() {
-    return (
-      <Modal
-        visible={showIcloudModal}
-        transparent
-        animationType="fade"
-        onRequestClose={() => setShowIcloudModal(false)}>
-        <KeyboardAvoidingView
-          style={styles.icloudOverlay}
-          behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-          <View style={styles.icloudCard}>
-            <Text style={styles.icloudTitle}>Connect Apple Calendar</Text>
-            <Text style={styles.icloudText}>
-              Use your Apple ID and an app-specific password for calendar sync.
-            </Text>
-            <TextInput
-              style={styles.icloudInput}
-              placeholder="Apple ID"
-              placeholderTextColor="#A8B3BF"
-              autoCapitalize="none"
-              keyboardType="email-address"
-              value={icloudAppleId}
-              onChangeText={setIcloudAppleId}
-            />
-            <TextInput
-              style={styles.icloudInput}
-              placeholder="App-specific password"
-              placeholderTextColor="#A8B3BF"
-              autoCapitalize="none"
-              secureTextEntry
-              value={icloudPassword}
-              onChangeText={setIcloudPassword}
-            />
-            <View style={styles.icloudActions}>
-              <TouchableOpacity
-                style={styles.icloudCancel}
-                onPress={() => setShowIcloudModal(false)}
-                disabled={connecting}>
-                <Text style={styles.icloudCancelText}>Cancel</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={styles.icloudConnect}
-                onPress={handleIcloudConnect}
-                disabled={connecting}>
-                {connecting ? (
-                  <ActivityIndicator color={COLORS.white} />
-                ) : (
-                  <Text style={styles.icloudConnectText}>Connect</Text>
-                )}
-              </TouchableOpacity>
-            </View>
-          </View>
-        </KeyboardAvoidingView>
-      </Modal>
-    );
-  }
 
   function renderSuccessToast() {
     if (!successToast) return null;
@@ -2212,24 +1975,6 @@ const Header = ({
   </View>
 );
 
-const TopBar = ({
-  title,
-  onBack,
-  insetsTop,
-}: {
-  title: string;
-  onBack: () => void;
-  insetsTop: number;
-}) => (
-  <View style={[styles.topBar, { paddingTop: Math.max(insetsTop + v(24), v(54)) }]}>
-    <TouchableOpacity onPress={onBack}>
-      <BackGlyph />
-    </TouchableOpacity>
-    <Text style={styles.topTitle}>{title}</Text>
-    <View style={{ width: h(32) }} />
-  </View>
-);
-
 const SheetTop = ({
   title,
   onBack,
@@ -2763,37 +2508,6 @@ const styles = StyleSheet.create({
     lineHeight: ms(38),
   },
   notificationIcon: { width: h(26), height: h(26) },
-  connectEmpty: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingHorizontal: h(16),
-    paddingBottom: v(140),
-  },
-  connectIconCircle: {
-    width: h(104),
-    height: h(104),
-    borderRadius: h(52),
-    backgroundColor: '#EDF1F5',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: v(28),
-  },
-  connectTitle: {
-    color: COLORS.ink,
-    fontFamily: 'Inter_700Bold',
-    fontSize: ms(30),
-    textAlign: 'center',
-    marginBottom: v(11),
-  },
-  connectText: {
-    color: COLORS.muted,
-    fontFamily: 'Inter_400Regular',
-    fontSize: ms(18),
-    lineHeight: ms(24),
-    textAlign: 'center',
-    marginBottom: v(28),
-  },
   loadingWrap: {
     flex: 1,
     alignItems: 'center',
@@ -2811,44 +2525,6 @@ const styles = StyleSheet.create({
   },
   primaryButtonText: { color: COLORS.white, fontFamily: 'Inter_700Bold', fontSize: ms(20) },
   disabledButton: { opacity: 0.55 },
-  topBar: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: h(16),
-    marginBottom: v(32),
-  },
-  topTitle: {
-    flex: 1,
-    color: COLORS.ink,
-    fontFamily: 'Inter_700Bold',
-    fontSize: ms(27),
-    textAlign: 'center',
-  },
-  providerList: { gap: v(12), paddingHorizontal: h(16) },
-  providerCard: {
-    height: v(72),
-    borderRadius: h(16),
-    backgroundColor: COLORS.white,
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: h(20),
-    borderWidth: 1,
-    borderColor: COLORS.white,
-  },
-  providerCardSelected: { borderColor: '#CBE985' },
-  providerText: {
-    color: COLORS.ink,
-    fontFamily: 'Inter_400Regular',
-    fontSize: ms(17),
-    marginLeft: h(16),
-  },
-  connectContinue: {
-    position: 'absolute',
-    left: h(16),
-    right: h(16),
-    bottom: v(43),
-    marginHorizontal: 0,
-  },
   calendarHeader: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -3579,63 +3255,6 @@ rescheduleBlockTitle: { color: COLORS.white, fontFamily: 'Inter_700Bold', fontSi
     fontSize: ms(16),
     marginBottom: v(8),
   },
-  icloudOverlay: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: 'rgba(23,25,39,0.42)',
-    paddingHorizontal: h(24),
-  },
-  icloudCard: {
-    width: '100%',
-    borderRadius: h(24),
-    backgroundColor: COLORS.white,
-    padding: h(22),
-  },
-  icloudTitle: {
-    color: COLORS.ink,
-    fontFamily: 'Inter_700Bold',
-    fontSize: ms(24),
-    marginBottom: v(8),
-  },
-  icloudText: {
-    color: COLORS.muted,
-    fontFamily: 'Inter_400Regular',
-    fontSize: ms(15),
-    lineHeight: ms(22),
-    marginBottom: v(16),
-  },
-  icloudInput: {
-    height: v(56),
-    borderRadius: h(28),
-    borderWidth: 1,
-    borderColor: COLORS.softLine,
-    color: COLORS.ink,
-    fontFamily: 'Inter_400Regular',
-    fontSize: ms(18),
-    paddingHorizontal: h(18),
-    marginBottom: v(12),
-  },
-  icloudActions: { flexDirection: 'row', gap: h(10), marginTop: v(6) },
-  icloudCancel: {
-    flex: 1,
-    height: v(50),
-    borderRadius: h(25),
-    borderWidth: 1,
-    borderColor: COLORS.green,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  icloudConnect: {
-    flex: 1,
-    height: v(50),
-    borderRadius: h(25),
-    backgroundColor: COLORS.green,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  icloudCancelText: { color: COLORS.green, fontFamily: 'Inter_700Bold', fontSize: ms(16) },
-  icloudConnectText: { color: COLORS.white, fontFamily: 'Inter_700Bold', fontSize: ms(16) },
   successToast: {
     position: 'absolute',
     left: h(16),
