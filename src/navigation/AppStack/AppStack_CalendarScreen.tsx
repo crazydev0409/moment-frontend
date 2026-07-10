@@ -96,6 +96,12 @@ const COLORS = {
   green: '#9AC51F',
   lightGreen: '#F8FDEB',
   greyButton: '#9AA3AC',
+  // Declined/rejected internal events — kept distinct from pending's green
+  // outline so the two can never be mistaken for each other. Matches Google
+  // Calendar: declining never removes the event, it just marks it declined
+  // (muted, this style) for both sender and receiver — only an explicit
+  // delete removes it from the calendar.
+  declinedText: '#9AA3AC',
 };
 
 const h = (size: number) => horizontalScale(size);
@@ -564,7 +570,11 @@ const AppStack_CalendarScreen: React.FC<Props> = ({ navigation, route }) => {
         .filter((request) => {
           if (seen.has(request.id)) return false;
           seen.add(request.id);
-          return request.status === 'approved' || request.status === 'pending';
+          // Matches Google Calendar convention: declining never removes the
+          // event, it just marks it declined (muted/grey-bordered) for
+          // everyone involved — sender included. Only an explicit
+          // delete/cancel removes it from the calendar entirely.
+          return request.status === 'approved' || request.status === 'pending' || request.status === 'rejected';
         })
         .map((request) => ({
           ...request,
@@ -845,6 +855,33 @@ const AppStack_CalendarScreen: React.FC<Props> = ({ navigation, route }) => {
     }
   };
 
+  const [respondingToEvent, setRespondingToEvent] = useState(false);
+
+  const respondToRequest = async (approved: boolean) => {
+    if (!selectedEvent) return;
+    try {
+      setRespondingToEvent(true);
+      await http.post(`/users/moment-requests/${selectedEvent.id}/respond`, { approved });
+      setSheet(null);
+      setSelectedEvent(null);
+      await loadCalendarData();
+      showSuccessToast(
+        approved ? 'Meeting confirmed' : 'Meeting declined',
+        approved
+          ? `${formatToastDate(new Date(selectedEvent.startTime))}, ${formatTime(new Date(selectedEvent.startTime))}`
+          : cleanTitle(selectedEvent.title)
+      );
+    } catch (error: any) {
+      console.error('Error responding to moment request:', error);
+      Alert.alert(
+        'Something went wrong',
+        error.response?.data?.error || 'Could not respond to this meeting request.'
+      );
+    } finally {
+      setRespondingToEvent(false);
+    }
+  };
+
   const rescheduleEvent = async () => {
     if (!selectedEvent || !rescheduleTime) return;
 
@@ -1069,6 +1106,12 @@ const AppStack_CalendarScreen: React.FC<Props> = ({ navigation, route }) => {
 
             const showSingleRow = isTiny || hasOverlap || (isCompact && !compactFitsTwoLines);
             const singleRowFont = isCompact ? compactSingleFont : tinyFont;
+            // Only internal (Catch-created) events have a real pending/confirmed
+            // lifecycle — external calendar events are already-confirmed by
+            // definition on whatever calendar they came from.
+            const isPending = event.sourceType === 'internal' && event.status === 'pending';
+            const isDeclined = event.sourceType === 'internal' && event.status === 'rejected';
+            const textColor = isPending ? COLORS.green : isDeclined ? COLORS.declinedText : '#759719';
             return (
               // Outer wrapper reserves the same top/height/gutter eventBlock
               // always used; the inner block is percentage-positioned within
@@ -1091,6 +1134,8 @@ const AppStack_CalendarScreen: React.FC<Props> = ({ navigation, route }) => {
                     },
                     hasOverlap && { marginHorizontal: h(1.5) },
                     event.sourceType === 'external' && styles.externalEventBlock,
+                    isPending && styles.pendingEventBlock,
+                    isDeclined && styles.declinedEventBlock,
                     isTiny && styles.eventBlockTiny,
                     isCompact && styles.eventBlockCompact,
                     isTiny && { paddingVertical: tinyPadding },
@@ -1104,31 +1149,41 @@ const AppStack_CalendarScreen: React.FC<Props> = ({ navigation, route }) => {
                     // for its normal 2-line layout — there isn't enough
                     // height/width to show more than one line legibly).
                     <View style={styles.eventTinyRow}>
-                      <Text style={[styles.eventTinyTitle, { fontSize: singleRowFont }]} numberOfLines={1}>
+                      <Text
+                        style={[styles.eventTinyTitle, { fontSize: singleRowFont, color: textColor }]}
+                        numberOfLines={1}>
                         {cleanTitle(event.title)}
                       </Text>
                       {!hasOverlap && (
-                        <Text style={[styles.eventTinyPrice, { fontSize: singleRowFont }]}>{priceLabel}</Text>
+                        <Text style={[styles.eventTinyPrice, { fontSize: singleRowFont, color: textColor }]}>
+                          {priceLabel}
+                        </Text>
                       )}
                     </View>
                   ) : isCompact ? (
                     // Two compact rows: title then price
                     <>
-                      <Text style={[styles.eventCompactTitle, { fontSize: compactTitleFont }]} numberOfLines={1}>
+                      <Text
+                        style={[styles.eventCompactTitle, { fontSize: compactTitleFont, color: textColor }]}
+                        numberOfLines={1}>
                         {cleanTitle(event.title)}
                       </Text>
-                      <Text style={[styles.eventCompactPrice, { fontSize: compactPriceFont }]}>{priceLabel}</Text>
+                      <Text style={[styles.eventCompactPrice, { fontSize: compactPriceFont, color: textColor }]}>
+                        {priceLabel}
+                      </Text>
                     </>
                   ) : (
                     // Full layout
                     <>
-                      <Text style={[styles.eventTitle, { fontSize: fullTitleFont }]} numberOfLines={1}>
+                      <Text
+                        style={[styles.eventTitle, { fontSize: fullTitleFont, color: textColor }]}
+                        numberOfLines={1}>
                         {cleanTitle(event.title)}
                       </Text>
-                      <Text style={[styles.eventTime, { fontSize: fullTimeFont }]} numberOfLines={1}>
+                      <Text style={[styles.eventTime, { fontSize: fullTimeFont, color: textColor }]} numberOfLines={1}>
                         {formatTime(new Date(event.startTime))} - {formatTime(new Date(event.endTime))}
                       </Text>
-                      <Text style={styles.eventPrice}>{priceLabel}</Text>
+                      <Text style={[styles.eventPrice, { color: textColor }]}>{priceLabel}</Text>
                       <View style={styles.eventProvider}>
                         <ProviderIcon provider={providerKey} size={20} />
                       </View>
@@ -1237,6 +1292,8 @@ const AppStack_CalendarScreen: React.FC<Props> = ({ navigation, route }) => {
                         const widthPct = 100 / event.totalColumns;
                         const leftPct = event.column * widthPct;
                         const titleFont = fitEventFontSize(pos.height - v(1) * 2, 1, ms(11));
+                        const isPending = event.sourceType === 'internal' && event.status === 'pending';
+                        const isDeclined = event.sourceType === 'internal' && event.status === 'rejected';
                         return (
                           <TouchableOpacity
                             key={event.id}
@@ -1244,6 +1301,8 @@ const AppStack_CalendarScreen: React.FC<Props> = ({ navigation, route }) => {
                             style={[
                               styles.weekEventBlock,
                               event.sourceType === 'external' && styles.externalEventBlock,
+                              isPending && styles.weekEventBlockPending,
+                              isDeclined && styles.weekEventBlockDeclined,
                               {
                                 top: pos.top,
                                 height: pos.height,
@@ -1256,6 +1315,8 @@ const AppStack_CalendarScreen: React.FC<Props> = ({ navigation, route }) => {
                               style={[
                                 styles.weekEventTitle,
                                 event.sourceType === 'external' && styles.weekEventTitleExternal,
+                                isPending && styles.weekEventTitlePending,
+                                isDeclined && styles.weekEventTitleDeclined,
                                 { fontSize: titleFont },
                               ]}
                               numberOfLines={1}>
@@ -1417,8 +1478,15 @@ const AppStack_CalendarScreen: React.FC<Props> = ({ navigation, route }) => {
               <Text style={[
                 styles.confirmBadge,
                 selectedEvent.status === 'pending' && { backgroundColor: '#FFF3CD', color: '#856404' },
+                selectedEvent.status === 'rejected' && { backgroundColor: COLORS.softLine, color: COLORS.declinedText },
               ]}>
-                {selectedEvent.status === 'approved' ? 'Confirmed' : selectedEvent.status === 'pending' ? 'Pending' : 'External'}
+                {selectedEvent.status === 'approved'
+                  ? 'Confirmed'
+                  : selectedEvent.status === 'pending'
+                    ? 'Pending'
+                    : selectedEvent.status === 'rejected'
+                      ? 'Declined'
+                      : 'External'}
               </Text>
               <Text style={styles.freeBadge}>{getPriceLabel(selectedEvent)}</Text>
             </View>
@@ -1440,6 +1508,28 @@ const AppStack_CalendarScreen: React.FC<Props> = ({ navigation, route }) => {
               selectedEvent.senderId === user.id ? 'You' : selectedEvent.sender?.name || 'Host'
             }
           />
+          {selectedEvent.sourceType === 'internal' &&
+            selectedEvent.status === 'pending' &&
+            selectedEvent.receiverId === user.id && (
+              <View style={styles.respondRow}>
+                <TouchableOpacity
+                  style={styles.declineButton}
+                  disabled={respondingToEvent}
+                  onPress={() => respondToRequest(false)}>
+                  <Text style={styles.declineButtonText}>Decline</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={styles.confirmButton}
+                  disabled={respondingToEvent}
+                  onPress={() => respondToRequest(true)}>
+                  {respondingToEvent ? (
+                    <ActivityIndicator color={COLORS.white} />
+                  ) : (
+                    <Text style={styles.confirmButtonText}>Confirm</Text>
+                  )}
+                </TouchableOpacity>
+              </View>
+            )}
           <Text style={styles.inviteesTitle}>Invitees</Text>
           <ScrollView
             horizontal
@@ -1608,6 +1698,8 @@ const AppStack_CalendarScreen: React.FC<Props> = ({ navigation, route }) => {
                 const evCompactSingleFont = fitEventFontSize(evPos.height - evTinyPadding * 2, 1, ms(11));
                 const evShowSingleRow = evIsTiny || (evIsCompact && !evCompactFitsTwoLines);
                 const evSingleRowFont = evIsCompact ? evCompactSingleFont : evTinyFont;
+                const evIsPending = event.sourceType === 'internal' && event.status === 'pending';
+                const evTextColor = evIsPending ? COLORS.green : COLORS.white;
                 return (
                   <TouchableOpacity
                     key={event.id}
@@ -1618,7 +1710,9 @@ const AppStack_CalendarScreen: React.FC<Props> = ({ navigation, route }) => {
                       evIsTiny && styles.eventBlockTiny,
                       evIsCompact && styles.eventBlockCompact,
                       evPos,
-                      { backgroundColor: COLORS.green, borderColor: COLORS.green },
+                      evIsPending
+                        ? { backgroundColor: 'transparent', borderColor: COLORS.green, borderWidth: 1.5 }
+                        : { backgroundColor: COLORS.green, borderColor: COLORS.green },
                       evIsTiny && { paddingVertical: evTinyPadding },
                       evIsCompact && { paddingVertical: evShowSingleRow ? evTinyPadding : evCompactPadding },
                     ]}
@@ -1626,34 +1720,34 @@ const AppStack_CalendarScreen: React.FC<Props> = ({ navigation, route }) => {
                     {evShowSingleRow ? (
                       <View style={styles.eventTinyRow}>
                         <Text
-                          style={[styles.eventTinyTitle, { color: COLORS.white, fontSize: evSingleRowFont }]}
+                          style={[styles.eventTinyTitle, { color: evTextColor, fontSize: evSingleRowFont }]}
                           numberOfLines={1}>
                           {cleanTitle(event.title)}
                         </Text>
-                        <Text style={[styles.eventTinyPrice, { color: COLORS.white, fontSize: evSingleRowFont }]}>
+                        <Text style={[styles.eventTinyPrice, { color: evTextColor, fontSize: evSingleRowFont }]}>
                           {priceLabel}
                         </Text>
                       </View>
                     ) : evIsCompact ? (
                       <>
                         <Text
-                          style={[styles.eventCompactTitle, { color: COLORS.white, fontSize: evCompactTitleFont }]}
+                          style={[styles.eventCompactTitle, { color: evTextColor, fontSize: evCompactTitleFont }]}
                           numberOfLines={1}>
                           {cleanTitle(event.title)}
                         </Text>
-                        <Text style={[styles.eventCompactPrice, { color: COLORS.white, fontSize: evCompactPriceFont }]}>
+                        <Text style={[styles.eventCompactPrice, { color: evTextColor, fontSize: evCompactPriceFont }]}>
                           {priceLabel}
                         </Text>
                       </>
                     ) : (
                       <>
-                        <Text style={styles.rescheduleBlockTitle} numberOfLines={1}>
+                        <Text style={[styles.rescheduleBlockTitle, { color: evTextColor }]} numberOfLines={1}>
                           {cleanTitle(event.title)}
                         </Text>
-                        <Text style={styles.rescheduleBlockTime} numberOfLines={1}>
+                        <Text style={[styles.rescheduleBlockTime, { color: evTextColor }]} numberOfLines={1}>
                           {formatTime(new Date(event.startTime))} - {formatTime(new Date(event.endTime))}
                         </Text>
-                        <Text style={[styles.eventPrice, { color: COLORS.white }]}>{priceLabel}</Text>
+                        <Text style={[styles.eventPrice, { color: evTextColor }]}>{priceLabel}</Text>
                       </>
                     )}
                   </TouchableOpacity>
@@ -2116,6 +2210,8 @@ const MonthAgendaGrid = ({
                 const widthPct = ((span.endCol - span.startCol + 1) / 7) * 100;
                 const leftPct = (span.startCol / 7) * 100;
                 const isExternal = span.event.sourceType === 'external';
+                const isPending = span.event.sourceType === 'internal' && span.event.status === 'pending';
+                const isDeclined = span.event.sourceType === 'internal' && span.event.status === 'rejected';
                 return (
                   <TouchableOpacity
                     key={span.event.id}
@@ -2124,6 +2220,8 @@ const MonthAgendaGrid = ({
                     style={[
                       styles.monthAgendaBar,
                       isExternal && styles.externalEventBlock,
+                      isPending && styles.weekEventBlockPending,
+                      isDeclined && styles.weekEventBlockDeclined,
                       {
                         top: span.lane * (MONTH_BAR_HEIGHT + MONTH_BAR_GAP),
                         left: `${leftPct}%` as const,
@@ -2135,7 +2233,12 @@ const MonthAgendaGrid = ({
                       span.continuesAfter && styles.monthAgendaBarNoRightRadius,
                     ]}>
                     <Text
-                      style={[styles.monthAgendaBarText, isExternal && { color: '#759719' }]}
+                      style={[
+                        styles.monthAgendaBarText,
+                        isExternal && { color: '#759719' },
+                        isPending && styles.weekEventTitlePending,
+                        isDeclined && styles.weekEventTitleDeclined,
+                      ]}
                       numberOfLines={1}>
                       {cleanTitle(span.event.title)}
                     </Text>
@@ -2629,8 +2732,12 @@ const styles = StyleSheet.create({
     paddingVertical: v(1),
     overflow: 'hidden',
   },
+  weekEventBlockPending: { backgroundColor: 'transparent', borderWidth: 1.5, borderColor: COLORS.green },
+  weekEventBlockDeclined: { backgroundColor: 'transparent', borderWidth: 1.5, borderColor: COLORS.pale },
   weekEventTitle: { color: COLORS.white, fontFamily: 'Inter_700Bold', fontSize: ms(11) },
   weekEventTitleExternal: { color: '#759719' },
+  weekEventTitlePending: { color: COLORS.green },
+  weekEventTitleDeclined: { color: COLORS.declinedText },
   weekNowLine: {
     position: 'absolute',
     left: 0,
@@ -2701,6 +2808,11 @@ const styles = StyleSheet.create({
     fontSize: ms(11),
   },
   externalEventBlock: { backgroundColor: '#F8FDEB' },
+  // Transparent fill + a solid green outline reads as "provisional" — still
+  // clearly green/on-brand, but visibly lighter-weight than a filled block,
+  // which is reserved for a meeting that's actually confirmed.
+  pendingEventBlock: { backgroundColor: 'transparent', borderColor: COLORS.green, borderWidth: 1.5 },
+  declinedEventBlock: { backgroundColor: 'transparent', borderColor: COLORS.pale, borderWidth: 1.5 },
   eventTitle: {
     color: '#759719',
     fontFamily: 'Inter_700Bold',
@@ -2948,6 +3060,31 @@ const styles = StyleSheet.create({
     textAlign: 'right',
     marginLeft: h(8),
   },
+  respondRow: {
+    flexDirection: 'row',
+    gap: h(10),
+    marginTop: v(14),
+    marginBottom: v(4),
+  },
+  declineButton: {
+    flex: 1,
+    height: v(48),
+    borderRadius: h(24),
+    borderWidth: 1,
+    borderColor: COLORS.line,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  declineButtonText: { color: COLORS.muted, fontFamily: 'Inter_700Bold', fontSize: ms(15) },
+  confirmButton: {
+    flex: 1,
+    height: v(48),
+    borderRadius: h(24),
+    backgroundColor: COLORS.green,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  confirmButtonText: { color: COLORS.white, fontFamily: 'Inter_700Bold', fontSize: ms(15) },
   inviteesTitle: {
     color: COLORS.ink,
     fontFamily: 'Inter_400Regular',

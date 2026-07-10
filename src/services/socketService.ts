@@ -1,13 +1,18 @@
 import { io, Socket } from 'socket.io-client';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-// Socket.IO server URL - should match backend (without /api path)
-// For iOS simulator use 'http://localhost:3000'
-// For Android emulator use 'http://10.0.2.2:3000'
-// For physical device use your computer's IP address
-const SOCKET_URL = __DEV__
-  ? 'http://10.0.2.2:3000' // Android emulator (change to 'http://localhost:3000' for iOS)
-  : 'https://moment-backend-production.up.railway.app';
+// Socket.IO connects to the same backend as the REST API client (just
+// without the /api suffix) — derived from EXPO_PUBLIC_API_BASE_URL so it
+// always matches whatever host the app is actually configured to talk to
+// (iOS simulator, Android emulator's 10.0.2.2 alias, a physical device's LAN
+// IP, or the real production API). This used to be a second, independently
+// hardcoded URL that silently drifted out of sync with the REST API host —
+// it pointed at an old Railway deployment while EXPO_PUBLIC_API_BASE_URL
+// (see eas.json) had already moved to Azure, so real-time socket events
+// (and the "you've been invited" in-app refresh they trigger) never
+// connected at all in production, and only worked in local dev if you
+// happened to be on an Android emulator.
+const SOCKET_URL = (process.env.EXPO_PUBLIC_API_BASE_URL || '').replace(/\/api\/?$/, '');
 
 let socket: Socket | null = null;
 let isConnecting = false;

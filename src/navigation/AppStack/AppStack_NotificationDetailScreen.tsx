@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
+  Alert,
   Image,
   ScrollView,
   Text,
@@ -236,13 +237,18 @@ const AppStack_NotificationDetailScreen: React.FC<Props> = ({ navigation, route 
     if (!meeting) return;
     try {
       setIsResponding(true);
+      // Backend expects { approved: boolean } — a previous { status: 'confirmed' | 'rejected' }
+      // body doesn't match that contract, so every accept/decline tap 400'd silently.
       await http.post(`/users/moment-requests/${meeting.id}/respond`, {
-        status: accept ? 'confirmed' : 'rejected',
+        approved: accept,
       });
       navigation.goBack();
     } catch (err: any) {
-      // Silently fail — the error could be shown inline in the future
       console.error('respond error', err);
+      Alert.alert(
+        'Something went wrong',
+        err.response?.data?.error || 'Could not respond to this meeting request. Please try again.'
+      );
     } finally {
       setIsResponding(false);
     }
@@ -313,8 +319,24 @@ const AppStack_NotificationDetailScreen: React.FC<Props> = ({ navigation, route 
           paddingBottom: v(isInviteType && meeting ? 120 : 40),
         }}
         showsVerticalScrollIndicator={false}>
-        {/* Main detail card */}
-        <View
+        {/* Main detail card — tapping it jumps to the exact day/time this
+            meeting is scheduled for in the Calendar screen (reusing the same
+            momentRequestId deep-link the Home screen's toast already uses,
+            which scrolls to and opens that specific event). */}
+        <TouchableOpacity
+          activeOpacity={meeting ? 0.85 : 1}
+          disabled={!meeting}
+          onPress={() => {
+            if (!meeting) return;
+            const start = new Date(meeting.startTime);
+            const year = start.getFullYear();
+            const month = String(start.getMonth() + 1).padStart(2, '0');
+            const day = String(start.getDate()).padStart(2, '0');
+            navigation.navigate('AppStack_CalendarScreen', {
+              date: `${year}-${month}-${day}`,
+              momentRequestId: meeting.id,
+            });
+          }}
           style={[
             tw`rounded-3xl`,
             {
@@ -502,7 +524,7 @@ const AppStack_NotificationDetailScreen: React.FC<Props> = ({ navigation, route 
               </ScrollView>
             </View>
           )}
-        </View>
+        </TouchableOpacity>
       </ScrollView>
 
       {/* Accept / Decline buttons — invite type only */}

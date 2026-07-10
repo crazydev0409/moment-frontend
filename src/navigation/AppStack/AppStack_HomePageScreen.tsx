@@ -364,26 +364,30 @@ const AppStack_HomePageScreen: React.FC<Props> = ({ navigation, route }) => {
   const toastAnim = useRef(new Animated.Value(-100)).current;
   const dateScrollRef = useRef<ScrollView>(null);
 
+  const showToast = useCallback((toastData: { title: string; subtitle: string; calendarDate?: string }) => {
+    setToast(toastData);
+    Animated.sequence([
+      Animated.timing(toastAnim, {
+        toValue: 0,
+        duration: 350,
+        useNativeDriver: true,
+      }),
+      Animated.delay(3500),
+      Animated.timing(toastAnim, {
+        toValue: -150,
+        duration: 350,
+        useNativeDriver: true,
+      }),
+    ]).start(() => setToast(null));
+  }, [toastAnim]);
+
   useEffect(() => {
     const toastData = route.params?.toast;
     if (toastData) {
-      setToast(toastData);
       navigation.setParams({ toast: undefined } as any);
-      Animated.sequence([
-        Animated.timing(toastAnim, {
-          toValue: 0,
-          duration: 350,
-          useNativeDriver: true,
-        }),
-        Animated.delay(3500),
-        Animated.timing(toastAnim, {
-          toValue: -150,
-          duration: 350,
-          useNativeDriver: true,
-        }),
-      ]).start(() => setToast(null));
+      showToast(toastData);
     }
-  }, [route.params?.toast]);
+  }, [route.params?.toast, showToast]);
 
   // Meetings data
   const [allMeetings, setAllMeetings] = useState<MomentRequest[]>([]);
@@ -540,6 +544,16 @@ const AppStack_HomePageScreen: React.FC<Props> = ({ navigation, route }) => {
             console.log('[HomePage] 📬 Meeting created - refreshing...');
             fetchMeetings();
             fetchUnreadNotificationCount();
+            // Visible in-app feedback in addition to the (silent) badge-count
+            // refresh above — the badge alone is easy to miss, especially
+            // while push notifications are unavailable (Expo Go, simulators).
+            showToast({
+              title: 'New meeting request',
+              subtitle: `${data.senderName || 'Someone'} invited you to "${data.title || 'a meeting'}"`,
+              calendarDate: data.startTime
+                ? new Date(data.startTime).toISOString().split('T')[0]
+                : undefined,
+            });
           },
           // Meeting accepted/rejected → sender gets update
           onMomentResponse: (data) => {
@@ -582,12 +596,33 @@ const AppStack_HomePageScreen: React.FC<Props> = ({ navigation, route }) => {
               fetchMeetings();
               fetchUnreadNotificationCount();
             }, 1000);
+
+            // Visible in-app feedback, same as the "new request" toast — the
+            // sender otherwise has no indication the receiver responded
+            // unless they happen to reopen the app or check the badge.
+            showToast({
+              title: newStatus === 'approved' ? 'Meeting confirmed' : 'Meeting declined',
+              subtitle:
+                newStatus === 'approved'
+                  ? `${data.receiverName || 'They'} confirmed "${data.title || 'your meeting'}"`
+                  : `${data.receiverName || 'They'} declined "${data.title || 'your meeting'}"`,
+              calendarDate: data.startTime
+                ? new Date(data.startTime).toISOString().split('T')[0]
+                : undefined,
+            });
           },
           // Meeting canceled → receiver gets update
           onMomentCanceled: (data) => {
             console.log('[HomePage] ❌ Meeting canceled - refreshing...');
             fetchMeetings();
             fetchUnreadNotificationCount();
+            showToast({
+              title: 'Meeting canceled',
+              subtitle: `"${data.title || 'A meeting'}" has been canceled`,
+              calendarDate: data.startTime
+                ? new Date(data.startTime).toISOString().split('T')[0]
+                : undefined,
+            });
           },
         });
       };
@@ -1065,9 +1100,6 @@ const AppStack_HomePageScreen: React.FC<Props> = ({ navigation, route }) => {
                 {upcomingMeeting ? (
                   insightSlide === 'traffic' ? (
                     <>
-                      <View style={styles.statusPill}>
-                        <Text style={styles.statusPillText}>Confirmed</Text>
-                      </View>
                       <View style={styles.previewMainRow}>
                         <View style={styles.avatarWrap}>
                           {getLocalAvatar(getOtherPerson(upcomingMeeting)?.phoneNumber) ? (
@@ -1089,9 +1121,13 @@ const AppStack_HomePageScreen: React.FC<Props> = ({ navigation, route }) => {
                           </Text>
                           <View style={styles.metaRow}>
                             <ClockGlyph />
-                            <Text style={styles.metaText}>{formatTimeRange(upcomingMeeting)}</Text>
-                            <PinGlyph />
                             <Text style={styles.metaText} numberOfLines={1}>
+                              {formatTimeRange(upcomingMeeting)}
+                            </Text>
+                            <PinGlyph />
+                            <Text
+                              style={[styles.metaText, styles.metaTextShrink]}
+                              numberOfLines={1}>
                               {getMeetingLocation(upcomingMeeting)}
                             </Text>
                           </View>
@@ -1572,21 +1608,16 @@ const styles = StyleSheet.create({
     borderRadius: h(18),
     borderWidth: 1,
     flex: 1,
-    minHeight: v(142),
-    padding: h(14),
-  },
-  statusPill: {
-    alignSelf: 'flex-start',
-    backgroundColor: COLORS.lightGreen,
-    borderRadius: h(12),
-    marginBottom: v(8),
-    paddingHorizontal: h(11),
-    paddingVertical: v(3),
-  },
-  statusPillText: {
-    color: '#64840F',
-    fontFamily: 'Inter_400Regular',
-    fontSize: ms(12),
+    // Fixed (not minHeight) so this always matches startDateCard's height
+    // exactly, since they sit side-by-side in the same row.
+    height: v(142),
+    // Extra bottom padding (beyond the h(14) used on the other three sides)
+    // reserves clear space for the absolutely-positioned slideDots below, so
+    // they don't crowd the confidence score bar, which is otherwise the last
+    // element in normal flow right above them.
+    paddingBottom: v(26),
+    paddingHorizontal: h(14),
+    paddingTop: h(14),
   },
   previewMainRow: {
     alignItems: 'center',
@@ -1622,6 +1653,13 @@ const styles = StyleSheet.create({
     color: COLORS.muted,
     fontFamily: 'Inter_400Regular',
     fontSize: ms(12),
+  },
+  // Only the location text is allowed to shrink/truncate — the clock icon,
+  // time, and pin icon stay full width so a long location name can no
+  // longer push the whole row past the card's edge (it was overflowing the
+  // card's right border instead of wrapping or truncating).
+  metaTextShrink: {
+    flexShrink: 1,
   },
   previewDivider: {
     backgroundColor: COLORS.line,
@@ -1697,7 +1735,7 @@ const styles = StyleSheet.create({
   },
   slideDots: {
     alignSelf: 'center',
-    bottom: v(8),
+    bottom: v(10),
     flexDirection: 'row',
     gap: h(4),
     position: 'absolute',
