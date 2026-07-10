@@ -33,8 +33,10 @@ import { getPlacesByQuery } from '~/helpers/common';
 import { formatPrice } from '~/helpers/hooks';
 import { http, mapApiKey } from '~/helpers/http';
 import { horizontalScale, moderateScale, verticalScale } from '~/helpers/responsive';
-import { AvailabilitySchedule } from '~/helpers/calendarAvailability';
-import { Avatar, SearchIcon, UpcomingIcon, LocationIcon, ChevronIcon, CheckIcon, CrossIcon, EditIcon } from '~/lib/images';
+import { AvailabilitySchedule, CalendarBusyEvent, isSlotBlocked } from '~/helpers/calendarAvailability';
+import { SearchIcon, UpcomingIcon, LocationIcon, ChevronIcon, CheckIcon, CrossIcon, EditIcon } from '~/lib/images';
+import { useDeviceContactAvatarMap } from '~/helpers/contactAvatars';
+import { ContactAvatar } from '~/components/ContactAvatar';
 
 type Props = NativeStackScreenProps<AppStackParamList, 'AppStack_SendCatchScreen'>;
 type FlowMode = 'one' | 'group';
@@ -53,6 +55,7 @@ interface HookOption {
   billingType?: 'fixed' | 'hourly' | null;
   description?: string | null;
   capacity?: number | null;
+  availabilitySlots: { weekday: number; startMinutes: number; endMinutes: number; isAvailable: boolean; isPaused: boolean }[];
 }
 
 interface Contact {
@@ -64,6 +67,7 @@ interface Contact {
     id: string;
     name: string;
     avatar?: string;
+    phoneNumber?: string;
   };
 }
 
@@ -105,6 +109,20 @@ function getDayOffset(dateString: string) {
   today.setHours(0, 0, 0, 0);
   target.setHours(0, 0, 0, 0);
   return Math.round((target.getTime() - today.getTime()) / (24 * 60 * 60 * 1000));
+}
+
+// Wide, fixed window for the one-time busy-events fetch (matches this
+// screen's practical "book sometime soon" usage) so day-rail navigation
+// doesn't need to keep refetching — same pattern as the Calendar screen's
+// broad upfront fetch.
+function busyEventsFetchRange() {
+  const start = new Date();
+  start.setDate(start.getDate() - 3);
+  start.setHours(0, 0, 0, 0);
+  const end = new Date();
+  end.setDate(end.getDate() + 30);
+  end.setHours(23, 59, 59, 999);
+  return { start: start.toISOString(), end: end.toISOString() };
 }
 
 function getVisibleDays(selectedOffset: number) {
@@ -238,6 +256,7 @@ const AppStack_SendCatchScreen: React.FC<Props> = ({ navigation, route }) => {
   const [hooksLoading, setHooksLoading] = useState(false);
   const [contacts, setContacts] = useState<Contact[]>([]);
   const [contactsLoading, setContactsLoading] = useState(true);
+  const { avatarMap } = useDeviceContactAvatarMap();
   const [selectedContacts, setSelectedContacts] = useState<Contact[]>(
     initialContact?.contactUser?.id ? [initialContact] : []
   );
@@ -279,6 +298,15 @@ const AppStack_SendCatchScreen: React.FC<Props> = ({ navigation, route }) => {
   const [loadingUserAvailability, setLoadingUserAvailability] = useState(true);
   const [recipientAvailabilities, setRecipientAvailabilities] = useState<Record<string, AvailabilitySchedule>>({});
   const [loadingRecipientAvailability, setLoadingRecipientAvailability] = useState(false);
+  // Actual busy time (existing approved meetings + connected calendar
+  // events) — the recurring weekly `AvailabilitySchedule` above only says
+  // "generally free on Tuesdays 9-5", it says nothing about a specific
+  // Tuesday already being booked. Without this, the slot picker could
+  // offer a time that looks open but the backend then rejects on submit.
+  const [senderBusyEvents, setSenderBusyEvents] = useState<CalendarBusyEvent[]>([]);
+  const [loadingSenderBusy, setLoadingSenderBusy] = useState(true);
+  const [recipientBusyEvents, setRecipientBusyEvents] = useState<Record<string, CalendarBusyEvent[]>>({});
+  const [loadingRecipientBusy, setLoadingRecipientBusy] = useState(false);
   const visibleDays = useMemo(() => getVisibleDays(selectedDayIndex), [selectedDayIndex]);
   const selectedStartLabel = selectedTime ? formatTimeString(selectedTime) : '';
   const selectedEndLabel = selectedTime
@@ -301,10 +329,20 @@ const AppStack_SendCatchScreen: React.FC<Props> = ({ navigation, route }) => {
       // Collect slots per participant for this weekday
       const allSlotSets: { startMinutes: number; endMinutes: number }[][] = [];
 
-      // Sender
-      const senderSlots = (userAvailability?.slots ?? [])
-        .filter((s) => s.weekday === weekday)
-        .map((s) => ({ startMinutes: s.startMinutes, endMinutes: s.endMinutes }));
+      // Sender — the hook picker (loadHooks) only ever lists the current
+      // user's OWN hooks, so when one is selected its availabilitySlots are
+      // the sender's own, more specific declaration for this particular
+      // meeting type (e.g. "my Yoga Class hook runs Mon/Wed/Fri 9-10am"),
+      // taking priority over their general recurring schedule.
+      const hookSlotsForDay = (selectedHook?.availabilitySlots ?? []).filter(
+        (s) => s.weekday === weekday && s.isAvailable && !s.isPaused
+      );
+      const senderSlots =
+        hookSlotsForDay.length > 0
+          ? hookSlotsForDay.map((s) => ({ startMinutes: s.startMinutes, endMinutes: s.endMinutes }))
+          : (userAvailability?.slots ?? [])
+              .filter((s) => s.weekday === weekday)
+              .map((s) => ({ startMinutes: s.startMinutes, endMinutes: s.endMinutes }));
       allSlotSets.push(senderSlots.length > 0 ? senderSlots : [{ startMinutes: 9 * 60, endMinutes: 17 * 60 }]);
 
       // Recipients
@@ -333,20 +371,39 @@ const AppStack_SendCatchScreen: React.FC<Props> = ({ navigation, route }) => {
         intersection = next.sort((a, b) => a.startMinutes - b.startMinutes);
       }
 
-      // Generate 15-min start times where the full meeting fits inside a window.
-      // Overlapping availability windows (e.g. two unmerged slots for the same
-      // person that share some minutes) can otherwise produce the same start
-      // time more than once, which would render two pills for one time slot —
-      // and both would light up as "selected" since they compare equal.
+      // Generate 15-min start times where the full meeting fits inside a
+      // window AND doesn't collide with anyone's actual busy time — the
+      // recurring AvailabilitySchedule above only says "generally free
+      // Tuesdays 9-5", not whether *this* Tuesday is already booked, which
+      // is what was letting the picker offer times the backend then
+      // rejected on submit. Overlapping availability windows (e.g. two
+      // unmerged slots for the same person that share some minutes) can
+      // otherwise produce the same start time more than once, hence the
+      // Set at the end.
+      const receiverBusyLists = selectedContacts
+        .map((c) => (c.contactUser?.id ? recipientBusyEvents[c.contactUser.id] : undefined))
+        .filter((events): events is CalendarBusyEvent[] => !!events);
+
       const slots: string[] = [];
       for (const window of intersection) {
         for (let minute = window.startMinutes; minute + duration <= window.endMinutes; minute += 15) {
+          const slotEnd = minute + duration;
+
+          const senderBlocked = isSlotBlocked(minute, slotEnd, dayDate, senderBusyEvents, {
+            hookId: selectedHook?.id,
+            capacity: selectedHook?.capacity,
+          });
+          if (senderBlocked) continue;
+
+          const receiverBlocked = receiverBusyLists.some((events) => isSlotBlocked(minute, slotEnd, dayDate, events));
+          if (receiverBlocked) continue;
+
           slots.push(minutesToTime(minute));
         }
       }
       return Array.from(new Set(slots));
     },
-    [duration, userAvailability, recipientAvailabilities, selectedContacts]
+    [duration, userAvailability, recipientAvailabilities, selectedContacts, selectedHook, senderBusyEvents, recipientBusyEvents]
   );
 
   const availableTimes = useMemo(
@@ -369,6 +426,7 @@ const AppStack_SendCatchScreen: React.FC<Props> = ({ navigation, route }) => {
         billingType: h.billingType ?? null,
         description: h.description ?? null,
         capacity: h.capacity ?? null,
+        availabilitySlots: h.availabilitySlots || [],
       }));
       setHooks(fetched);
       setSelectedHook((prev) => prev ?? (fetched[0] || null));
@@ -387,13 +445,24 @@ const AppStack_SendCatchScreen: React.FC<Props> = ({ navigation, route }) => {
       .then((res) => setUserAvailability(res.data))
       .catch(() => {/* keep fallback */})
       .finally(() => setLoadingUserAvailability(false));
+
+    const { start, end } = busyEventsFetchRange();
+    http
+      .get('/users/calendar-events', { params: { start, end } })
+      .then((res) => setSenderBusyEvents(res.data.events || []))
+      .catch(() => {/* keep empty — treated as "no known conflicts" */})
+      .finally(() => setLoadingSenderBusy(false));
   }, []);
 
   useFocusEffect(useCallback(() => {
     loadHooks();
   }, [loadHooks]));
 
-  // Fetch each recipient's availability whenever the contact selection changes
+  // Fetch each recipient's availability + actual busy events whenever the
+  // contact selection changes. Availability alone only says "generally
+  // free Tuesdays 9-5" — busy events are what catch a specific Tuesday
+  // already being booked, which is what was actually causing slots to look
+  // open in this picker yet get rejected by the backend on submit.
   useEffect(() => {
     const ids = selectedContacts
       .map((c) => c.contactUser?.id)
@@ -401,11 +470,14 @@ const AppStack_SendCatchScreen: React.FC<Props> = ({ navigation, route }) => {
 
     if (ids.length === 0) {
       setRecipientAvailabilities({});
+      setRecipientBusyEvents({});
       return;
     }
 
     let cancelled = false;
     setLoadingRecipientAvailability(true);
+    setLoadingRecipientBusy(true);
+    const { start, end } = busyEventsFetchRange();
 
     Promise.all(
       ids.map((id) =>
@@ -423,6 +495,24 @@ const AppStack_SendCatchScreen: React.FC<Props> = ({ navigation, route }) => {
       setRecipientAvailabilities(map);
     }).finally(() => {
       if (!cancelled) setLoadingRecipientAvailability(false);
+    });
+
+    Promise.all(
+      ids.map((id) =>
+        http
+          .get(`/users/${id}/calendar-events`, { params: { start, end } })
+          .then((res) => ({ id, events: (res.data.events || []) as CalendarBusyEvent[] }))
+          .catch(() => ({ id, events: [] as CalendarBusyEvent[] })),
+      ),
+    ).then((results) => {
+      if (cancelled) return;
+      const map: Record<string, CalendarBusyEvent[]> = {};
+      for (const { id, events } of results) {
+        map[id] = events;
+      }
+      setRecipientBusyEvents(map);
+    }).finally(() => {
+      if (!cancelled) setLoadingRecipientBusy(false);
     });
 
     return () => { cancelled = true; };
@@ -446,11 +536,11 @@ const AppStack_SendCatchScreen: React.FC<Props> = ({ navigation, route }) => {
   useEffect(() => {
     if (didPickInitialTimeRef.current) return;
     // Don't decide anything yet while the sender's or recipients' real
-    // availability is still loading — until then `availableTimes` is built
-    // from the temporary 9am-5pm fallback window, which could easily (and
-    // wrongly) look "exhausted" and jump straight to tomorrow before the
+    // availability/busy-events are still loading — until then `availableTimes`
+    // is built from the temporary 9am-5pm fallback window, which could easily
+    // (and wrongly) look "exhausted" and jump straight to tomorrow before the
     // real, possibly-later-running availability ever gets a chance to load.
-    if (loadingUserAvailability || loadingRecipientAvailability) return;
+    if (loadingUserAvailability || loadingRecipientAvailability || loadingSenderBusy || loadingRecipientBusy) return;
     didPickInitialTimeRef.current = true;
 
     if (selectedDayIndex === 0) {
@@ -482,6 +572,8 @@ const AppStack_SendCatchScreen: React.FC<Props> = ({ navigation, route }) => {
     computeAvailableTimesForDay,
     loadingUserAvailability,
     loadingRecipientAvailability,
+    loadingSenderBusy,
+    loadingRecipientBusy,
   ]);
 
   useEffect(() => {
@@ -808,8 +900,10 @@ const AppStack_SendCatchScreen: React.FC<Props> = ({ navigation, route }) => {
                 ]}
                 onPress={() => toggleContact(contact)}>
                 <View style={styles.contactAvatarWrap}>
-                  <Image
-                    source={contact.contactUser?.avatar ? { uri: contact.contactUser.avatar } : Avatar}
+                  <ContactAvatar
+                    avatarMap={avatarMap}
+                    hashedPhoneNumber={contact.contactUser?.phoneNumber}
+                    profileAvatarUrl={contact.contactUser?.avatar}
                     style={[styles.contactAvatar, !isRegistered && { opacity: 0.4 }]}
                   />
                   {isRegistered && (
@@ -1022,7 +1116,7 @@ const AppStack_SendCatchScreen: React.FC<Props> = ({ navigation, route }) => {
           paddingHorizontal: h(16),
           paddingBottom: v(180),
         }}>
-        {loadingUserAvailability || loadingRecipientAvailability ? (
+        {loadingUserAvailability || loadingRecipientAvailability || loadingSenderBusy || loadingRecipientBusy ? (
           <ActivityIndicator size="large" color={COLORS.green} style={{ marginTop: v(40) }} />
         ) : (
           <>
@@ -1451,8 +1545,10 @@ const AppStack_SendCatchScreen: React.FC<Props> = ({ navigation, route }) => {
               key={contact.id}
               style={styles.inviteeContact}
               onPress={() => toggleContact(contact)}>
-              <Image
-                source={contact.contactUser?.avatar ? { uri: contact.contactUser.avatar } : Avatar}
+              <ContactAvatar
+                avatarMap={avatarMap}
+                hashedPhoneNumber={contact.contactUser?.phoneNumber}
+                profileAvatarUrl={contact.contactUser?.avatar}
                 style={styles.inviteeAvatar}
               />
               <View style={styles.plusBadge}>
@@ -1555,7 +1651,9 @@ const CustomizeRow = ({
   onPress?: () => void;
   disabled?: boolean;
   avatars?: Contact[];
-}) => (
+}) => {
+  const { avatarMap } = useDeviceContactAvatarMap();
+  return (
   <TouchableOpacity
     style={[styles.customRow, disabled && styles.disabledRow]}
     onPress={onPress}
@@ -1566,9 +1664,11 @@ const CustomizeRow = ({
     {avatars ? (
       <View style={styles.rowAvatars}>
         {avatars.slice(0, 4).map((contact, index) => (
-          <Image
+          <ContactAvatar
             key={contact.id}
-            source={contact.contactUser?.avatar ? { uri: contact.contactUser.avatar } : Avatar}
+            avatarMap={avatarMap}
+            hashedPhoneNumber={contact.contactUser?.phoneNumber}
+            profileAvatarUrl={contact.contactUser?.avatar}
             style={[styles.rowAvatar, { marginLeft: index === 0 ? 0 : -h(10) }]}
           />
         ))}
@@ -1579,18 +1679,24 @@ const CustomizeRow = ({
     <View style={styles.customSpacer} />
     {control || <Image source={ChevronIcon} style={{ width: h(16), height: h(16) }} tintColor={COLORS.muted} />}
   </TouchableOpacity>
-);
+  );
+};
 
-const InviteeChip = ({ contact, onRemove }: { contact: Contact; onRemove: () => void }) => (
+const InviteeChip = ({ contact, onRemove }: { contact: Contact; onRemove: () => void }) => {
+  const { avatarMap } = useDeviceContactAvatarMap();
+  return (
   <TouchableOpacity style={styles.inviteeChip} onPress={onRemove}>
-    <Image
-      source={contact.contactUser?.avatar ? { uri: contact.contactUser.avatar } : Avatar}
+    <ContactAvatar
+      avatarMap={avatarMap}
+      hashedPhoneNumber={contact.contactUser?.phoneNumber}
+      profileAvatarUrl={contact.contactUser?.avatar}
       style={styles.chipAvatar}
     />
     <Text style={styles.chipText}>{contact.displayName}</Text>
     <Image source={CrossIcon} style={{ width: h(14), height: h(14), marginLeft: h(8) }} tintColor={COLORS.muted} />
   </TouchableOpacity>
-);
+  );
+};
 
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: COLORS.background },

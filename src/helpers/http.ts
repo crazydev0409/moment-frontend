@@ -7,5 +7,4 @@ export const http = axios.create({
     'Content-Type': 'application/json',
   },
 });
-export const uploadPath = 'http://10.0.2.2:3000/uploads/';
 export const mapApiKey = process.env.EXPO_PUBLIC_GOOGLE_PLACES_API_KEY;

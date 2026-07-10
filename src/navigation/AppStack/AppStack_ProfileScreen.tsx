@@ -1,6 +1,7 @@
 import React, { useCallback, useState } from 'react';
 import {
   ActivityIndicator,
+  Alert,
   Image,
   Modal,
   ScrollView,
@@ -12,6 +13,8 @@ import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { useFocusEffect } from '@react-navigation/native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useAtom } from 'jotai';
+import * as ImagePicker from 'expo-image-picker';
+import * as ImageManipulator from 'expo-image-manipulator';
 
 import tw from '~/tailwindcss';
 import { AppStackParamList } from '.';
@@ -50,6 +53,7 @@ const AppStack_ProfileScreen: React.FC<Props> = ({ navigation }) => {
   const [user, setUser] = useAtom(userAtom);
   const [showLogoutModal, setShowLogoutModal] = useState(false);
   const [isLoggingOut, setIsLoggingOut] = useState(false);
+  const [isUploadingAvatar, setIsUploadingAvatar] = useState(false);
 
   const resetUserAtom = () => {
     setUser({
@@ -74,6 +78,53 @@ const AppStack_ProfileScreen: React.FC<Props> = ({ navigation }) => {
   }, [setUser]);
 
   useFocusEffect(useCallback(() => { fetchProfile(); }, [fetchProfile]));
+
+  const changeAvatar = async () => {
+    try {
+      const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (!permission.granted) {
+        Alert.alert('Photo access needed', 'Allow photo library access to set a profile picture.');
+        return;
+      }
+
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: 'images',
+        allowsEditing: true,
+        aspect: [1, 1],
+        quality: 0.8,
+      });
+      if (result.canceled || !result.assets[0]) return;
+
+      setIsUploadingAvatar(true);
+      // Resize/compress client-side so the upload stays small regardless of
+      // the source photo's original resolution. Uploaded as a real file
+      // (not embedded as base64) — a base64 data URI renders unreliably as
+      // an <Image> source on-device, especially on Android, while a normal
+      // hosted URL (what this now produces) always works.
+      const manipulated = await ImageManipulator.manipulateAsync(
+        result.assets[0].uri,
+        [{ resize: { width: 512, height: 512 } }],
+        { compress: 0.7, format: ImageManipulator.SaveFormat.JPEG }
+      );
+
+      const formData = new FormData();
+      formData.append('avatar', {
+        uri: manipulated.uri,
+        name: 'avatar.jpg',
+        type: 'image/jpeg',
+      } as any);
+
+      const res = await http.post('/users/profile/avatar', formData, {
+        headers: { 'Content-Type': 'multipart/form-data' },
+      });
+      if (res.data?.user) setUser(res.data.user);
+    } catch (error) {
+      console.error('Error updating avatar:', error);
+      Alert.alert('Something went wrong', 'Could not update your profile picture. Please try again.');
+    } finally {
+      setIsUploadingAvatar(false);
+    }
+  };
 
   const doLogout = async () => {
     setShowLogoutModal(false);
@@ -169,14 +220,17 @@ const AppStack_ProfileScreen: React.FC<Props> = ({ navigation }) => {
         <View style={[tw`items-center`, { marginBottom: verticalScale(28) }]}>
           <TouchableOpacity
             activeOpacity={0.8}
-            onPress={() => navigation.navigate('AppStack_ProfileSettingsScreen')}
+            onPress={changeAvatar}
+            disabled={isUploadingAvatar}
             style={{ position: 'relative', marginBottom: verticalScale(12) }}>
             <View
               style={[
                 tw`rounded-full overflow-hidden items-center justify-center`,
                 { width: horizontalScale(88), height: horizontalScale(88), backgroundColor: colors.field },
               ]}>
-              {(user as any)?.avatar ? (
+              {isUploadingAvatar ? (
+                <ActivityIndicator color={colors.green} />
+              ) : (user as any)?.avatar ? (
                 <Image source={{ uri: (user as any).avatar }} style={{ width: '100%', height: '100%' }} />
               ) : (
                 <Image source={Avatar} style={{ width: horizontalScale(52), height: horizontalScale(52) }} />

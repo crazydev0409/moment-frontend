@@ -23,6 +23,7 @@ import { http } from '~/helpers/http';
 import { horizontalScale, verticalScale, moderateScale } from '~/helpers/responsive';
 import { colors } from '~/lib/theme';
 import { hashPhoneNumber } from '~/utils/phoneHash';
+import { resolveContactAvatarUri, useDeviceContactAvatarMap } from '~/helpers/contactAvatars';
 
 type Props = NativeStackScreenProps<AppStackParamList, 'AppStack_ContactScreen'>;
 
@@ -49,6 +50,9 @@ const AppStack_ContactScreen: React.FC<Props> = ({ navigation }) => {
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [notifCount, setNotifCount] = useState(0);
+  // This is the one screen responsible for actually prompting for Contacts
+  // access — every other screen just reads whatever's already granted.
+  const { refreshAvatarMap } = useDeviceContactAvatarMap({ requestPermission: true });
 
   const loadContacts = useCallback(async (showSpinner = true) => {
     try {
@@ -61,30 +65,11 @@ const AppStack_ContactScreen: React.FC<Props> = ({ navigation }) => {
         finalStatus = status;
       }
 
-      const phoneToAvatarMap = new Map<string, string>();
-
       if (finalStatus === 'granted') {
-        const { data } = await Contacts.getContactsAsync({
-          fields: [Contacts.Fields.Name, Contacts.Fields.Image, Contacts.Fields.PhoneNumbers],
-        });
-
-        await Promise.all(
-          data.map(async (c) => {
-            if (c.phoneNumbers && c.image?.uri) {
-              await Promise.all(
-                c.phoneNumbers.map(async (p) => {
-                  const norm = p.number?.replace(/[\s\-\(\)]/g, '') || '';
-                  if (norm) {
-                    const hashed = await hashPhoneNumber(norm);
-                    phoneToAvatarMap.set(hashed, c.image!.uri!);
-                  }
-                })
-              );
-            }
-          })
-        );
-
         try {
+          const { data } = await Contacts.getContactsAsync({
+            fields: [Contacts.Fields.Name, Contacts.Fields.PhoneNumbers],
+          });
           const importable = data
             .filter((c) => c.name && c.phoneNumbers?.length)
             .map((c) => ({
@@ -101,16 +86,35 @@ const AppStack_ContactScreen: React.FC<Props> = ({ navigation }) => {
         }
       }
 
+      // Refresh (rather than just read) the shared device-contact-photo map
+      // so it reflects a permission grant/import that may have just happened.
+      const currentAvatarMap = await refreshAvatarMap();
+
       const res = await http.get('/users/contacts');
       const backendContacts: BackendContact[] = res.data.contacts || [];
 
-      const formatted: DisplayContact[] = backendContacts.map((bc) => ({
-        id: bc.id,
-        name: bc.displayName || 'Unknown',
-        imageUri: bc.contactPhone ? phoneToAvatarMap.get(bc.contactPhone) : undefined,
-        backend: bc,
-        isRegistered: !!(bc.contactUserId || bc.contactUser?.id),
-      }));
+      const formatted: DisplayContact[] = await Promise.all(
+        backendContacts.map(async (bc) => {
+          // Contact.contactPhone is stored as plain E.164 server-side
+          // (unlike User.phoneNumber, which is hashed), so it must be
+          // hashed the same way as every other lookup key before it can
+          // match the device-contact-photo map.
+          let hashedContactPhone: string | undefined;
+          if (bc.contactPhone) {
+            const normalized = bc.contactPhone.replace(/[\s\-()]/g, '');
+            if (normalized) hashedContactPhone = await hashPhoneNumber(normalized);
+          }
+          return {
+            id: bc.id,
+            name: bc.displayName || 'Unknown',
+            imageUri:
+              resolveContactAvatarUri(currentAvatarMap, hashedContactPhone, bc.contactUser?.avatar) ||
+              undefined,
+            backend: bc,
+            isRegistered: !!(bc.contactUserId || bc.contactUser?.id),
+          };
+        })
+      );
 
       formatted.sort((a, b) => {
         if (a.isRegistered !== b.isRegistered) return a.isRegistered ? -1 : 1;
@@ -131,7 +135,7 @@ const AppStack_ContactScreen: React.FC<Props> = ({ navigation }) => {
       setIsLoading(false);
       setIsRefreshing(false);
     }
-  }, []);
+  }, [refreshAvatarMap]);
 
   useFocusEffect(
     useCallback(() => {
@@ -226,7 +230,7 @@ const AppStack_ContactScreen: React.FC<Props> = ({ navigation }) => {
                 ]}>
                 <Text
                   style={[tw`font-associate-bold`, { color: colors.white, fontSize: moderateScale(10) }]}>
-                  {notifCount}
+                  {notifCount > 9 ? '9+' : notifCount}
                 </Text>
               </View>
             )}

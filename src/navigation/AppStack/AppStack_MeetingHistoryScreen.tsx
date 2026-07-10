@@ -18,6 +18,7 @@ import { http } from '~/helpers/http';
 import { horizontalScale, verticalScale, moderateScale } from '~/helpers/responsive';
 import { colors } from '~/lib/theme';
 import { formatPrice } from '~/helpers/hooks';
+import { resolveContactAvatarUri, useDeviceContactAvatarMap } from '~/helpers/contactAvatars';
 
 type Props = NativeStackScreenProps<AppStackParamList, 'AppStack_MeetingHistoryScreen'>;
 
@@ -34,7 +35,8 @@ interface MeetingRequest {
   currency?: string;
   senderId: string;
   receiverId: string;
-  participants?: Array<{ user?: { avatar?: string | null } | null }>;
+  sender?: { id: string; name?: string | null; avatar?: string | null; phoneNumber?: string | null } | null;
+  receiver?: { id: string; name?: string | null; avatar?: string | null; phoneNumber?: string | null } | null;
 }
 
 const GlobeIcon = ({ size = 13, color = '#6F7780' }: { size?: number; color?: string }) => (
@@ -50,6 +52,7 @@ const AppStack_MeetingHistoryScreen: React.FC<Props> = ({ navigation, route }) =
   const [pastMeetings, setPastMeetings] = useState<MeetingRequest[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const { avatarMap } = useDeviceContactAvatarMap();
 
   const load = async (showSpinner = true) => {
     try {
@@ -105,7 +108,7 @@ const AppStack_MeetingHistoryScreen: React.FC<Props> = ({ navigation, route }) =
     return d.toLocaleDateString('en-US', { day: 'numeric', month: 'short' });
   };
 
-  const renderAvatarStack = (participants?: Array<{ user?: { avatar?: string | null } | null }>) => {
+  const renderAvatarStack = (participants?: Array<{ user?: { avatar?: string | null; phoneNumber?: string | null } | null }>) => {
     if (!participants || participants.length === 0) return null;
     const shown = participants.slice(0, 4);
     const extra = participants.length - shown.length;
@@ -125,8 +128,11 @@ const AppStack_MeetingHistoryScreen: React.FC<Props> = ({ navigation, route }) =
                 backgroundColor: colors.field,
               },
             ]}>
-            {p.user?.avatar ? (
-              <Image source={{ uri: p.user.avatar }} style={{ width: '100%', height: '100%' }} />
+            {resolveContactAvatarUri(avatarMap, p.user?.phoneNumber, p.user?.avatar) ? (
+              <Image
+                source={{ uri: resolveContactAvatarUri(avatarMap, p.user?.phoneNumber, p.user?.avatar)! }}
+                style={{ width: '100%', height: '100%' }}
+              />
             ) : (
               <Image source={Avatar} style={{ width: horizontalScale(18), height: horizontalScale(18) }} />
             )}
@@ -233,7 +239,11 @@ const AppStack_MeetingHistoryScreen: React.FC<Props> = ({ navigation, route }) =
                 </View>
 
                 <View style={{ marginTop: verticalScale(10) }}>
-                  {renderAvatarStack(m.participants)}
+                  {renderAvatarStack(
+                    (m.senderId === contactUserId ? m.sender : m.receiver)
+                      ? [{ user: m.senderId === contactUserId ? m.sender : m.receiver }]
+                      : undefined
+                  )}
                 </View>
               </View>
             ))

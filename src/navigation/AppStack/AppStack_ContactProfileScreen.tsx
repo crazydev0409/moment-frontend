@@ -25,6 +25,7 @@ import { horizontalScale as h, verticalScale as v, moderateScale as ms } from '~
 const horizontalScale = h, verticalScale = v, moderateScale = ms;
 import { colors, accessBadge } from '~/lib/theme';
 import { Hook, formatDuration, formatPrice } from '~/helpers/hooks';
+import { resolveContactAvatarUri, useDeviceContactAvatarMap } from '~/helpers/contactAvatars';
 
 const GlobeIcon = ({ size = 13, color = colors.grey }: { size?: number; color?: string }) => (
   <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
@@ -189,14 +190,14 @@ interface MeetingRequest {
   priceCents?: number | null;
   currency?: string;
   confidenceScore?: number | null;
-  participants?: Array<{ user?: { avatar?: string | null } | null }>;
+  participants?: Array<{ user?: { avatar?: string | null; phoneNumber?: string | null } | null }>;
 }
 
 interface ContactDetail {
   id: string;
   displayName: string;
   autoConfirm: boolean;
-  contactUser?: { id: string; name?: string | null; avatar?: string | null; bio?: string | null; accountType?: string | null } | null;
+  contactUser?: { id: string; name?: string | null; avatar?: string | null; phoneNumber?: string | null; bio?: string | null; accountType?: string | null } | null;
   contactUserId?: string | null;
 }
 
@@ -212,6 +213,7 @@ const AppStack_ContactProfileScreen: React.FC<Props> = ({ navigation, route }) =
   const [isBlocked, setIsBlocked] = useState(false);
   const [autoConfirm, setAutoConfirm] = useState(false);
   const [expandedHooks, setExpandedHooks] = useState<Record<string, boolean>>({});
+  const { avatarMap } = useDeviceContactAvatarMap();
 
   const load = useCallback(async (showSpinner = true) => {
     try {
@@ -255,9 +257,12 @@ const AppStack_ContactProfileScreen: React.FC<Props> = ({ navigation, route }) =
         }
       }
 
-      // Check if blocked
+      // Check if blocked — each entry is a BlockedContact row ({id, blockerId,
+      // blockedId, blocked: User}), so `id` is the block record's own row id,
+      // not the blocked user's id. Comparing against `blockedId` (or
+      // equivalently `.blocked.id`) is what actually identifies the user.
       const blockedRes = await http.get('/users/blocked').catch(() => ({ data: { blockedUsers: [] } }));
-      const blockedIds: string[] = (blockedRes.data.blockedUsers || []).map((u: any) => u.id);
+      const blockedIds: string[] = (blockedRes.data.blockedUsers || []).map((u: any) => u.blockedId);
       if (contactUid) setIsBlocked(blockedIds.includes(contactUid));
     } catch (err) {
       console.error('ContactProfile load error:', err);
@@ -299,6 +304,11 @@ const AppStack_ContactProfileScreen: React.FC<Props> = ({ navigation, route }) =
       } else {
         await http.delete(`/users/unblock/${uid}`);
       }
+      // Blocking/unblocking changes what the Hooks tab can see (the backend
+      // 403s that fetch for a blocked relationship) — reload everything
+      // right away instead of leaving the tabs showing stale pre-toggle
+      // data until the user happens to navigate away and back.
+      await load(false);
     } catch {
       setIsBlocked(!val);
       Alert.alert('Error', 'Could not update block setting.');
@@ -333,7 +343,7 @@ const AppStack_ContactProfileScreen: React.FC<Props> = ({ navigation, route }) =
     return d.toLocaleDateString('en-US', { day: 'numeric', month: 'short' });
   };
 
-  const renderAvatarStack = (participants?: Array<{ user?: { avatar?: string | null } | null }>) => {
+  const renderAvatarStack = (participants?: Array<{ user?: { avatar?: string | null; phoneNumber?: string | null } | null }>) => {
     if (!participants || participants.length === 0) return null;
     const shown = participants.slice(0, 4);
     const extra = participants.length - shown.length;
@@ -353,8 +363,11 @@ const AppStack_ContactProfileScreen: React.FC<Props> = ({ navigation, route }) =
                 backgroundColor: colors.field,
               },
             ]}>
-            {p.user?.avatar ? (
-              <Image source={{ uri: p.user.avatar }} style={{ width: '100%', height: '100%' }} />
+            {resolveContactAvatarUri(avatarMap, p.user?.phoneNumber, p.user?.avatar) ? (
+              <Image
+                source={{ uri: resolveContactAvatarUri(avatarMap, p.user?.phoneNumber, p.user?.avatar)! }}
+                style={{ width: '100%', height: '100%' }}
+              />
             ) : (
               <Image source={Avatar} style={{ width: horizontalScale(16), height: horizontalScale(16) }} />
             )}
@@ -608,8 +621,11 @@ const AppStack_ContactProfileScreen: React.FC<Props> = ({ navigation, route }) =
                 tw`rounded-full overflow-hidden items-center justify-center`,
                 { width: horizontalScale(64), height: horizontalScale(64), backgroundColor: colors.field, marginRight: horizontalScale(14) },
               ]}>
-              {contactUser?.avatar ? (
-                <Image source={{ uri: contactUser.avatar }} style={{ width: '100%', height: '100%' }} />
+              {resolveContactAvatarUri(avatarMap, contactUser?.phoneNumber, contactUser?.avatar) ? (
+                <Image
+                  source={{ uri: resolveContactAvatarUri(avatarMap, contactUser?.phoneNumber, contactUser?.avatar)! }}
+                  style={{ width: '100%', height: '100%' }}
+                />
               ) : (
                 <Image source={Avatar} style={{ width: horizontalScale(38), height: horizontalScale(38) }} />
               )}

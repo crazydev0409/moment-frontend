@@ -1,5 +1,4 @@
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
-import * as Contacts from 'expo-contacts';
 import React, { useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
@@ -20,8 +19,9 @@ import { AppStackParamList } from '.';
 
 import { http } from '~/helpers/http';
 import { horizontalScale, moderateScale, verticalScale } from '~/helpers/responsive';
-import { Avatar, SearchIcon } from '~/lib/images';
-import { hashPhoneNumber } from '~/utils/phoneHash';
+import { SearchIcon } from '~/lib/images';
+import { useDeviceContactAvatarMap } from '~/helpers/contactAvatars';
+import { ContactAvatar } from '~/components/ContactAvatar';
 
 type Props = NativeStackScreenProps<AppStackParamList, 'AppStack_SearchScreen'>;
 
@@ -134,12 +134,11 @@ const AppStack_SearchScreen: React.FC<Props> = ({ navigation }) => {
   const [meetings, setMeetings] = useState<MomentRequest[]>([]);
   const [loading, setLoading] = useState(true);
   const [userId, setUserId] = useState<string>('');
-  const [localAvatars, setLocalAvatars] = useState<Map<string, string>>(new Map());
+  const { avatarMap: localAvatars } = useDeviceContactAvatarMap();
 
   useEffect(() => {
     fetchUserData();
     fetchMeetings();
-    loadLocalContactAvatars();
   }, []);
 
   const fetchUserData = async () => {
@@ -174,41 +173,6 @@ const AppStack_SearchScreen: React.FC<Props> = ({ navigation }) => {
     }
   };
 
-  const loadLocalContactAvatars = async () => {
-    try {
-      const { status } = await Contacts.getPermissionsAsync();
-
-      if (status === 'granted') {
-        const { data } = await Contacts.getContactsAsync({
-          fields: [Contacts.Fields.Name, Contacts.Fields.Image, Contacts.Fields.PhoneNumbers],
-        });
-
-        const phoneToAvatarMap = new Map<string, string>();
-
-        await Promise.all(
-          data.map(async (contact) => {
-            if (contact.phoneNumbers && contact.phoneNumbers.length > 0 && contact.image?.uri) {
-              const avatarUri = contact.image.uri;
-              await Promise.all(
-                contact.phoneNumbers.map(async (phone) => {
-                  const normalized = phone.number?.replace(/[\s\-()]/g, '') || '';
-                  if (normalized && avatarUri) {
-                    const hashed = await hashPhoneNumber(normalized);
-                    phoneToAvatarMap.set(hashed, avatarUri);
-                  }
-                })
-              );
-            }
-          })
-        );
-
-        setLocalAvatars(phoneToAvatarMap);
-      }
-    } catch (error) {
-      console.error('Error loading local contact avatars:', error);
-    }
-  };
-
   const getOtherPerson = (meeting: MomentRequest) =>
     meeting.senderId === userId ? meeting.receiver : meeting.sender;
 
@@ -228,11 +192,6 @@ const AppStack_SearchScreen: React.FC<Props> = ({ navigation }) => {
     const placeMatch = text.match(/(?:at|location:)\s*([^,\n]+)/i);
     if (placeMatch?.[1]) return placeMatch[1].trim();
     return meeting.meetingType?.toLowerCase().includes('remote') ? 'Remote' : '';
-  };
-
-  const getLocalAvatar = (phoneNumber?: string) => {
-    if (!phoneNumber) return null;
-    return localAvatars.get(phoneNumber) || null;
   };
 
   const getConfidence = (meeting: MomentRequest) =>
@@ -334,7 +293,6 @@ const AppStack_SearchScreen: React.FC<Props> = ({ navigation }) => {
             ) : filteredMeetings.length > 0 ? (
               filteredMeetings.map((meeting) => {
                 const otherPerson = getOtherPerson(meeting);
-                const localAvatar = getLocalAvatar(otherPerson?.phoneNumber);
                 const isPending = meeting.status?.toLowerCase() === 'pending';
                 const isPaid = Boolean(meeting.meetingType?.toLowerCase().includes('paid'));
                 const confidence = getConfidence(meeting);
@@ -384,17 +342,14 @@ const AppStack_SearchScreen: React.FC<Props> = ({ navigation }) => {
                     )}
 
                     <View style={styles.attendeeRow}>
-                      {Array.from({ length: isPaid ? 1 : 4 }).map((_, index) => (
-                        <View
-                          key={`${meeting.id}-avatar-${index}`}
-                          style={[styles.smallAvatar, { marginLeft: index === 0 ? 0 : -h(8) }]}>
-                          {index === 0 && localAvatar ? (
-                            <Image source={{ uri: localAvatar }} style={styles.smallAvatarImage} />
-                          ) : (
-                            <Image source={Avatar} style={styles.smallAvatarImage} />
-                          )}
-                        </View>
-                      ))}
+                      <View style={styles.smallAvatar}>
+                        <ContactAvatar
+                          avatarMap={localAvatars}
+                          hashedPhoneNumber={otherPerson?.phoneNumber}
+                          profileAvatarUrl={otherPerson?.avatar}
+                          style={styles.smallAvatarImage}
+                        />
+                      </View>
                     </View>
 
                     <View style={styles.cardDivider} />

@@ -32,9 +32,11 @@ import { http } from '~/helpers/http';
 import { horizontalScale, moderateScale, verticalScale } from '~/helpers/responsive';
 import { AvailabilitySchedule } from '~/helpers/calendarAvailability';
 import { layoutEventsForDay, layoutEventsForMonthRow, dayKey } from '~/helpers/calendarLayout';
-import { Avatar, NotificationsIcon, GoogleCalendarIcon, OutlookIcon, HookIcon, CheckIcon } from '~/lib/images';
+import { NotificationsIcon, GoogleCalendarIcon, OutlookIcon, HookIcon, CheckIcon } from '~/lib/images';
 import { setupSocketEventListeners, getSocket, initializeSocket } from '~/services/socketService';
 import { userAtom } from '~/store';
+import { useDeviceContactAvatarMap } from '~/helpers/contactAvatars';
+import { ContactAvatar } from '~/components/ContactAvatar';
 
 type Props = NativeStackScreenProps<AppStackParamList, 'AppStack_CalendarScreen'>;
 
@@ -316,6 +318,7 @@ function getUnavailableBands(
 const AppStack_CalendarScreen: React.FC<Props> = ({ navigation, route }) => {
   const insets = useSafeAreaInsets();
   const [user] = useAtom(userAtom);
+  const { avatarMap } = useDeviceContactAvatarMap();
 
   const routeDate = route.params?.date;
   const routeContact = route.params?.contact;
@@ -515,9 +518,14 @@ const AppStack_CalendarScreen: React.FC<Props> = ({ navigation, route }) => {
     })
   ).current;
 
-  const loadCalendarData = useCallback(async () => {
+  // showSpinner=false is for socket-driven background refreshes (a new/
+  // updated meeting arrived) — the data still gets refetched fully, it just
+  // doesn't flip the full-screen loading state, so the event list updates
+  // in place once the fetch resolves instead of flashing a spinner over
+  // whatever the user is currently looking at.
+  const loadCalendarData = useCallback(async (showSpinner = true) => {
     try {
-      setLoading(true);
+      if (showSpinner) setLoading(true);
       const [integrationsResponse, receivedResponse, sentResponse, contactsResponse, availabilityResponse] =
         await Promise.all([
           http.get('/users/calendar-integrations'),
@@ -687,9 +695,12 @@ const AppStack_CalendarScreen: React.FC<Props> = ({ navigation, route }) => {
     }
   }, [routeMomentRequestId, events]);
 
+  // Silent — the user is coming back to a screen that already has (maybe
+  // slightly stale) data; this just seamlessly syncs it rather than
+  // flashing a spinner every time they switch tabs back to Calendar.
   useFocusEffect(
     useCallback(() => {
-      loadCalendarData();
+      loadCalendarData(false);
       http.get('/users/notifications').then((res) => {
         const notifs = res.data.notifications || [];
         setUnreadNotifCount(notifs.filter((n: any) => !n.isRead).length);
@@ -707,7 +718,7 @@ const AppStack_CalendarScreen: React.FC<Props> = ({ navigation, route }) => {
         eventType === 'moment.request.created' ||
         eventType === 'moment.request.canceled'
       ) {
-        setTimeout(() => loadCalendarData(), 1000);
+        setTimeout(() => loadCalendarData(false), 1000);
       }
     });
     return () => subscription.remove();
@@ -731,13 +742,26 @@ const AppStack_CalendarScreen: React.FC<Props> = ({ navigation, route }) => {
         if (!currentSocket?.connected) return;
         if (cleanup) cleanup();
 
+        // Background refresh, not a full reload with a spinner — a new/
+        // updated meeting should just appear once the refetch resolves,
+        // the same way Google Calendar's live sync never interrupts
+        // whatever the user is currently looking at. Deferred past any
+        // in-progress navigation/transition for the same reason as
+        // HomePageScreen's socket handlers (auto-confirm can make an
+        // "approved" event arrive essentially instantly, sometimes right
+        // as this screen is still transitioning in) — a plain setTimeout(0)
+        // is what actually avoids react-native-screens' "useInsertionEffect
+        // must not schedule updates" warning here, not InteractionManager
+        // (which only tracks JS-driven interactions, not native transitions).
         cleanup = setupSocketEventListeners({
-          onMomentRequest: () => loadCalendarData(),
+          onMomentRequest: () => {
+            setTimeout(() => loadCalendarData(false), 0);
+          },
           onMomentResponse: () => {
-            setTimeout(() => loadCalendarData(), 1000);
+            setTimeout(() => loadCalendarData(false), 1000);
           },
           onMomentCanceled: () => {
-            setTimeout(() => loadCalendarData(), 1000);
+            setTimeout(() => loadCalendarData(false), 1000);
           },
         });
       };
@@ -864,7 +888,10 @@ const AppStack_CalendarScreen: React.FC<Props> = ({ navigation, route }) => {
       await http.post(`/users/moment-requests/${selectedEvent.id}/respond`, { approved });
       setSheet(null);
       setSelectedEvent(null);
-      await loadCalendarData();
+      // Silent — the Confirm/Decline button already shows its own inline
+      // spinner via respondingToEvent, no need to also flash the full-screen
+      // loading state on top of that.
+      await loadCalendarData(false);
       showSuccessToast(
         approved ? 'Meeting confirmed' : 'Meeting declined',
         approved
@@ -983,14 +1010,14 @@ const AppStack_CalendarScreen: React.FC<Props> = ({ navigation, route }) => {
                 position: 'absolute',
                 top: -2,
                 right: -2,
-                width: h(16),
-                height: h(16),
-                borderRadius: h(8),
+                width: h(18),
+                height: h(18),
+                borderRadius: h(9),
                 backgroundColor: COLORS.green,
                 alignItems: 'center',
                 justifyContent: 'center',
               }}>
-              <Text style={{ color: COLORS.white, fontSize: ms(9), fontFamily: 'AssociateSansBold' }}>
+              <Text style={{ color: COLORS.white, fontSize: ms(10), fontFamily: 'AssociateSansBold' }}>
                 {unreadNotifCount > 9 ? '9+' : unreadNotifCount}
               </Text>
             </View>
@@ -1941,8 +1968,10 @@ const AppStack_CalendarScreen: React.FC<Props> = ({ navigation, route }) => {
                 key={person.id}
                 style={styles.inviteeChip}
                 onPress={() => setRemoveInvitee(person)}>
-                <Image
-                  source={person.avatar ? { uri: person.avatar } : Avatar}
+                <ContactAvatar
+                  avatarMap={avatarMap}
+                  hashedPhoneNumber={person.phoneNumber}
+                  profileAvatarUrl={person.avatar}
                   style={styles.chipAvatar}
                 />
                 <Text style={styles.chipText}>
@@ -2441,9 +2470,16 @@ const PersonBubble = ({
   removable?: boolean;
   onRemove?: () => void;
   addable?: boolean;
-}) => (
+}) => {
+  const { avatarMap } = useDeviceContactAvatarMap();
+  return (
   <View style={styles.personBubble}>
-    <Image source={person.avatar ? { uri: person.avatar } : Avatar} style={styles.personAvatar} />
+    <ContactAvatar
+      avatarMap={avatarMap}
+      hashedPhoneNumber={person.phoneNumber}
+      profileAvatarUrl={person.avatar}
+      style={styles.personAvatar}
+    />
     {selectable ? (
       <View style={styles.personCheck}>
         <Image source={CheckIcon} style={{ width: ms(11), height: ms(11) }} tintColor={COLORS.white} />
@@ -2461,7 +2497,8 @@ const PersonBubble = ({
     ) : null}
     <Text style={styles.personName}>{person.name || person.phoneNumber || 'Invitee'}</Text>
   </View>
-);
+  );
+};
 
 function cleanTitle(title?: string) {
   if (!title) return 'Meeting';

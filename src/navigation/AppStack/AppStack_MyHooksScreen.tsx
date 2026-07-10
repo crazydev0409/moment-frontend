@@ -30,6 +30,7 @@ import {
   formatPrice,
   summarizeAvailability,
 } from '~/helpers/hooks';
+import { resolveContactAvatarUri, useDeviceContactAvatarMap } from '~/helpers/contactAvatars';
 
 type Props = NativeStackScreenProps<AppStackParamList, 'AppStack_MyHooksScreen'>;
 
@@ -41,6 +42,7 @@ const AppStack_MyHooksScreen: React.FC<Props> = ({ navigation, route }) => {
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});
   const [accountType, setAccountType] = useState('user');
   const [toast, setToast] = useState<string | null>(null);
+  const { avatarMap } = useDeviceContactAvatarMap();
 
   const loadHooks = useCallback(async (showSpinner = true) => {
     try {
@@ -161,8 +163,11 @@ const AppStack_MyHooksScreen: React.FC<Props> = ({ navigation, route }) => {
                 backgroundColor: '#E3E7EB',
               },
             ]}>
-            {p.user?.avatar ? (
-              <Image source={{ uri: p.user.avatar }} style={{ width: '100%', height: '100%' }} />
+            {resolveContactAvatarUri(avatarMap, p.user?.phoneNumber, p.user?.avatar) ? (
+              <Image
+                source={{ uri: resolveContactAvatarUri(avatarMap, p.user?.phoneNumber, p.user?.avatar)! }}
+                style={{ width: '100%', height: '100%' }}
+              />
             ) : (
               <Image source={Avatar} style={{ width: horizontalScale(18), height: horizontalScale(18) }} />
             )}

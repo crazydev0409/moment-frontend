@@ -12,7 +12,7 @@ export interface HookParticipant {
   displayName?: string | null;
   contactPhone?: string | null;
   status: 'invited' | 'accepted' | 'declined';
-  user?: { id: string; name?: string | null; avatar?: string | null } | null;
+  user?: { id: string; name?: string | null; avatar?: string | null; phoneNumber?: string | null } | null;
 }
 
 export interface HookAvailabilitySlot {
@@ -49,7 +49,7 @@ export interface Hook {
   updatedAt: string;
   participants: HookParticipant[];
   availabilitySlots?: HookAvailabilitySlot[];
-  owner?: { id: string; name?: string | null; avatar?: string | null; accountType?: string };
+  owner?: { id: string; name?: string | null; avatar?: string | null; accountType?: string; phoneNumber?: string | null };
   isOwner?: boolean;
   group?: string;
   participantCount?: number;

@@ -26,6 +26,7 @@ import { http } from '~/helpers/http';
 import { horizontalScale, verticalScale, moderateScale } from '~/helpers/responsive';
 import { colors } from '~/lib/theme';
 import { formatPrice } from '~/helpers/hooks';
+import { resolveContactAvatarUri, useDeviceContactAvatarMap } from '~/helpers/contactAvatars';
 
 const h = horizontalScale;
 const v = verticalScale;
@@ -54,14 +55,15 @@ interface MeetingRequest {
   isPaid?: boolean;
   priceCents?: number | null;
   currency?: string;
-  sender?: { id: string; name?: string | null; avatar?: string | null };
-  participants?: Array<{ user?: { id: string; name?: string | null; avatar?: string | null } | null }>;
+  sender?: { id: string; name?: string | null; avatar?: string | null; phoneNumber?: string | null };
+  participants?: Array<{ user?: { id: string; name?: string | null; avatar?: string | null; phoneNumber?: string | null } | null }>;
 }
 
 interface Participant {
   id?: string;
   name?: string | null;
   avatar?: string | null;
+  phoneNumber?: string | null;
 }
 
 // ===== SVG Icons =====
@@ -104,7 +106,10 @@ function formatDate(start: string): string {
 const InviteePill: React.FC<{ p: Participant; strikethrough?: boolean }> = ({
   p,
   strikethrough,
-}) => (
+}) => {
+  const { avatarMap } = useDeviceContactAvatarMap();
+  const uri = resolveContactAvatarUri(avatarMap, p.phoneNumber, p.avatar);
+  return (
   <View
     style={[
       tw`flex-row items-center rounded-full`,
@@ -121,8 +126,8 @@ const InviteePill: React.FC<{ p: Participant; strikethrough?: boolean }> = ({
         tw`rounded-full overflow-hidden items-center justify-center`,
         { width: h(28), height: h(28), backgroundColor: colors.border, marginRight: h(8) },
       ]}>
-      {p.avatar ? (
-        <Image source={{ uri: p.avatar }} style={{ width: h(28), height: h(28) }} />
+      {uri ? (
+        <Image source={{ uri }} style={{ width: h(28), height: h(28) }} />
       ) : (
         <Image source={Avatar} style={{ width: h(18), height: h(18) }} tintColor={colors.grey} />
       )}
@@ -137,11 +142,15 @@ const InviteePill: React.FC<{ p: Participant; strikethrough?: boolean }> = ({
       {p.name || 'Unknown'}
     </Text>
   </View>
-);
+  );
+};
 
 // ===== Invitee avatar (for "Other invitees" horizontal scroll) =====
 
-const InviteeAvatar: React.FC<{ p: Participant }> = ({ p }) => (
+const InviteeAvatar: React.FC<{ p: Participant }> = ({ p }) => {
+  const { avatarMap } = useDeviceContactAvatarMap();
+  const uri = resolveContactAvatarUri(avatarMap, p.phoneNumber, p.avatar);
+  return (
   <View style={[tw`items-center`, { marginRight: h(16) }]}>
     <View style={{ position: 'relative', marginBottom: v(6) }}>
       <View
@@ -149,8 +158,8 @@ const InviteeAvatar: React.FC<{ p: Participant }> = ({ p }) => (
           tw`rounded-full overflow-hidden items-center justify-center`,
           { width: h(52), height: h(52), backgroundColor: colors.field },
         ]}>
-        {p.avatar ? (
-          <Image source={{ uri: p.avatar }} style={{ width: h(52), height: h(52) }} />
+        {uri ? (
+          <Image source={{ uri }} style={{ width: h(52), height: h(52) }} />
         ) : (
           <Image source={Avatar} style={{ width: h(30), height: h(30) }} tintColor={colors.grey} />
         )}
@@ -191,7 +200,8 @@ const InviteeAvatar: React.FC<{ p: Participant }> = ({ p }) => (
       </Text>
     )}
   </View>
-);
+  );
+};
 
 // ===== Main Screen =====
 
@@ -202,6 +212,7 @@ const AppStack_NotificationDetailScreen: React.FC<Props> = ({ navigation, route 
   const [meeting, setMeeting] = useState<MeetingRequest | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isResponding, setIsResponding] = useState(false);
+  const { avatarMap } = useDeviceContactAvatarMap();
 
   useEffect(() => {
     (async () => {
@@ -355,9 +366,9 @@ const AppStack_NotificationDetailScreen: React.FC<Props> = ({ navigation, route 
                     tw`rounded-full overflow-hidden items-center justify-center`,
                     { width: h(46), height: h(46), backgroundColor: colors.field },
                   ]}>
-                  {meeting?.sender?.avatar ? (
+                  {resolveContactAvatarUri(avatarMap, meeting?.sender?.phoneNumber, meeting?.sender?.avatar) ? (
                     <Image
-                      source={{ uri: meeting.sender.avatar }}
+                      source={{ uri: resolveContactAvatarUri(avatarMap, meeting?.sender?.phoneNumber, meeting?.sender?.avatar)! }}
                       style={{ width: h(46), height: h(46) }}
                     />
                   ) : (

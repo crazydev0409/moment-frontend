@@ -45,6 +45,12 @@
         }
       ],
       [
+        "expo-image-picker",
+        {
+          "photosPermission": "Catch needs access to your photos so you can set a profile picture."
+        }
+      ],
+      [
         "@stripe/stripe-react-native",
         {}
       ]
@@ -73,10 +79,19 @@
       },
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false,
+        "NSAppTransportSecurity": {
+          "NSAllowsLocalNetworking": true,
+          "NSExceptionDomains": {
+            "66.201.40.33": {
+              "NSExceptionAllowsInsecureHTTPLoads": true
+            }
+          }
+        },
         "NSLocationWhenInUseUsageDescription": "Catch needs your location to provide weather updates and location-based features.",
         "NSLocationAlwaysUsageDescription": "Catch needs your location to provide weather updates and location-based features.",
         "NSContactsUsageDescription": "Catch needs access to your contacts to help you connect with friends and schedule meetings.",
         "NSCameraUsageDescription": "Catch needs your camera to scan booking QR codes.",
+        "NSPhotoLibraryUsageDescription": "Catch needs access to your photos so you can set a profile picture.",
         "NSUserNotificationsUsageDescription": "Catch needs to send you notifications about meeting requests and updates.",
         "UIBackgroundModes": ["remote-notification", "fetch"]
       }
@@ -97,7 +112,9 @@
         "ACCESS_FINE_LOCATION",
         "android.permission.ACCESS_COARSE_LOCATION",
         "android.permission.ACCESS_FINE_LOCATION",
-        "android.permission.CAMERA"
+        "android.permission.CAMERA",
+        "android.permission.READ_MEDIA_IMAGES",
+        "android.permission.READ_EXTERNAL_STORAGE"
       ],
       "package": "com.crazydev0409.catchapp",
       "softwareKeyboardLayoutMode": "pan"

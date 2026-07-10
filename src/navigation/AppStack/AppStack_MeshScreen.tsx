@@ -38,6 +38,7 @@ import {
   formatPrice,
   minutesToLabel,
 } from '~/helpers/hooks';
+import { resolveContactAvatarUri, useDeviceContactAvatarMap } from '~/helpers/contactAvatars';
 
 const h = horizontalScale;
 const v = verticalScale;
@@ -873,6 +874,7 @@ const ProfileView: React.FC<ProfileViewProps> = ({
 }) => {
   const owner = hook.owner;
   const isRequested = contactRequested.has(hook.ownerId);
+  const { avatarMap } = useDeviceContactAvatarMap();
 
   const tags = useMemo(() => {
     const tagSet = new Set<string>();
@@ -920,8 +922,11 @@ const ProfileView: React.FC<ProfileViewProps> = ({
                 marginBottom: v(12),
               },
             ]}>
-            {owner?.avatar ? (
-              <Image source={{ uri: owner.avatar }} style={{ width: h(76), height: h(76) }} />
+            {resolveContactAvatarUri(avatarMap, owner?.phoneNumber, owner?.avatar) ? (
+              <Image
+                source={{ uri: resolveContactAvatarUri(avatarMap, owner?.phoneNumber, owner?.avatar)! }}
+                style={{ width: h(76), height: h(76) }}
+              />
             ) : (
               <Image
                 source={Avatar}

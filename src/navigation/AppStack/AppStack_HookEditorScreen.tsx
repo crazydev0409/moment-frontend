@@ -38,6 +38,7 @@ import {
   minutesToLabel,
   summarizeAvailability,
 } from '~/helpers/hooks';
+import { resolveContactAvatarUri, useDeviceContactAvatarMap } from '~/helpers/contactAvatars';
 
 type Props = NativeStackScreenProps<AppStackParamList, 'AppStack_HookEditorScreen'>;
 
@@ -47,7 +48,7 @@ interface ContactItem {
   id: string;
   displayName: string;
   contactPhone?: string;
-  contactUser?: { id: string; name?: string; avatar?: string };
+  contactUser?: { id: string; name?: string; avatar?: string; phoneNumber?: string };
 }
 
 interface PlaceResult {
@@ -159,6 +160,7 @@ const AppStack_HookEditorScreen: React.FC<Props> = ({ navigation, route }) => {
   const [selectedContacts, setSelectedContacts] = useState<ContactItem[]>([]);
   const [showContactPicker, setShowContactPicker] = useState(false);
   const [contacts, setContacts] = useState<ContactItem[]>([]);
+  const { avatarMap } = useDeviceContactAvatarMap();
   const [contactSearch, setContactSearch] = useState('');
 
   // Sheets
@@ -207,7 +209,12 @@ const AppStack_HookEditorScreen: React.FC<Props> = ({ navigation, route }) => {
           .map((p) => ({
             id: p.user!.id,
             displayName: p.displayName || p.user?.name || 'Contact',
-            contactUser: { id: p.user!.id, name: p.user?.name || undefined, avatar: p.user?.avatar || undefined },
+            contactUser: {
+              id: p.user!.id,
+              name: p.user?.name || undefined,
+              avatar: p.user?.avatar || undefined,
+              phoneNumber: p.user?.phoneNumber || undefined,
+            },
           }))
       );
     } catch (error) {
@@ -541,8 +548,11 @@ const AppStack_HookEditorScreen: React.FC<Props> = ({ navigation, route }) => {
                   {selectedContacts.map((c) => (
                     <TouchableOpacity key={c.contactUser?.id} onPress={() => toggleContact(c)} style={{ alignItems: 'center', marginRight: horizontalScale(12), marginBottom: verticalScale(8) }}>
                       <View style={[tw`rounded-full overflow-hidden items-center justify-center`, { backgroundColor: '#E3E7EB', width: horizontalScale(52), height: horizontalScale(52) }]}>
-                        {c.contactUser?.avatar ? (
-                          <Image source={{ uri: c.contactUser.avatar }} style={{ width: '100%', height: '100%' }} />
+                        {resolveContactAvatarUri(avatarMap, c.contactUser?.phoneNumber, c.contactUser?.avatar) ? (
+                          <Image
+                            source={{ uri: resolveContactAvatarUri(avatarMap, c.contactUser?.phoneNumber, c.contactUser?.avatar)! }}
+                            style={{ width: '100%', height: '100%' }}
+                          />
                         ) : (
                           <Image source={Avatar} style={{ width: horizontalScale(28), height: horizontalScale(28) }} />
                         )}
@@ -773,8 +783,11 @@ const AppStack_HookEditorScreen: React.FC<Props> = ({ navigation, route }) => {
                       <TouchableOpacity key={contact.id} activeOpacity={0.8} onPress={() => toggleContact(contact)} style={{ alignItems: 'center', width: horizontalScale(62) }}>
                         <View style={{ position: 'relative' }}>
                           <View style={[tw`rounded-full overflow-hidden items-center justify-center`, { backgroundColor: '#E3E7EB', width: horizontalScale(56), height: horizontalScale(56) }]}>
-                            {contact.contactUser?.avatar ? (
-                              <Image source={{ uri: contact.contactUser.avatar }} style={{ width: '100%', height: '100%' }} />
+                            {resolveContactAvatarUri(avatarMap, contact.contactUser?.phoneNumber, contact.contactUser?.avatar) ? (
+                              <Image
+                                source={{ uri: resolveContactAvatarUri(avatarMap, contact.contactUser?.phoneNumber, contact.contactUser?.avatar)! }}
+                                style={{ width: '100%', height: '100%' }}
+                              />
                             ) : (
                               <Image source={Avatar} style={{ width: horizontalScale(32), height: horizontalScale(32) }} />
                             )}
@@ -809,8 +822,11 @@ const AppStack_HookEditorScreen: React.FC<Props> = ({ navigation, route }) => {
                         onPress={() => toggleContact(c)}
                         style={[tw`flex-row items-center rounded-full`, { backgroundColor: colors.field, paddingVertical: verticalScale(6), paddingLeft: horizontalScale(6), paddingRight: horizontalScale(10), gap: horizontalScale(6) }]}>
                         <View style={[tw`rounded-full overflow-hidden items-center justify-center`, { width: horizontalScale(26), height: horizontalScale(26), backgroundColor: '#E3E7EB' }]}>
-                          {c.contactUser?.avatar ? (
-                            <Image source={{ uri: c.contactUser.avatar }} style={{ width: '100%', height: '100%' }} />
+                          {resolveContactAvatarUri(avatarMap, c.contactUser?.phoneNumber, c.contactUser?.avatar) ? (
+                            <Image
+                              source={{ uri: resolveContactAvatarUri(avatarMap, c.contactUser?.phoneNumber, c.contactUser?.avatar)! }}
+                              style={{ width: '100%', height: '100%' }}
+                            />
                           ) : (
                             <Image source={Avatar} style={{ width: horizontalScale(16), height: horizontalScale(16) }} />
                           )}

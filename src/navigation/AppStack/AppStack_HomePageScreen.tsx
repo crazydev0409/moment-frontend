@@ -1,6 +1,5 @@
 import { useFocusEffect } from '@react-navigation/native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
-import * as Contacts from 'expo-contacts';
 import * as Location from 'expo-location';
 import * as Notifications from 'expo-notifications';
 import React, { useEffect, useState, useCallback, useMemo, useRef } from 'react';
@@ -23,7 +22,6 @@ import { AppStackParamList } from '.';
 import { http } from '~/helpers/http';
 import { horizontalScale, verticalScale, moderateScale } from '~/helpers/responsive';
 import {
-  Avatar,
   SearchIcon,
   WeClearSky,
   WeFoggy,
@@ -35,7 +33,8 @@ import {
   WeThunderstorm,
 } from '~/lib/images';
 import { setupSocketEventListeners, getSocket, initializeSocket } from '~/services/socketService';
-import { hashPhoneNumber } from '~/utils/phoneHash';
+import { useDeviceContactAvatarMap } from '~/helpers/contactAvatars';
+import { ContactAvatar } from '~/components/ContactAvatar';
 
 type Props = NativeStackScreenProps<AppStackParamList, 'AppStack_HomePageScreen'>;
 type MeetingFilter = 'all' | 'needsAttention' | 'comingUp';
@@ -363,6 +362,12 @@ const AppStack_HomePageScreen: React.FC<Props> = ({ navigation, route }) => {
   const [toast, setToast] = useState<{ title: string; subtitle: string; calendarDate?: string } | null>(null);
   const toastAnim = useRef(new Animated.Value(-100)).current;
   const dateScrollRef = useRef<ScrollView>(null);
+  // Debounces the delayed post-socket-event refetch below — if a second
+  // "response" event lands (or fires twice from the same event, e.g. React
+  // dev-mode double-invoking an effect) before the first delayed refetch
+  // has run, this collapses them into a single fetchMeetings() call instead
+  // of running it redundantly.
+  const pendingResponseRefetchRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const showToast = useCallback((toastData: { title: string; subtitle: string; calendarDate?: string }) => {
     setToast(toastData);
@@ -409,8 +414,9 @@ const AppStack_HomePageScreen: React.FC<Props> = ({ navigation, route }) => {
     longitude: number;
   } | null>(null);
 
-  // Local contact avatars mapping (phone number -> avatar URI)
-  const [localAvatars, setLocalAvatars] = useState<Map<string, string>>(new Map());
+  // Device-contact photo mapping (hashed phone number -> local image URI),
+  // shared/cached across every screen that needs it.
+  const { avatarMap: localAvatars } = useDeviceContactAvatarMap();
 
   useEffect(() => {
     // Generate dates for the current week
@@ -455,13 +461,15 @@ const AppStack_HomePageScreen: React.FC<Props> = ({ navigation, route }) => {
     fetchMeetings();
     fetchUnreadNotificationCount();
     requestLocationAndFetchWeather();
-    loadLocalContactAvatars();
   }, []);
 
-  // Refresh meetings when screen comes into focus
+  // Refresh meetings when screen comes into focus — silent, since the user
+  // is coming back to a screen that already has (maybe slightly stale)
+  // data; this just seamlessly syncs it rather than flashing a spinner
+  // every time they switch tabs back to Home.
   useFocusEffect(
     useCallback(() => {
-      fetchMeetings();
+      fetchMeetings(false);
       fetchUnreadNotificationCount();
     }, [])
   );
@@ -489,7 +497,7 @@ const AppStack_HomePageScreen: React.FC<Props> = ({ navigation, route }) => {
         eventType === 'moment.deleted'
       ) {
         console.log('📬 Moment-related notification received, refreshing meetings...');
-        fetchMeetings();
+        fetchMeetings(false);
         fetchUnreadNotificationCount();
       }
     });
@@ -538,11 +546,27 @@ const AppStack_HomePageScreen: React.FC<Props> = ({ navigation, route }) => {
           cleanup();
         }
 
+        // Socket events can arrive at any moment — including mid-transition,
+        // right as a screen is navigating in (e.g. auto-confirm now makes
+        // the sender's "approved" event arrive essentially instantly, often
+        // landing while SendCatchScreen's navigation back to this screen is
+        // still settling). Updating state at that exact moment trips
+        // react-native-screens' native-stack internals ("useInsertionEffect
+        // must not schedule updates"). InteractionManager.runAfterInteractions
+        // does NOT help here — it only tracks JS-driven interactions
+        // (gestures, Animated), not react-native-screens' native
+        // UIKit/Fragment transitions, so its callback can still fire inside
+        // the same problematic window. A plain setTimeout(0) reliably
+        // escapes to the next macrotask, after React's current commit
+        // cycle — the actual fix for this specific warning.
+        const deferred = (handler: (data: any) => void) => (data: any) =>
+          setTimeout(() => handler(data), 0);
+
         cleanup = setupSocketEventListeners({
           // Meeting created → receiver gets update
-          onMomentRequest: (data) => {
+          onMomentRequest: deferred((data) => {
             console.log('[HomePage] 📬 Meeting created - refreshing...');
-            fetchMeetings();
+            fetchMeetings(false);
             fetchUnreadNotificationCount();
             // Visible in-app feedback in addition to the (silent) badge-count
             // refresh above — the badge alone is easy to miss, especially
@@ -554,9 +578,9 @@ const AppStack_HomePageScreen: React.FC<Props> = ({ navigation, route }) => {
                 ? new Date(data.startTime).toISOString().split('T')[0]
                 : undefined,
             });
-          },
+          }),
           // Meeting accepted/rejected → sender gets update
-          onMomentResponse: (data) => {
+          onMomentResponse: deferred((data) => {
             console.log('[HomePage] ✅ Meeting accepted/rejected socket event received:', {
               eventType: data.eventType,
               momentRequestId: data.momentRequestId,
@@ -590,10 +614,17 @@ const AppStack_HomePageScreen: React.FC<Props> = ({ navigation, route }) => {
               console.warn('[HomePage] No momentRequestId in socket data');
             }
 
-            // Always refetch to ensure consistency (even if request wasn't in state)
-            setTimeout(() => {
+            // Always refetch to ensure consistency (even if request wasn't in
+            // state — e.g. an auto-confirmed meeting the receiver never saw
+            // as pending, where the incremental update above is a no-op
+            // since there's nothing to find-and-patch yet). Debounced: a
+            // second event landing before this fires just reschedules it,
+            // rather than running two overlapping fetches.
+            if (pendingResponseRefetchRef.current) clearTimeout(pendingResponseRefetchRef.current);
+            pendingResponseRefetchRef.current = setTimeout(() => {
+              pendingResponseRefetchRef.current = null;
               console.log('[HomePage] Refetching meetings after socket event...');
-              fetchMeetings();
+              fetchMeetings(false);
               fetchUnreadNotificationCount();
             }, 1000);
 
@@ -610,11 +641,11 @@ const AppStack_HomePageScreen: React.FC<Props> = ({ navigation, route }) => {
                 ? new Date(data.startTime).toISOString().split('T')[0]
                 : undefined,
             });
-          },
+          }),
           // Meeting canceled → receiver gets update
-          onMomentCanceled: (data) => {
+          onMomentCanceled: deferred((data) => {
             console.log('[HomePage] ❌ Meeting canceled - refreshing...');
-            fetchMeetings();
+            fetchMeetings(false);
             fetchUnreadNotificationCount();
             showToast({
               title: 'Meeting canceled',
@@ -623,7 +654,7 @@ const AppStack_HomePageScreen: React.FC<Props> = ({ navigation, route }) => {
                 ? new Date(data.startTime).toISOString().split('T')[0]
                 : undefined,
             });
-          },
+          }),
         });
       };
 
@@ -677,9 +708,15 @@ const AppStack_HomePageScreen: React.FC<Props> = ({ navigation, route }) => {
     }
   };
 
-  const fetchMeetings = async () => {
+  // showSpinner=false is for socket-driven background refreshes (a new/
+  // updated meeting arrived) — refetches fully but doesn't flip the
+  // full-screen loading state or wipe the list on a transient failure, so
+  // the meeting list just updates in place once fresh data lands instead of
+  // flashing a spinner (or worse, briefly going empty) over whatever the
+  // user is already looking at.
+  const fetchMeetings = async (showSpinner = true) => {
     try {
-      setLoading(true);
+      if (showSpinner) setLoading(true);
       // Fetch both received and sent moment requests using existing endpoints
       const [receivedResponse, sentResponse] = await Promise.all([
         http.get('/users/moment-requests/received'),
@@ -696,9 +733,11 @@ const AppStack_HomePageScreen: React.FC<Props> = ({ navigation, route }) => {
       setAllMeetings(allMeetings);
     } catch (error) {
       console.error('Error fetching meetings:', error);
-      setAllMeetings([]); // Set to empty array on error
+      // Only clear on a foreground/initial-load failure — a silent
+      // background refresh failing shouldn't wipe out data already on screen.
+      if (showSpinner) setAllMeetings([]);
     } finally {
-      setLoading(false);
+      if (showSpinner) setLoading(false);
     }
   };
 
@@ -708,47 +747,6 @@ const AppStack_HomePageScreen: React.FC<Props> = ({ navigation, route }) => {
       setUnreadNotificationCount(response.data.unreadCount || 0);
     } catch (error) {
       console.error('Error fetching unread notification count:', error);
-    }
-  };
-
-  const loadLocalContactAvatars = async () => {
-    try {
-      const { status } = await Contacts.getPermissionsAsync();
-
-      if (status === 'granted') {
-        const { data } = await Contacts.getContactsAsync({
-          fields: [Contacts.Fields.Name, Contacts.Fields.Image, Contacts.Fields.PhoneNumbers],
-        });
-
-        // Create a map of hashed phone numbers to local contact avatars
-        const phoneToAvatarMap = new Map<string, string>();
-
-        // Process contacts sequentially or in parallel? Parallel is faster.
-        await Promise.all(
-          data.map(async (contact) => {
-            if (contact.phoneNumbers && contact.phoneNumbers.length > 0 && contact.image?.uri) {
-              const avatarUri = contact.image.uri;
-              await Promise.all(
-                contact.phoneNumbers.map(async (phone) => {
-                  // Normalize phone number
-                  const normalized = phone.number?.replace(/[\s\-()]/g, '') || '';
-                  if (normalized && avatarUri) {
-                    // Determine if it already looks like a hash or needs hashing
-                    // During transition, some might be raw, some might be hashed
-                    // But specifically for local contacts, we ALWAYS hash them to match backend hashes
-                    const hashed = await hashPhoneNumber(normalized);
-                    phoneToAvatarMap.set(hashed, avatarUri);
-                  }
-                })
-              );
-            }
-          })
-        );
-
-        setLocalAvatars(phoneToAvatarMap);
-      }
-    } catch (error) {
-      console.error('Error loading local contact avatars:', error);
     }
   };
 
@@ -944,15 +942,6 @@ const AppStack_HomePageScreen: React.FC<Props> = ({ navigation, route }) => {
     });
   };
 
-  const getLocalAvatar = (phoneNumber?: string) => {
-    if (!phoneNumber) return null;
-    // Since backend returns hashed phone numbers, if phoneNumber is a 64-char hex string,
-    // it's already hashed and we can look it up directly.
-    // If it's not a hash (legacy data), we would need to hash it, but here we assume
-    // it's either the hash from the backend or nothing.
-    return localAvatars.get(phoneNumber) || null;
-  };
-
   return (
     <View style={styles.screen}>
       {toast && (
@@ -1016,7 +1005,7 @@ const AppStack_HomePageScreen: React.FC<Props> = ({ navigation, route }) => {
             {unreadNotificationCount > 0 && (
               <View style={styles.notificationBadge}>
                 <Text style={styles.notificationBadgeText}>
-                  {unreadNotificationCount > 99 ? '99+' : unreadNotificationCount}
+                  {unreadNotificationCount > 9 ? '9+' : unreadNotificationCount}
                 </Text>
               </View>
             )}
@@ -1102,18 +1091,12 @@ const AppStack_HomePageScreen: React.FC<Props> = ({ navigation, route }) => {
                     <>
                       <View style={styles.previewMainRow}>
                         <View style={styles.avatarWrap}>
-                          {getLocalAvatar(getOtherPerson(upcomingMeeting)?.phoneNumber) ? (
-                            <Image
-                              source={{
-                                uri:
-                                  getLocalAvatar(getOtherPerson(upcomingMeeting)?.phoneNumber) ||
-                                  undefined,
-                              }}
-                              style={styles.avatarImage}
-                            />
-                          ) : (
-                            <Image source={Avatar} style={styles.avatarImage} />
-                          )}
+                          <ContactAvatar
+                            avatarMap={localAvatars}
+                            hashedPhoneNumber={getOtherPerson(upcomingMeeting)?.phoneNumber}
+                            profileAvatarUrl={getOtherPerson(upcomingMeeting)?.avatar}
+                            style={styles.avatarImage}
+                          />
                         </View>
                         <View style={styles.previewCopy}>
                           <Text style={styles.previewTitle} numberOfLines={1}>
@@ -1146,18 +1129,12 @@ const AppStack_HomePageScreen: React.FC<Props> = ({ navigation, route }) => {
                     <>
                       <View style={styles.previewMainRow}>
                         <View style={styles.avatarWrap}>
-                          {getLocalAvatar(getOtherPerson(upcomingMeeting)?.phoneNumber) ? (
-                            <Image
-                              source={{
-                                uri:
-                                  getLocalAvatar(getOtherPerson(upcomingMeeting)?.phoneNumber) ||
-                                  undefined,
-                              }}
-                              style={styles.avatarImage}
-                            />
-                          ) : (
-                            <Image source={Avatar} style={styles.avatarImage} />
-                          )}
+                          <ContactAvatar
+                            avatarMap={localAvatars}
+                            hashedPhoneNumber={getOtherPerson(upcomingMeeting)?.phoneNumber}
+                            profileAvatarUrl={getOtherPerson(upcomingMeeting)?.avatar}
+                            style={styles.avatarImage}
+                          />
                         </View>
                         <View style={styles.previewCopy}>
                           <Text style={styles.previewTitle} numberOfLines={1}>
@@ -1299,7 +1276,6 @@ const AppStack_HomePageScreen: React.FC<Props> = ({ navigation, route }) => {
           ) : filteredMeetings.length > 0 ? (
             filteredMeetings.map((meeting) => {
               const otherPerson = getOtherPerson(meeting);
-              const localAvatar = getLocalAvatar(otherPerson?.phoneNumber);
               const isPending = meeting.status?.toLowerCase() === 'pending';
               const isPaid = Boolean(meeting.meetingType?.toLowerCase().includes('paid'));
               const confidence = getConfidence(meeting);
@@ -1349,19 +1325,14 @@ const AppStack_HomePageScreen: React.FC<Props> = ({ navigation, route }) => {
                   )}
 
                   <View style={styles.attendeeRow}>
-                    {Array.from({ length: Math.min(4, filteredMeetings.length + 1) }).map(
-                      (_, index) => (
-                        <View
-                          key={`${meeting.id}-avatar-${index}`}
-                          style={[styles.smallAvatar, { marginLeft: index === 0 ? 0 : -h(8) }]}>
-                          {index === 0 && localAvatar ? (
-                            <Image source={{ uri: localAvatar }} style={styles.smallAvatarImage} />
-                          ) : (
-                            <Image source={Avatar} style={styles.smallAvatarImage} />
-                          )}
-                        </View>
-                      )
-                    )}
+                    <View style={styles.smallAvatar}>
+                      <ContactAvatar
+                        avatarMap={localAvatars}
+                        hashedPhoneNumber={otherPerson?.phoneNumber}
+                        profileAvatarUrl={otherPerson?.avatar}
+                        style={styles.smallAvatarImage}
+                      />
+                    </View>
                   </View>
 
                   <View style={styles.cardDivider} />
@@ -1460,19 +1431,19 @@ const styles = StyleSheet.create({
   },
   notificationBadge: {
     alignItems: 'center',
-    backgroundColor: '#EF4444',
-    borderRadius: h(8),
-    height: h(16),
+    backgroundColor: COLORS.green,
+    borderRadius: h(9),
+    height: h(18),
     justifyContent: 'center',
-    minWidth: h(16),
+    minWidth: h(18),
     position: 'absolute',
-    right: h(5),
-    top: h(5),
+    right: h(-2),
+    top: h(-2),
   },
   notificationBadgeText: {
     color: COLORS.white,
-    fontFamily: 'Inter_700Bold',
-    fontSize: ms(8),
+    fontFamily: 'AssociateSansBold',
+    fontSize: ms(10),
   },
   dateRail: {
     gap: h(8),
