@@ -751,7 +751,7 @@ const ReserveSheet: React.FC<ReserveSheetProps> = ({ hook, submitting, onReserve
             tw`items-center justify-center rounded-full`,
             {
               backgroundColor: !nextSlot || submitting ? colors.greyLight : colors.green,
-              paddingVertical: v(16),
+              paddingVertical: v(12),
               marginTop: v(24),
             },
           ]}>
@@ -762,7 +762,7 @@ const ReserveSheet: React.FC<ReserveSheetProps> = ({ hook, submitting, onReserve
               style={{
                 fontFamily: 'AssociateSansBold',
                 color: colors.white,
-                fontSize: ms(16),
+                fontSize: ms(15),
               }}>
               Reserve now
             </Text>

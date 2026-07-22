@@ -453,12 +453,12 @@ const AppStack_AvailabilityScreen: React.FC<Props> = ({ navigation }) => {
               disabled={isSaving}
               style={[
                 tw`rounded-full items-center`,
-                { backgroundColor: colors.green, paddingVertical: v(15), opacity: isSaving ? 0.6 : 1 },
+                { backgroundColor: colors.green, paddingVertical: v(12), opacity: isSaving ? 0.6 : 1 },
               ]}>
               {isSaving ? (
                 <ActivityIndicator size="small" color={colors.white} />
               ) : (
-                <Text style={[tw`font-associate-bold`, { color: colors.white, fontSize: ms(16) }]}>
+                <Text style={[tw`font-associate-bold`, { color: colors.white, fontSize: ms(15) }]}>
                   Save
                 </Text>
               )}

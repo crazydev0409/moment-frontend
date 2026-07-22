@@ -210,12 +210,12 @@ const AppStack_ProfileSettingsScreen: React.FC<Props> = ({ navigation }) => {
             disabled={isSaving}
             style={[
               tw`rounded-full items-center`,
-              { backgroundColor: colors.green, paddingVertical: verticalScale(15), opacity: isSaving ? 0.6 : 1 },
+              { backgroundColor: colors.green, paddingVertical: verticalScale(12), opacity: isSaving ? 0.6 : 1 },
             ]}>
             {isSaving ? (
               <ActivityIndicator color={colors.white} />
             ) : (
-              <Text style={[tw`font-associate-bold`, { color: colors.white, fontSize: moderateScale(16) }]}>Save</Text>
+              <Text style={[tw`font-associate-bold`, { color: colors.white, fontSize: moderateScale(15) }]}>Save</Text>
             )}
           </TouchableOpacity>
         </View>

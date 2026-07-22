@@ -306,9 +306,9 @@ const AppStack_AvailableTimesScreen: React.FC<Props> = ({ navigation, route }) =
           activeOpacity={0.85}
           style={[
             tw`rounded-full items-center justify-center`,
-            { backgroundColor: colors.green, paddingVertical: verticalScale(15) },
+            { backgroundColor: colors.green, paddingVertical: verticalScale(12) },
           ]}>
-          <Text style={[tw`font-associate-bold`, { color: colors.white, fontSize: moderateScale(16) }]}>
+          <Text style={[tw`font-associate-bold`, { color: colors.white, fontSize: moderateScale(15) }]}>
             Send a Catch
           </Text>
         </TouchableOpacity>

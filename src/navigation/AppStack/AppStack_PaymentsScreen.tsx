@@ -216,7 +216,7 @@ const AppStack_PaymentsScreen: React.FC<Props> = ({ navigation }) => {
                 disabled={isStartingPayoutSetup}
                 style={[
                   tw`rounded-full items-center justify-center`,
-                  { backgroundColor: colors.green, paddingVertical: v(13) },
+                  { backgroundColor: colors.green, paddingVertical: v(12) },
                 ]}>
                 {isStartingPayoutSetup ? (
                   <ActivityIndicator size="small" color={colors.white} />

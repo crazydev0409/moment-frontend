@@ -405,8 +405,8 @@ const AppStack_MyHooksScreen: React.FC<Props> = ({ navigation, route }) => {
         <TouchableOpacity
           onPress={() => navigation.navigate('AppStack_HookEditorScreen', {})}
           activeOpacity={0.85}
-          style={[tw`rounded-full items-center`, { backgroundColor: colors.green, paddingVertical: verticalScale(15) }]}>
-          <Text style={[tw`font-associate-bold`, { color: colors.white, fontSize: moderateScale(16) }]}>{hooks.length > 0 ? 'Create new hook' : 'Create hook'}</Text>
+          style={[tw`rounded-full items-center`, { backgroundColor: colors.green, paddingVertical: verticalScale(12) }]}>
+          <Text style={[tw`font-associate-bold`, { color: colors.white, fontSize: moderateScale(15) }]}>{hooks.length > 0 ? 'Create new hook' : 'Create hook'}</Text>
         </TouchableOpacity>
       </View>
 

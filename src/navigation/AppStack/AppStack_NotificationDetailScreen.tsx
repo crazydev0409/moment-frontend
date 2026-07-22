@@ -558,7 +558,7 @@ const AppStack_NotificationDetailScreen: React.FC<Props> = ({ navigation, route 
             disabled={isResponding}
             style={[
               tw`flex-1 rounded-full flex-row items-center justify-center`,
-              { backgroundColor: colors.field, paddingVertical: v(15) },
+              { backgroundColor: colors.field, paddingVertical: v(12) },
             ]}>
             <Image
               source={CrossIcon}
@@ -569,7 +569,7 @@ const AppStack_NotificationDetailScreen: React.FC<Props> = ({ navigation, route 
               style={{
                 fontFamily: 'AssociateSansBold',
                 color: colors.ink,
-                fontSize: ms(15),
+                fontSize: ms(14),
               }}>
               Decline Invite
             </Text>
@@ -580,7 +580,7 @@ const AppStack_NotificationDetailScreen: React.FC<Props> = ({ navigation, route 
             disabled={isResponding}
             style={[
               tw`flex-1 rounded-full flex-row items-center justify-center`,
-              { backgroundColor: colors.green, paddingVertical: v(15) },
+              { backgroundColor: colors.green, paddingVertical: v(12) },
             ]}>
             {isResponding ? (
               <ActivityIndicator color={colors.white} />
@@ -595,7 +595,7 @@ const AppStack_NotificationDetailScreen: React.FC<Props> = ({ navigation, route 
                   style={{
                     fontFamily: 'AssociateSansBold',
                     color: colors.white,
-                    fontSize: ms(15),
+                    fontSize: ms(14),
                   }}>
                   Accept Invite
                 </Text>

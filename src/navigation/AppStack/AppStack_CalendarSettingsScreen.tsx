@@ -427,8 +427,8 @@ const AppStack_CalendarSettingsScreen: React.FC<Props> = ({ navigation }) => {
                   flex: 1,
                   borderWidth: 1.5,
                   borderColor: colors.green,
-                  borderRadius: h(28),
-                  paddingVertical: v(14),
+                  borderRadius: h(22),
+                  paddingVertical: v(12),
                   alignItems: 'center',
                   marginRight: h(10),
                 }}>
@@ -441,8 +441,8 @@ const AppStack_CalendarSettingsScreen: React.FC<Props> = ({ navigation }) => {
                 style={{
                   flex: 1,
                   backgroundColor: colors.green,
-                  borderRadius: h(28),
-                  paddingVertical: v(14),
+                  borderRadius: h(22),
+                  paddingVertical: v(12),
                   alignItems: 'center',
                   opacity: connecting ? 0.6 : 1,
                 }}>

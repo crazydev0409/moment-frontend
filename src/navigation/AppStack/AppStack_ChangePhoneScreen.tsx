@@ -243,14 +243,14 @@ const AppStack_ChangePhoneScreen: React.FC<Props> = ({ navigation }) => {
                   tw`rounded-full items-center justify-center`,
                   {
                     backgroundColor: isPhoneValid ? colors.green : colors.greenTint,
-                    paddingVertical: v(16),
+                    paddingVertical: v(12),
                     marginTop: v(28),
                   },
                 ]}>
                 {isSubmitting ? (
                   <ActivityIndicator size="small" color={colors.white} />
                 ) : (
-                  <Text style={[tw`font-associate-bold`, { color: colors.white, fontSize: ms(16) }]}>
+                  <Text style={[tw`font-associate-bold`, { color: colors.white, fontSize: ms(15) }]}>
                     Continue
                   </Text>
                 )}
@@ -335,13 +335,13 @@ const AppStack_ChangePhoneScreen: React.FC<Props> = ({ navigation }) => {
                   tw`rounded-full items-center justify-center`,
                   {
                     backgroundColor: code.length === CODE_LENGTH ? colors.green : colors.greenTint,
-                    paddingVertical: v(16),
+                    paddingVertical: v(12),
                   },
                 ]}>
                 {isSubmitting ? (
                   <ActivityIndicator size="small" color={colors.white} />
                 ) : (
-                  <Text style={[tw`font-associate-bold`, { color: colors.white, fontSize: ms(16) }]}>
+                  <Text style={[tw`font-associate-bold`, { color: colors.white, fontSize: ms(15) }]}>
                     Continue
                   </Text>
                 )}

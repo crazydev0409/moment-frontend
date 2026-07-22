@@ -1,4 +1,4 @@
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -137,9 +137,16 @@ const AppStack_ContactScreen: React.FC<Props> = ({ navigation }) => {
     }
   }, [refreshAvatarMap]);
 
+  // Only the very first load shows the full-screen spinner — like WhatsApp,
+  // returning to this screen from elsewhere should refresh in the background
+  // while the already-loaded list stays on screen, not flash back to a
+  // blank loading state every time.
+  const didLoadOnceRef = useRef(false);
   useFocusEffect(
     useCallback(() => {
-      loadContacts();
+      const showSpinner = !didLoadOnceRef.current;
+      didLoadOnceRef.current = true;
+      loadContacts(showSpinner);
     }, [loadContacts])
   );
 
@@ -299,12 +306,14 @@ const AppStack_ContactScreen: React.FC<Props> = ({ navigation }) => {
                   style={[
                     tw`flex-row items-center rounded-2xl`,
                     {
-                      backgroundColor: contact.isRegistered ? colors.card : colors.field,
+                      backgroundColor: colors.card,
                       padding: horizontalScale(14),
                       marginBottom: verticalScale(10),
                     },
                   ]}>
-                  {/* Avatar */}
+                  {/* Avatar — always full opacity, same as registered cards,
+                      even when the rest of the row is dimmed for "disabled":
+                      a faded photo defeats the point of showing it. */}
                   <View style={{ position: 'relative', marginRight: horizontalScale(14) }}>
                     <View
                       style={[
@@ -312,7 +321,7 @@ const AppStack_ContactScreen: React.FC<Props> = ({ navigation }) => {
                         {
                           width: horizontalScale(52),
                           height: horizontalScale(52),
-                          backgroundColor: contact.isRegistered ? colors.field : colors.border,
+                          backgroundColor: colors.field,
                         },
                       ]}>
                       {contact.imageUri ? (
@@ -324,7 +333,6 @@ const AppStack_ContactScreen: React.FC<Props> = ({ navigation }) => {
                         <Image
                           source={Avatar}
                           style={{ width: horizontalScale(32), height: horizontalScale(32) }}
-                          tintColor={contact.isRegistered ? undefined : colors.greyLight}
                         />
                       )}
                     </View>
@@ -351,21 +359,29 @@ const AppStack_ContactScreen: React.FC<Props> = ({ navigation }) => {
                     )}
                   </View>
 
-                  {/* Name */}
+                  {/* Name — carries the "disabled" signal on its own, so the
+                      avatar next to it can stay crisp and recognizable. */}
                   <Text
                     numberOfLines={1}
                     style={[
                       tw`flex-1 font-associate-bold`,
-                      { color: contact.isRegistered ? colors.ink : colors.greyLight, fontSize: moderateScale(15) },
+                      {
+                        color: colors.ink,
+                        fontSize: moderateScale(15),
+                        opacity: contact.isRegistered ? 1 : 0.45,
+                      },
                     ]}>
                     {contact.name}
                   </Text>
 
-                  {/* Action */}
-                  {contact.isRegistered && (
+                  {/* Action — reserve the same slot on unregistered rows so
+                      every card lines up at an identical height/alignment. */}
+                  {contact.isRegistered ? (
                     <TouchableOpacity onPress={() => handleHookIconPress(contact)} activeOpacity={0.7}>
                       <HookCircleIcon />
                     </TouchableOpacity>
+                  ) : (
+                    <View style={{ width: horizontalScale(40), height: horizontalScale(40) }} />
                   )}
                 </TouchableOpacity>
               );

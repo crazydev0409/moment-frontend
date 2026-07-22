@@ -304,8 +304,8 @@ const AppStack_QRScannerScreen: React.FC<Props> = ({ navigation }) => {
         <TouchableOpacity
           onPress={handleShare}
           activeOpacity={0.85}
-          style={[tw`rounded-full items-center`, { backgroundColor: colors.green, paddingVertical: verticalScale(15) }]}>
-          <Text style={[tw`font-associate-bold`, { color: colors.white, fontSize: moderateScale(16) }]}>Share</Text>
+          style={[tw`rounded-full items-center`, { backgroundColor: colors.green, paddingVertical: verticalScale(12) }]}>
+          <Text style={[tw`font-associate-bold`, { color: colors.white, fontSize: moderateScale(15) }]}>Share</Text>
         </TouchableOpacity>
         <TouchableOpacity
           onPress={handleCopyLink}
@@ -315,10 +315,10 @@ const AppStack_QRScannerScreen: React.FC<Props> = ({ navigation }) => {
             {
               borderWidth: 1.5,
               borderColor: colors.green,
-              paddingVertical: verticalScale(14),
+              paddingVertical: verticalScale(11),
             },
           ]}>
-          <Text style={[tw`font-associate-bold`, { color: colors.green, fontSize: moderateScale(16) }]}>Copy Link</Text>
+          <Text style={[tw`font-associate-bold`, { color: colors.green, fontSize: moderateScale(15) }]}>Copy Link</Text>
         </TouchableOpacity>
       </View>
 

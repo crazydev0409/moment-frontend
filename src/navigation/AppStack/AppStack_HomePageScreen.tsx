@@ -12,7 +12,6 @@ import {
   ActivityIndicator,
   StyleSheet,
   Animated,
-  Dimensions,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Svg, { Circle, Path } from 'react-native-svg';
@@ -361,7 +360,6 @@ const AppStack_HomePageScreen: React.FC<Props> = ({ navigation, route }) => {
   // Toast state
   const [toast, setToast] = useState<{ title: string; subtitle: string; calendarDate?: string } | null>(null);
   const toastAnim = useRef(new Animated.Value(-100)).current;
-  const dateScrollRef = useRef<ScrollView>(null);
   // Debounces the delayed post-socket-event refetch below — if a second
   // "response" event lands (or fires twice from the same event, e.g. React
   // dev-mode double-invoking an effect) before the first delayed refetch
@@ -444,16 +442,6 @@ const AppStack_HomePageScreen: React.FC<Props> = ({ navigation, route }) => {
 
     setDates(weekDates);
     setSelectedDate(today);
-
-    // Scroll so today's pill is centered in the rail
-    const pillWidth = horizontalScale(52);
-    const gap = horizontalScale(12);
-    const pillStep = pillWidth + gap;
-    const railViewWidth = Dimensions.get('window').width - 2 * horizontalScale(16);
-    const scrollX = Math.max(0, daysFromMonday * pillStep - (railViewWidth / 2 - pillWidth / 2));
-    setTimeout(() => {
-      dateScrollRef.current?.scrollTo({ x: scrollX, animated: true });
-    }, 100);
   }, []);
 
   useEffect(() => {
@@ -984,7 +972,7 @@ const AppStack_HomePageScreen: React.FC<Props> = ({ navigation, route }) => {
         contentContainerStyle={[
           styles.content,
           {
-            paddingTop: Math.max(insets.top + v(18), v(54)),
+            paddingTop: Math.max(insets.top + v(6), v(38)),
             paddingBottom: Math.max(insets.bottom + v(130), v(150)),
           },
         ]}
@@ -994,14 +982,14 @@ const AppStack_HomePageScreen: React.FC<Props> = ({ navigation, route }) => {
             onPress={() => navigation.navigate('AppStack_ProfileScreen')}
             activeOpacity={0.75}
             style={styles.headerButton}>
-            <ProfileGlyph />
+            <ProfileGlyph size={24} />
           </TouchableOpacity>
 
           <TouchableOpacity
             onPress={() => navigation.navigate('AppStack_NotificationScreen')}
             activeOpacity={0.75}
             style={styles.headerButton}>
-            <BellGlyph />
+            <BellGlyph size={26} />
             {unreadNotificationCount > 0 && (
               <View style={styles.notificationBadge}>
                 <Text style={styles.notificationBadgeText}>
@@ -1012,11 +1000,7 @@ const AppStack_HomePageScreen: React.FC<Props> = ({ navigation, route }) => {
           </TouchableOpacity>
         </View>
 
-        <ScrollView
-          ref={dateScrollRef}
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={styles.dateRail}>
+        <View style={styles.dateRail}>
           {dates.map((item) => {
             const selected = isSelected(item.fullDate);
             return (
@@ -1032,7 +1016,7 @@ const AppStack_HomePageScreen: React.FC<Props> = ({ navigation, route }) => {
               </TouchableOpacity>
             );
           })}
-        </ScrollView>
+        </View>
 
         <TouchableOpacity
           activeOpacity={0.85}
@@ -1181,7 +1165,7 @@ const AppStack_HomePageScreen: React.FC<Props> = ({ navigation, route }) => {
                     <Text style={styles.trafficSource}>4 min ago by OneLoner</Text>
                   </View>
                   <View style={styles.carCircle}>
-                    <CarGlyph />
+                    <CarGlyph size={36} />
                   </View>
                 </>
               ) : (
@@ -1415,27 +1399,27 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     flexDirection: 'row',
     justifyContent: 'space-between',
-    marginBottom: v(20),
+    marginBottom: v(16),
   },
   headerButton: {
     alignItems: 'center',
     backgroundColor: COLORS.white,
-    borderRadius: h(28),
-    height: h(56),
+    borderRadius: h(22),
+    height: h(44),
     justifyContent: 'center',
     shadowColor: '#1C2330',
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.04,
     shadowRadius: 4,
-    width: h(56),
+    width: h(44),
   },
   notificationBadge: {
     alignItems: 'center',
     backgroundColor: COLORS.green,
-    borderRadius: h(9),
-    height: h(18),
+    borderRadius: h(8),
+    height: h(16),
     justifyContent: 'center',
-    minWidth: h(18),
+    minWidth: h(16),
     position: 'absolute',
     right: h(-2),
     top: h(-2),
@@ -1446,20 +1430,20 @@ const styles = StyleSheet.create({
     fontSize: ms(10),
   },
   dateRail: {
-    gap: h(8),
-    paddingRight: h(24),
+    flexDirection: 'row',
+    justifyContent: 'space-between',
   },
   datePill: {
     alignItems: 'center',
     backgroundColor: COLORS.white,
     borderColor: COLORS.line,
-    borderRadius: h(30),
+    borderRadius: h(26),
     borderWidth: 1,
-    height: v(64),
+    height: v(54),
     justifyContent: 'space-between',
-    paddingBottom: v(3),
-    paddingTop: v(8),
-    width: h(46),
+    paddingBottom: v(2),
+    paddingTop: v(6),
+    width: h(40),
   },
   datePillSelected: {
     backgroundColor: COLORS.ink,
@@ -1467,8 +1451,8 @@ const styles = StyleSheet.create({
   dateDay: {
     color: COLORS.ink,
     fontFamily: 'Inter_400Regular',
-    fontSize: ms(13),
-    lineHeight: ms(17),
+    fontSize: ms(12),
+    lineHeight: ms(15),
   },
   dateDaySelected: {
     color: COLORS.white,
@@ -1476,10 +1460,10 @@ const styles = StyleSheet.create({
   dateBubble: {
     alignItems: 'center',
     backgroundColor: '#EEF1F4',
-    borderRadius: h(19),
-    height: h(38),
+    borderRadius: h(16),
+    height: h(32),
     justifyContent: 'center',
-    width: h(38),
+    width: h(32),
   },
   dateBubbleSelected: {
     backgroundColor: COLORS.white,
@@ -1487,30 +1471,30 @@ const styles = StyleSheet.create({
   dateNumber: {
     color: COLORS.ink,
     fontFamily: 'Inter_400Regular',
-    fontSize: ms(18),
-    lineHeight: ms(23),
+    fontSize: ms(16),
+    lineHeight: ms(20),
   },
   searchBar: {
     alignItems: 'center',
     backgroundColor: COLORS.white,
     borderColor: COLORS.line,
-    borderRadius: h(25),
+    borderRadius: h(21),
     borderWidth: 1,
     flexDirection: 'row',
-    height: v(48),
-    marginTop: v(16),
+    height: v(42),
+    marginTop: v(14),
     paddingHorizontal: h(16),
   },
   searchPlaceholder: {
     color: '#A8B3BF',
     flex: 1,
     fontFamily: 'Inter_400Regular',
-    fontSize: ms(15),
+    fontSize: ms(14),
   },
   searchIcon: {
-    height: h(20),
+    height: h(18),
     tintColor: '#A8B3BF',
-    width: h(20),
+    width: h(18),
   },
   emptyPanel: {
     alignItems: 'center',
@@ -1518,30 +1502,30 @@ const styles = StyleSheet.create({
     borderColor: COLORS.line,
     borderRadius: h(20),
     borderWidth: 1,
-    marginTop: v(16),
-    paddingBottom: v(22),
+    marginTop: v(14),
+    paddingBottom: v(18),
     paddingHorizontal: h(24),
-    paddingTop: v(28),
+    paddingTop: v(22),
   },
   emptyText: {
     color: COLORS.muted,
     fontFamily: 'Inter_400Regular',
-    fontSize: ms(16),
-    marginBottom: v(16),
-    marginTop: v(8),
+    fontSize: ms(15),
+    marginBottom: v(14),
+    marginTop: v(6),
   },
   scheduleButton: {
     alignItems: 'center',
     alignSelf: 'stretch',
     backgroundColor: COLORS.green,
-    borderRadius: h(25),
-    height: v(50),
+    borderRadius: h(22),
+    height: v(44),
     justifyContent: 'center',
   },
   scheduleButtonText: {
     color: COLORS.white,
     fontFamily: 'Inter_700Bold',
-    fontSize: ms(18),
+    fontSize: ms(15),
   },
   upcomingRow: {
     flexDirection: 'row',
@@ -1725,10 +1709,10 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.ink,
     borderRadius: h(18),
     flexDirection: 'row',
-    marginTop: v(9),
-    minHeight: v(136),
+    marginTop: v(8),
+    minHeight: v(118),
     overflow: 'hidden',
-    padding: h(18),
+    padding: h(14),
   },
   insightTextColumn: {
     flex: 1,
@@ -1743,35 +1727,35 @@ const styles = StyleSheet.create({
   trafficChipText: {
     color: COLORS.ink,
     fontFamily: 'Inter_400Regular',
-    fontSize: ms(13),
+    fontSize: ms(12),
   },
   trafficDistance: {
     color: COLORS.white,
     fontFamily: 'Inter_400Regular',
-    fontSize: ms(30),
-    lineHeight: ms(37),
-    marginTop: v(20),
+    fontSize: ms(24),
+    lineHeight: ms(29),
+    marginTop: v(12),
   },
   trafficPlace: {
     color: '#B7BDCA',
     fontFamily: 'Inter_400Regular',
-    fontSize: ms(14),
-    marginTop: v(6),
+    fontSize: ms(13),
+    marginTop: v(5),
   },
   trafficSource: {
     color: '#8E95A4',
     fontFamily: 'Inter_400Regular',
-    fontSize: ms(12),
-    marginTop: v(6),
+    fontSize: ms(11),
+    marginTop: v(5),
   },
   carCircle: {
     alignItems: 'center',
     alignSelf: 'center',
     backgroundColor: COLORS.white,
-    borderRadius: h(35),
-    height: h(70),
+    borderRadius: h(29),
+    height: h(58),
     justifyContent: 'center',
-    width: h(70),
+    width: h(58),
   },
   rideContent: {
     flex: 1,
@@ -1779,30 +1763,30 @@ const styles = StyleSheet.create({
   rideTitle: {
     color: COLORS.white,
     fontFamily: 'Inter_700Bold',
-    fontSize: ms(21),
+    fontSize: ms(18),
   },
   rideSubtitle: {
     color: '#C2C6D2',
     fontFamily: 'Inter_400Regular',
-    fontSize: ms(14),
-    marginBottom: v(12),
-    marginTop: v(5),
+    fontSize: ms(13),
+    marginBottom: v(10),
+    marginTop: v(4),
   },
   rideProvider: {
     alignItems: 'center',
     borderBottomColor: '#272A39',
     borderBottomWidth: 1,
     flexDirection: 'row',
-    paddingVertical: v(9),
+    paddingVertical: v(7),
   },
   providerLogo: {
     alignItems: 'center',
     backgroundColor: COLORS.white,
-    borderRadius: h(10),
-    height: h(20),
+    borderRadius: h(9),
+    height: h(18),
     justifyContent: 'center',
-    marginRight: h(10),
-    width: h(20),
+    marginRight: h(9),
+    width: h(18),
   },
   lyftLogo: {
     backgroundColor: '#D927C9',
@@ -1849,15 +1833,15 @@ const styles = StyleSheet.create({
     borderRadius: h(17),
     borderWidth: 1,
     flexDirection: 'row',
-    height: v(74),
-    marginTop: v(9),
-    paddingHorizontal: h(18),
+    height: v(60),
+    marginTop: v(8),
+    paddingHorizontal: h(16),
   },
   weatherTemp: {
     color: COLORS.ink,
     fontFamily: 'Inter_700Bold',
-    fontSize: ms(28),
-    marginRight: h(16),
+    fontSize: ms(24),
+    marginRight: h(14),
   },
   weatherCopy: {
     flex: 1,
@@ -1865,17 +1849,17 @@ const styles = StyleSheet.create({
   weatherTitle: {
     color: COLORS.ink,
     fontFamily: 'Inter_400Regular',
-    fontSize: ms(16),
+    fontSize: ms(15),
   },
   weatherDate: {
     color: COLORS.muted,
     fontFamily: 'Inter_400Regular',
-    fontSize: ms(14),
-    marginTop: v(3),
+    fontSize: ms(13),
+    marginTop: v(2),
   },
   weatherIcon: {
-    height: h(42),
-    width: h(42),
+    height: h(34),
+    width: h(34),
   },
   sectionTitle: {
     color: COLORS.ink,

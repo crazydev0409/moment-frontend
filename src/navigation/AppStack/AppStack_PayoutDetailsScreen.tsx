@@ -131,12 +131,12 @@ const AppStack_PayoutDetailsScreen: React.FC<Props> = ({ navigation }) => {
             disabled={isWorking}
             style={[
               tw`rounded-full items-center justify-center`,
-              { backgroundColor: colors.green, paddingVertical: v(15), opacity: isWorking ? 0.6 : 1 },
+              { backgroundColor: colors.green, paddingVertical: v(12), opacity: isWorking ? 0.6 : 1 },
             ]}>
             {isWorking ? (
               <ActivityIndicator color={colors.white} />
             ) : (
-              <Text style={[tw`font-associate-bold`, { color: colors.white, fontSize: ms(16) }]}>
+              <Text style={[tw`font-associate-bold`, { color: colors.white, fontSize: ms(15) }]}>
                 {primaryLabel}
               </Text>
             )}

@@ -622,11 +622,11 @@ const AppStack_HookEditorScreen: React.FC<Props> = ({ navigation, route }) => {
             onPress={handleSave}
             activeOpacity={0.85}
             disabled={isSaving}
-            style={[tw`rounded-full items-center`, { backgroundColor: colors.green, paddingVertical: verticalScale(15) }, isSaving && tw`opacity-60`]}>
+            style={[tw`rounded-full items-center`, { backgroundColor: colors.green, paddingVertical: verticalScale(12) }, isSaving && tw`opacity-60`]}>
             {isSaving ? (
               <ActivityIndicator size="small" color={colors.white} />
             ) : (
-              <Text style={[tw`font-associate-bold`, { color: colors.white, fontSize: moderateScale(16) }]}>Create</Text>
+              <Text style={[tw`font-associate-bold`, { color: colors.white, fontSize: moderateScale(15) }]}>Create</Text>
             )}
           </TouchableOpacity>
         )}

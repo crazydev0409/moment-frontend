@@ -5,6 +5,7 @@ import {
   Alert,
   Dimensions,
   Image,
+  Modal,
   PanResponder,
   RefreshControl,
   ScrollView,
@@ -31,6 +32,28 @@ const GlobeIcon = ({ size = 13, color = colors.grey }: { size?: number; color?: 
   <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
     <Circle cx="12" cy="12" r="9" stroke={color} strokeWidth="1.5" />
     <Path d="M12 3C9.5 6.5 9.5 17.5 12 21M12 3C14.5 6.5 14.5 17.5 12 21M3.5 9h17M3.5 15h17" stroke={color} strokeWidth="1.5" />
+  </Svg>
+);
+
+const HistoryIcon = ({ size = 24, color = colors.ink }: { size?: number; color?: string }) => (
+  <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+    <Path
+      d="M12 21a9 9 0 1 0-9-9"
+      stroke={color}
+      strokeWidth="1.8"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    />
+    <Path d="M3 8v4h4" stroke={color} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+    <Path d="M12 7.5V12l3 2" stroke={color} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+  </Svg>
+);
+
+const MoreIcon = ({ size = 24, color = colors.ink }: { size?: number; color?: string }) => (
+  <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+    <Circle cx="5" cy="12" r="1.8" fill={color} />
+    <Circle cx="12" cy="12" r="1.8" fill={color} />
+    <Circle cx="19" cy="12" r="1.8" fill={color} />
   </Svg>
 );
 
@@ -213,6 +236,7 @@ const AppStack_ContactProfileScreen: React.FC<Props> = ({ navigation, route }) =
   const [isBlocked, setIsBlocked] = useState(false);
   const [autoConfirm, setAutoConfirm] = useState(false);
   const [expandedHooks, setExpandedHooks] = useState<Record<string, boolean>>({});
+  const [menuVisible, setMenuVisible] = useState(false);
   const { avatarMap } = useDeviceContactAvatarMap();
 
   const load = useCallback(async (showSpinner = true) => {
@@ -323,6 +347,29 @@ const AppStack_ContactProfileScreen: React.FC<Props> = ({ navigation, route }) =
       setAutoConfirm(!val);
       Alert.alert('Error', 'Could not update auto-confirm setting.');
     }
+  };
+
+  const handleRemoveContact = () => {
+    setMenuVisible(false);
+    Alert.alert(
+      'Remove contact',
+      `Remove ${contactName || contact?.displayName || 'this contact'} from your contacts?`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Remove',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await http.delete(`/users/contacts/${contactId}`);
+              navigation.goBack();
+            } catch {
+              Alert.alert('Error', 'Could not remove contact. Please try again.');
+            }
+          },
+        },
+      ]
+    );
   };
 
   const formatMeetingTime = (startTime: string, endTime: string) => {
@@ -587,20 +634,76 @@ const AppStack_ContactProfileScreen: React.FC<Props> = ({ navigation, route }) =
         <Text style={[tw`font-associate-bold`, { color: colors.ink, fontSize: moderateScale(18.75) }]}>
           Contact profile
         </Text>
-        <TouchableOpacity
-          onPress={() => {
-            const uid = contactUserId || contact?.contactUserId || contact?.contactUser?.id;
-            if (uid) {
-              navigation.navigate('AppStack_MeetingHistoryScreen', {
-                contactUserId: uid,
-                contactName: displayName,
-              });
-            }
-          }}
-          activeOpacity={0.7}>
-          <Image source={UpcomingIcon} style={{ width: h(24), height: h(24) }} tintColor={colors.ink} />
-        </TouchableOpacity>
+        <View style={tw`flex-row items-center`}>
+          <TouchableOpacity
+            onPress={() => {
+              const uid = contactUserId || contact?.contactUserId || contact?.contactUser?.id;
+              if (uid) {
+                navigation.navigate('AppStack_MeetingHistoryScreen', {
+                  contactUserId: uid,
+                  contactName: displayName,
+                });
+              }
+            }}
+            activeOpacity={0.7}
+            style={{ marginRight: h(16) }}>
+            <HistoryIcon size={h(24)} color={colors.ink} />
+          </TouchableOpacity>
+          <TouchableOpacity onPress={() => setMenuVisible(true)} activeOpacity={0.7}>
+            <MoreIcon size={h(24)} color={colors.ink} />
+          </TouchableOpacity>
+        </View>
       </View>
+
+      {/* Menu dropdown — Auto-Confirm / Block Contact / Remove Contact */}
+      <Modal visible={menuVisible} transparent animationType="fade" onRequestClose={() => setMenuVisible(false)}>
+        <TouchableOpacity
+          style={tw`flex-1`}
+          activeOpacity={1}
+          onPress={() => setMenuVisible(false)}>
+          <View
+            style={[
+              tw`rounded-2xl absolute`,
+              {
+                top: verticalScale(90),
+                right: '8%',
+                width: horizontalScale(230),
+                backgroundColor: colors.card,
+                paddingVertical: v(6),
+                shadowColor: '#000',
+                shadowOffset: { width: 0, height: 6 },
+                shadowOpacity: 0.15,
+                shadowRadius: 16,
+                elevation: 8,
+              },
+            ]}>
+            <View style={[tw`flex-row items-center justify-between`, { paddingHorizontal: h(16), paddingVertical: v(12) }]}>
+              <Text style={[tw`font-associate`, { color: colors.ink, fontSize: ms(15) }]}>Auto-Confirm</Text>
+              <Switch
+                value={autoConfirm}
+                onValueChange={handleToggleAutoConfirm}
+                trackColor={{ true: colors.green, false: colors.border }}
+              />
+            </View>
+            <View style={{ height: 1, backgroundColor: colors.border, marginHorizontal: h(16) }} />
+            <View style={[tw`flex-row items-center justify-between`, { paddingHorizontal: h(16), paddingVertical: v(12) }]}>
+              <Text style={[tw`font-associate`, { color: colors.ink, fontSize: ms(15) }]}>Block Contact</Text>
+              <Switch
+                value={isBlocked}
+                onValueChange={handleToggleBlock}
+                trackColor={{ true: colors.danger, false: colors.border }}
+              />
+            </View>
+            <View style={{ height: 1, backgroundColor: colors.border, marginHorizontal: h(16) }} />
+            <TouchableOpacity
+              onPress={handleRemoveContact}
+              activeOpacity={0.7}
+              style={{ paddingHorizontal: h(16), paddingVertical: v(12) }}>
+              <Text style={[tw`font-associate-bold`, { color: colors.danger, fontSize: ms(15) }]}>Remove Contact</Text>
+            </TouchableOpacity>
+          </View>
+        </TouchableOpacity>
+      </Modal>
 
       {isLoading ? (
         <View style={tw`flex-1 items-center justify-center`}>
@@ -692,28 +795,6 @@ const AppStack_ContactProfileScreen: React.FC<Props> = ({ navigation, route }) =
             </Text>
           )}
 
-          {/* Block / Auto-Confirm toggles */}
-          <View style={[tw`rounded-2xl`, { backgroundColor: colors.card, marginBottom: verticalScale(10) }]}>
-            <View style={[tw`flex-row items-center justify-between`, { padding: moderateScale(16) }]}>
-              <Text style={[tw`font-associate`, { color: colors.ink, fontSize: moderateScale(15) }]}>Block</Text>
-              <Switch
-                value={isBlocked}
-                onValueChange={handleToggleBlock}
-                trackColor={{ true: colors.danger, false: colors.border }}
-              />
-            </View>
-          </View>
-          <View style={[tw`rounded-2xl`, { backgroundColor: colors.card, marginBottom: verticalScale(18) }]}>
-            <View style={[tw`flex-row items-center justify-between`, { padding: moderateScale(16) }]}>
-              <Text style={[tw`font-associate`, { color: colors.ink, fontSize: moderateScale(15) }]}>Auto-Confirm</Text>
-              <Switch
-                value={autoConfirm}
-                onValueChange={handleToggleAutoConfirm}
-                trackColor={{ true: colors.green, false: colors.border }}
-              />
-            </View>
-          </View>
-
           {/* Tabs */}
           <View style={[tw`flex-row`, { borderBottomWidth: 1, borderBottomColor: colors.border, marginBottom: verticalScale(16) }]}>
             {(['upcoming', 'hooks'] as TabKey[]).map((tab) => (
@@ -795,14 +876,14 @@ const AppStack_ContactProfileScreen: React.FC<Props> = ({ navigation, route }) =
           activeOpacity={0.85}
           style={[
             tw`rounded-full flex-row items-center justify-center`,
-            { backgroundColor: isDeletedAccount ? colors.border : colors.green, paddingVertical: verticalScale(15) },
+            { backgroundColor: isDeletedAccount ? colors.border : colors.green, paddingVertical: verticalScale(12) },
           ]}>
           <Image
             source={HookIcon}
-            style={{ width: h(20), height: h(20), marginRight: h(8) }}
+            style={{ width: h(18), height: h(18), marginRight: h(8) }}
             tintColor={isDeletedAccount ? colors.grey : colors.white}
           />
-          <Text style={[tw`font-associate-bold`, { color: isDeletedAccount ? colors.grey : colors.white, fontSize: ms(16) }]}>
+          <Text style={[tw`font-associate-bold`, { color: isDeletedAccount ? colors.grey : colors.white, fontSize: ms(15) }]}>
             {isDeletedAccount ? 'No longer available' : 'View available times'}
           </Text>
         </TouchableOpacity>
